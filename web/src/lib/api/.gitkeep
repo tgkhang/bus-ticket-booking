@@ -1,0 +1,9 @@
+# API Functions
+
+This directory will contain API functions for communicating with the backend.
+
+Examples:
+- auth.ts - Authentication API calls
+- buses.ts - Bus-related API calls
+- bookings.ts - Booking API calls
+- payments.ts - Payment API calls

@@ -1,0 +1,9 @@
+# Custom Hooks
+
+This directory will contain custom React hooks for the bus ticket booking application.
+
+Examples:
+- useAuth - Authentication hook
+- useBooking - Booking management hook
+- useLocalStorage - Local storage hook
+- useFetch - Data fetching hook

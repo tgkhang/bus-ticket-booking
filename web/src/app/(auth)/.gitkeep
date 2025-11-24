@@ -1,0 +1,9 @@
+# Authentication Pages
+
+This directory will contain authentication-related pages.
+
+Examples:
+- login/
+- register/
+- forgot-password/
+- reset-password/
