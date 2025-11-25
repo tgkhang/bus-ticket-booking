@@ -2,6 +2,12 @@
 import { StatusCodes } from 'http-status-codes'
 import { env } from '~/config/environment'
 
+// Example of a simple error-handling middleware in Express.js
+// app.use((err, req, res, next) => {
+//   console.error(err.stack)
+//   res.status(500).send('Something broke!')
+// })
+
 // Custom middleware for handling errors globally
 export const errorHandlingMiddleware = (err, req, res, next) => {
   // If the developer forgets to set statusCode, default to 500 INTERNAL_SERVER_ERROR
