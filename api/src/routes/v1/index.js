@@ -11,7 +11,7 @@ Router.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Bus Ticket Booking API is running!',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   })
 })
 

@@ -12,19 +12,48 @@ datasource db {
 
 // User Management
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  phone         String?
-  password_hash String
-  role          String   @default("customer") // customer, operator, admin
-  created_at    DateTime @default(now())
+  id                   String    @id @default(uuid())
+  email                String    @unique
+  username             String    @unique
+  password             String
+  displayName          String?
+  avatar               String?
+  role                 String    @default("client") // client, admin, operator
+  isActive             Boolean   @default(false)
+  verifyToken          String?
+  verifyTokenExpiry    DateTime?
+  passwordResetToken   String?   @unique
+  passwordResetExpiry  DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   // Relationships
+  refreshTokens   RefreshToken[]
   payment_methods PaymentMethod[]
-  feedbacks      Feedback[]
-  bookings       Booking[]
+  feedbacks       Feedback[]
+  bookings        Booking[]
 
   @@map("users")
+}
+
+// Refresh Token for JWT rotation
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  familyId  String    // Token family for rotation detection
+  expiresAt DateTime
+  isRevoked Boolean   @default(false)
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime  @default(now())
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
 }
 
 model PaymentMethod {

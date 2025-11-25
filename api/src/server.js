@@ -7,10 +7,12 @@ import { APIs_V1 } from '~/routes/v1'
 import { errorHandlingMiddleware } from '~/middlewares/errorHandlingMiddleware'
 import { corsOptions } from '~/config/cors.js'
 import { CONNECT_DB, CLOSE_DB } from '~/config/prisma.js'
-//import cookieParser from 'cookie-parser'
+import helmet from 'helmet'
+import cookieParser from 'cookie-parser'
 
 const START_SERVER = () => {
   const app = express()
+  app.use(helmet())
   const hostname = env.LOCAL_DEV_APP_HOST || 'localhost'
   const PORT = env.LOCAL_DEV_APP_PORT || 3000
 
@@ -19,14 +21,10 @@ const START_SERVER = () => {
     next()
   })
 
-  //app.use(cookieParser()) // Enable cookie parsing middleware
-  app.use(cors(corsOptions)) // Enable CORS for all routes by default
-
-  // Middleware to parse JSON request bodies, enable request json body data
+  app.use(cookieParser())
+  app.use(cors(corsOptions))
   app.use(express.json())
   app.use('/v1', APIs_V1)
-
-  // Middleware for handling errors globally
   app.use(errorHandlingMiddleware)
 
   if (env.BUILD_MODE === 'production') {
@@ -39,7 +37,6 @@ const START_SERVER = () => {
     })
   }
 
-  // Cleanup tasks before exit application
   exitHook(async (callback) => {
     console.log('\n4.Exiting application, closing DB connection...')
     await CLOSE_DB()
@@ -48,7 +45,6 @@ const START_SERVER = () => {
   })
 }
 
-// Using async/await syntax IIFE
 ;(async () => {
   try {
     console.log('1.Connecting to PostgreSQL DB...')
