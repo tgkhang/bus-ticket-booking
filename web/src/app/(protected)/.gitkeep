@@ -1,9 +1,0 @@
-# Protected Pages
-
-This directory will contain pages that require authentication.
-
-Examples:
-- dashboard/
-- bookings/
-- profile/
-- admin/

@@ -7,17 +7,19 @@ async function main() {
   console.log('🌱 Starting database seeding...')
 
   // Create sample users
-  const hashedPassword = await bcryptjs.hash('password123', 10)
-  
+  const hashedPassword = await bcryptjs.hash('Demo@123', 10)
+
   const user1 = await prisma.user.upsert({
     where: { email: 'john.doe@example.com' },
     update: {},
     create: {
       email: 'john.doe@example.com',
-      phone: '+1234567890',
-      password_hash: hashedPassword,
-      role: 'customer'
-    }
+      username: 'johndoe',
+      password: hashedPassword,
+      displayName: 'John Doe',
+      role: 'client',
+      isActive: true,
+    },
   })
 
   const user2 = await prisma.user.upsert({
@@ -25,10 +27,26 @@ async function main() {
     update: {},
     create: {
       email: 'jane.smith@example.com',
-      phone: '+0987654321',
-      password_hash: hashedPassword,
-      role: 'customer'
-    }
+      username: 'janesmith',
+      password: hashedPassword,
+      displayName: 'Jane Smith',
+      role: 'client',
+      isActive: true,
+    },
+  })
+
+  // Create admin user
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@busticket.com' },
+    update: {},
+    create: {
+      email: 'admin@busticket.com',
+      username: 'admin',
+      password: hashedPassword,
+      displayName: 'System Administrator',
+      role: 'admin',
+      isActive: true,
+    },
   })
 
   // Create sample operator
@@ -38,8 +56,8 @@ async function main() {
       contact_email: 'contact@greenbus.com',
       contact_phone: '+1555000111',
       status: 'approved',
-      approved_at: new Date()
-    }
+      approved_at: new Date(),
+    },
   })
 
   // Create sample route
@@ -49,8 +67,8 @@ async function main() {
       origin: 'Ho Chi Minh City',
       destination: 'Da Lat',
       distance_km: 300,
-      estimated_minutes: 360
-    }
+      estimated_minutes: 360,
+    },
   })
 
   // Create sample bus
@@ -62,33 +80,28 @@ async function main() {
       plate_number: 'GBL-001',
       model: 'Mercedes Sprinter',
       seat_capacity: 16,
-      amenities_json: JSON.stringify(['WiFi', 'AC', 'Reclining Seats', 'Reading Lights'])
-    }
+      amenities_json: JSON.stringify(['WiFi', 'AC', 'Reclining Seats', 'Reading Lights']),
+    },
   })
 
   // Create seats for the bus
-  const seatNumbers = [
-    'A1', 'A2', 'A3', 'A4',
-    'B1', 'B2', 'B3', 'B4',
-    'C1', 'C2', 'C3', 'C4',
-    'D1', 'D2', 'D3', 'D4'
-  ]
+  const seatNumbers = ['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C2', 'C3', 'C4', 'D1', 'D2', 'D3', 'D4']
 
   for (const seatNumber of seatNumbers) {
     await prisma.seat.upsert({
-      where: { 
+      where: {
         bus_id_seat_number: {
           bus_id: bus.id,
-          seat_number: seatNumber
-        }
+          seat_number: seatNumber,
+        },
       },
       update: {},
       create: {
         bus_id: bus.id,
         seat_number: seatNumber,
         seat_type: seatNumber.startsWith('A') ? 'premium' : 'regular',
-        is_active: true
-      }
+        is_active: true,
+      },
     })
   }
 
@@ -107,13 +120,13 @@ async function main() {
       departure_time: tomorrow,
       arrival_time: arrivalTime,
       base_price: 250000, // 250,000 VND
-      status: 'scheduled'
-    }
+      status: 'scheduled',
+    },
   })
 
   // Create seat statuses for the trip
   const seats = await prisma.seat.findMany({
-    where: { bus_id: bus.id }
+    where: { bus_id: bus.id },
   })
 
   for (const seat of seats) {
@@ -121,15 +134,15 @@ async function main() {
       where: {
         trip_id_seat_id: {
           trip_id: trip.id,
-          seat_id: seat.id
-        }
+          seat_id: seat.id,
+        },
       },
       update: {},
       create: {
         trip_id: trip.id,
         seat_id: seat.id,
-        status: 'available'
-      }
+        status: 'available',
+      },
     })
   }
 
@@ -139,18 +152,11 @@ async function main() {
       user_id: user1.id,
       provider: 'stripe',
       token: 'card_1234567890abcdef',
-      is_default: true
-    }
+      is_default: true,
+    },
   })
 
   console.log('✅ Database seeding completed!')
-  console.log('📊 Created:')
-  console.log('   - 2 users')
-  console.log('   - 1 operator')
-  console.log('   - 1 route')
-  console.log('   - 1 bus with 16 seats')
-  console.log('   - 1 trip scheduled for tomorrow')
-  console.log('   - 1 payment method')
 }
 
 main()

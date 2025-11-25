@@ -23,7 +23,7 @@ export const pickUser = (user) => {
     'avatar',
     'role',
     'isActive',
-    'createdAt',
-    'updatedAt',
+    // 'createdAt',
+    // 'updatedAt',
   ])
 }

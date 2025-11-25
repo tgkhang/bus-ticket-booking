@@ -41,7 +41,9 @@ const login = async (req, res, next) => {
     res.cookie('accessToken', result.accessToken, getCookieOptions(accessTokenMaxAge))
     res.cookie('refreshToken', result.refreshToken, getCookieOptions(refreshTokenMaxAge))
 
-    res.status(StatusCodes.OK).json(result)
+    // Don't send tokens in response body - they're in httpOnly cookies
+    const { accessToken, refreshToken, ...userDataWithoutTokens } = result
+    res.status(StatusCodes.OK).json(userDataWithoutTokens)
   } catch (error) {
     next(error)
   }
@@ -58,7 +60,8 @@ const refreshToken = async (req, res, next) => {
     res.cookie('accessToken', result.accessToken, getCookieOptions(accessTokenMaxAge))
     res.cookie('refreshToken', result.refreshToken, getCookieOptions(refreshTokenMaxAge))
 
-    res.status(StatusCodes.OK).json(result)
+    // Don't send tokens in response body
+    res.status(StatusCodes.OK).json({ refreshed: true })
   } catch (error) {
     next(new ApiError(StatusCodes.FORBIDDEN, 'Could not refresh access token, please login again'))
   }
@@ -131,6 +134,16 @@ const update = async (req, res, next) => {
   }
 }
 
+const getMe = async (req, res, next) => {
+  try {
+    const userId = req.jwtDecoded.id
+    const user = await userService.getMe(userId)
+    res.status(StatusCodes.OK).json(user)
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const userController = {
   createNew,
   verifyAccount,
@@ -141,4 +154,5 @@ export const userController = {
   forgotPassword,
   resetPassword,
   update,
+  getMe,
 }

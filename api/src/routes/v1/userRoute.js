@@ -64,6 +64,8 @@ Router.route('/reset_password').put(passwordResetLimiter, userValidation.resetPa
 
 // ============ Protected Routes ============
 
+Router.route('/me').get(authMiddleware.isAuthorized, userController.getMe)
+
 Router.route('/update').put(authMiddleware.isAuthorized, userValidation.update, userController.update)
 
 Router.route('/logout_all_devices').delete(authMiddleware.isAuthorized, userController.logoutAllDevices)
