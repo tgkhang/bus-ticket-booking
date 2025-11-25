@@ -33,15 +33,11 @@ export const PERMISSIONS = {
   DELETE_MESSAGE_A: 'delete-message-a',
 }
 
-// Mock Roles with Permissions (Level 2 RBAC)
+// Mock Roles with Permissions (RBAC)
 export const MOCK_ROLES = [
   {
     name: USER_ROLES.ADMIN,
-    permissions: [
-      PERMISSIONS.READ_MESSAGE_A,
-      PERMISSIONS.WRITE_MESSAGE_A,
-      PERMISSIONS.DELETE_MESSAGE_A,
-    ],
+    permissions: [PERMISSIONS.READ_MESSAGE_A, PERMISSIONS.WRITE_MESSAGE_A, PERMISSIONS.DELETE_MESSAGE_A],
   },
   {
     name: USER_ROLES.OPERATOR,

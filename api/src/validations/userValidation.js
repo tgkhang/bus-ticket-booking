@@ -5,6 +5,7 @@ import { EMAIL_RULE_MESSAGE, PASSWORD_RULE, PASSWORD_RULE_MESSAGE } from '~/util
 
 const createNew = async (req, res, next) => {
   const correctCondition = Joi.object({
+    username: Joi.string().alphanum().min(3).max(30).required().trim(),
     email: Joi.string().email().required().trim().message(EMAIL_RULE_MESSAGE),
     password: Joi.string().required().pattern(PASSWORD_RULE).message(PASSWORD_RULE_MESSAGE),
   })
@@ -49,7 +50,7 @@ const login = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   const correctCondition = Joi.object({
-    displayName: Joi.string().trim().strict(),
+    username: Joi.string().trim().strict(),
     currentPassword: Joi.string()
       .pattern(PASSWORD_RULE)
       .message('current_password: ' + PASSWORD_RULE_MESSAGE),

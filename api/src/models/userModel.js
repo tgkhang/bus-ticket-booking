@@ -1,7 +1,7 @@
 import { GET_DB } from '~/config/prisma'
 import { USER_ROLES } from '~/utils/constants'
 
-const INVALID_UPDATE_FIELDS = ['id', 'email', 'createdAt', 'username']
+const INVALID_UPDATE_FIELDS = ['id', 'email', 'createdAt', 'updatedAt', 'username']
 
 const createNew = async (data) => {
   try {

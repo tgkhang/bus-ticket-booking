@@ -29,7 +29,7 @@ const createNew = async (reqBody) => {
     const newUser = {
       email: reqBody.email,
       password: bcryptjs.hashSync(reqBody.password, 10),
-      username: nameFromEmail,
+      username: reqBody.username,
       displayName: nameFromEmail,
       verifyToken: uuidv4(),
       verifyTokenExpiry: new Date(Date.now() + VERIFY_TOKEN_EXPIRY_MS),
@@ -76,7 +76,7 @@ const verifyAccount = async (reqBody) => {
       throw new ApiError(StatusCodes.GONE, 'Verification token has already been used or expired')
     }
 
-    if (existingUser.verifyTokenExpiry && Date.now() > existingUser.verifyTokenExpiry) {
+    if (existingUser.verifyTokenExpiry && new Date() > new Date(existingUser.verifyTokenExpiry)) {
       throw new ApiError(StatusCodes.GONE, 'Verification token has expired. Please request a new one.')
     }
 
@@ -88,10 +88,9 @@ const verifyAccount = async (reqBody) => {
       isActive: true,
       verifyToken: null,
       verifyTokenExpiry: null,
-      updatedAt: Date.now(),
     }
 
-    const updatedUser = await userModel.update(existingUser._id, updateData)
+    const updatedUser = await userModel.update(existingUser.id, updateData)
 
     return pickUser(updatedUser)
   } catch (error) {
@@ -295,7 +294,7 @@ const resetPassword = async (reqBody) => {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid or expired reset token')
     }
 
-    if (Date.now() > existingUser.passwordResetExpiry) {
+    if (new Date() > new Date(existingUser.passwordResetExpiry)) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Reset token has expired. Please request a new one.')
     }
 
@@ -352,6 +351,18 @@ const update = async (userId, reqBody) => {
   }
 }
 
+const getMe = async (userId) => {
+  try {
+    const user = await userModel.findOneById(userId)
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found')
+    }
+    return pickUser(user)
+  } catch (error) {
+    throw error
+  }
+}
+
 export const userService = {
   createNew,
   verifyAccount,
@@ -362,4 +373,5 @@ export const userService = {
   forgotPassword,
   resetPassword,
   update,
+  getMe,
 }

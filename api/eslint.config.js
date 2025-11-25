@@ -49,7 +49,7 @@ export default [
       'keyword-spacing': 'warn',
       // 'comma-dangle': 'warn',
       'comma-spacing': 'warn',
-      'arrow-spacing': 'warn'
+      'arrow-spacing': 'warn',
     }
   },
   {
