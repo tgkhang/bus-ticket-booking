@@ -1,9 +1,0 @@
-# Utility Functions
-
-This directory will contain utility functions and helpers.
-
-Examples:
-- date.ts - Date formatting and manipulation
-- validation.ts - Form validation utilities
-- constants.ts - Application constants
-- formatters.ts - Data formatting functions
