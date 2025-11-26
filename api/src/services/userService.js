@@ -10,6 +10,7 @@ import { BrevoEmailProvider } from '~/providers/BrevoEmailProvider'
 import { JwtProvider } from '~/providers/JwtProvider'
 import { env } from '~/config/environment'
 import ms from 'ms'
+import { GET_DB } from '~/config/prisma'
 
 // Helper to get client info from request
 const getClientInfo = (req) => ({
