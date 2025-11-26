@@ -14,14 +14,20 @@ export default function OAuthSuccessPage() {
       return;
     }
 
-    // Once initialized, check if authenticated
-    if (isAuthenticated) {
-      // Successfully authenticated, redirect to dashboard
-      router.push('/dashboard');
-    } else {
-      // Not authenticated, redirect to login
-      router.push('/login?error=oauth_auth_failed');
-    }
+    // Add a small delay to allow browser/extensions to complete async operations
+    // This prevents "Unchecked runtime.lastError" warnings from Chrome extensions
+    const timer = setTimeout(() => {
+      // Once initialized, check if authenticated
+      if (isAuthenticated) {
+        // Successfully authenticated, redirect to dashboard
+        router.push('/dashboard');
+      } else {
+        // Not authenticated, redirect to login
+        router.push('/login?error=oauth_auth_failed');
+      }
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
   }, [isAuthenticated, isInitialized, router]);
 
   return (
