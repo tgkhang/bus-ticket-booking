@@ -35,3 +35,13 @@ export const getMeAPI = async () => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/users/me`)
   return response.data
 }
+
+export const oauthGoogleLoginAPI = async (userData: {
+  email: string
+  name: string
+  picture?: string
+  sub: string
+}) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/users/oauth/google`, userData)
+  return response.data
+}

@@ -15,7 +15,7 @@ model User {
   id                   String    @id @default(uuid())
   email                String    @unique
   username             String    @unique
-  password             String
+  password             String?   // Optional for OAuth users
   displayName          String?
   avatar               String?
   role                 String    @default("client") // client, admin, operator
@@ -24,6 +24,12 @@ model User {
   verifyTokenExpiry    DateTime?
   passwordResetToken   String?   @unique
   passwordResetExpiry  DateTime?
+
+  // OAuth fields
+  oauthProvider        String?   // google, facebook, etc.
+  oauthSub             String?   @unique // Auth0 user ID
+  isOauthUser          Boolean   @default(false)
+
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 

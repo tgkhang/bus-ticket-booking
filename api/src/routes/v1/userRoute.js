@@ -53,6 +53,9 @@ Router.route('/refresh_token').get(generalLimiter, userController.refreshToken)
 
 Router.route('/logout').delete(userController.logout)
 
+// OAuth routes
+Router.route('/oauth/google').post(generalLimiter, userController.oauthGoogleLogin)
+
 // Password reset routes
 Router.route('/forgot_password').post(
   passwordResetLimiter,

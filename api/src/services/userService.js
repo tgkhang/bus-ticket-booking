@@ -363,6 +363,79 @@ const getMe = async (userId) => {
   }
 }
 
+const oauthGoogleLogin = async (reqBody, req) => {
+  try {
+    const { email, name, picture, sub } = reqBody
+
+    // Check if user exists by email or OAuth sub
+    let user = await userModel.findOneByEmail(email) || await userModel.findOneByOauthSub(sub)
+
+    if (user) {
+      // Update existing user with OAuth info
+      user = await userModel.update(user.id, {
+        avatar: picture || user.avatar,
+        displayName: name || user.displayName,
+        oauthProvider: 'google',
+        oauthSub: sub,
+        isOauthUser: true,
+        isActive: true, // Auto-activate OAuth users
+      })
+    } else {
+      // Create new OAuth user
+      // Generate unique username from email
+      let username = email.split('@')[0]
+      const existingUsername = await GET_DB().user.findUnique({ where: { username } })
+      if (existingUsername) {
+        username = `${username}_${uuidv4().slice(0, 8)}`
+      }
+
+      user = await userModel.createOAuthUser({
+        email,
+        username,
+        name,
+        picture,
+        sub,
+        provider: 'google',
+      })
+    }
+
+    // Create tokens (same as regular login)
+    const userInfo = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    }
+
+    const accessToken = await JwtProvider.generateToken(userInfo, env.ACCESS_JWT_SECRET_KEY, env.ACCESS_JWT_EXPIRES_IN)
+    const refreshToken = await JwtProvider.generateToken(
+      userInfo,
+      env.REFRESH_JWT_SECRET_KEY,
+      env.REFRESH_JWT_EXPIRES_IN
+    )
+
+    // Store refresh token
+    const familyId = uuidv4()
+    const refreshTokenExpiryMs = ms(env.REFRESH_JWT_EXPIRES_IN || '14d')
+    const clientInfo = getClientInfo(req)
+    await refreshTokenModel.createNew({
+      userId: user.id,
+      token: refreshToken,
+      familyId,
+      expiresAt: Date.now() + refreshTokenExpiryMs,
+      userAgent: clientInfo.userAgent,
+      ipAddress: clientInfo.ipAddress,
+    })
+
+    return {
+      accessToken,
+      refreshToken,
+      ...pickUser(user),
+    }
+  } catch (error) {
+    throw error
+  }
+}
+
 export const userService = {
   createNew,
   verifyAccount,
@@ -374,4 +447,5 @@ export const userService = {
   resetPassword,
   update,
   getMe,
+  oauthGoogleLogin,
 }
