@@ -19,7 +19,9 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "node prisma/seed.js",
     "prisma:reset": "prisma migrate reset",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "prepare": "husky install",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@babel/runtime": "^7.28.4",
@@ -54,6 +56,9 @@
     "babel-plugin-module-resolver": "^5.0.2",
     "eslint": "^9.38.0",
     "nodemon": "^3.1.10",
-    "prisma": "^6.19.0"
+    "prisma": "^6.19.0",
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.2",
+    "prettier": "^3.2.4"
   }
 }
