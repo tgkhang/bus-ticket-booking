@@ -144,6 +144,25 @@ const getMe = async (req, res, next) => {
   }
 }
 
+const oauthGoogleLogin = async (req, res, next) => {
+  try {
+    const result = await userService.oauthGoogleLogin(req.body, req)
+
+    // Set cookies with proper expiry (same as regular login)
+    const accessTokenMaxAge = ms(env.ACCESS_JWT_EXPIRES_IN || '1h')
+    const refreshTokenMaxAge = ms(env.REFRESH_JWT_EXPIRES_IN || '14d')
+
+    res.cookie('accessToken', result.accessToken, getCookieOptions(accessTokenMaxAge))
+    res.cookie('refreshToken', result.refreshToken, getCookieOptions(refreshTokenMaxAge))
+
+    // Don't send tokens in response body
+    const { accessToken, refreshToken, ...userDataWithoutTokens } = result
+    res.status(StatusCodes.OK).json(userDataWithoutTokens)
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const userController = {
   createNew,
   verifyAccount,
@@ -155,4 +174,5 @@ export const userController = {
   resetPassword,
   update,
   getMe,
+  oauthGoogleLogin,
 }
