@@ -1,6 +1,10 @@
 import { env } from '~/config/environment'
 
-export const WHITELIST_DOMAINS = ['http://localhost:5173', 'https://bus-booking-frontend.vercel.app']
+export const WHITELIST_DOMAINS = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://busbook-one.vercel.app',
+]
 
 export const FIELD_REQUIRED_MESSAGE = 'This field is required.'
 export const EMAIL_RULE = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i
