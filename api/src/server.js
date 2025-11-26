@@ -14,7 +14,7 @@ const START_SERVER = () => {
   const app = express()
   app.use(helmet())
   const hostname = env.LOCAL_DEV_APP_HOST || 'localhost'
-  const PORT = env.LOCAL_DEV_APP_PORT || 3000
+  const PORT = env.PORT || env.LOCAL_DEV_APP_PORT || 3000
 
   app.use((req, res, next) => {
     res.set('Cache-Control', 'no-store')
@@ -28,8 +28,9 @@ const START_SERVER = () => {
   app.use(errorHandlingMiddleware)
 
   if (env.BUILD_MODE === 'production') {
-    app.listen(env.PORT, () => {
-      console.log(`3.Production: Server is running at ${env.PORT}`)
+    // Listen on 0.0.0.0 for Render/public cloud
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`3.Production: Server is running on http://0.0.0.0:${PORT}`)
     })
   } else {
     app.listen(PORT, hostname, () => {
