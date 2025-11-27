@@ -81,11 +81,48 @@ const update = async (userId, updateData) => {
   }
 }
 
+const findOneByOauthSub = async (oauthSub) => {
+  try {
+    const prisma = GET_DB()
+    const user = await prisma.user.findUnique({
+      where: { oauthSub },
+    })
+    return user
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+
+const createOAuthUser = async (data) => {
+  try {
+    const prisma = GET_DB()
+    const createdUser = await prisma.user.create({
+      data: {
+        email: data.email,
+        username: data.username,
+        displayName: data.name,
+        avatar: data.picture || null,
+        role: USER_ROLES.CLIENT,
+        isActive: true, // OAuth users are auto-verified
+        oauthProvider: data.provider || 'google',
+        oauthSub: data.sub,
+        isOauthUser: true,
+        password: null, // OAuth users don't have passwords
+      },
+    })
+    return createdUser
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+
 export const userModel = {
   USER_ROLES,
   createNew,
   findOneById,
   findOneByEmail,
   findByPasswordResetToken,
+  findOneByOauthSub,
+  createOAuthUser,
   update,
 }
