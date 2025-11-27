@@ -134,11 +134,19 @@ This ensures cookies set by the backend reach the user's browser, not the Next.j
 
 ```env
 # Auth0 Configuration
+<<<<<<< HEAD
 AUTH0_SECRET=8c3bc55eb81e018426844ef53268b0e89fd555ddf555384725ae6a7286920140
 APP_BASE_URL=http://localhost:3000
 AUTH0_DOMAIN=
 AUTH0_CLIENT_ID=
 AUTH0_CLIENT_SECRET=
+=======
+AUTH0_SECRET=<your_secret_here>  # Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+APP_BASE_URL=http://localhost:3000
+AUTH0_DOMAIN=<your_auth0_domain>  # e.g., dev-xxxxxxxx.us.auth0.com
+AUTH0_CLIENT_ID=<your_client_id>
+AUTH0_CLIENT_SECRET=<your_client_secret>
+>>>>>>> 007ad2a36dd5a9f1496b8543ffa3454c5d0ffd20
 
 # API endpoint
 NEXT_PUBLIC_API_ROOT=http://localhost:8010
@@ -150,7 +158,11 @@ NEXT_PUBLIC_API_ROOT=http://localhost:8010
 |----------|-------------|---------|
 | `AUTH0_SECRET` | 32-character random string for session encryption | Generate with: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 | `APP_BASE_URL` | Your frontend URL | `http://localhost:3000` (dev)<br>`https://busbook.com` (prod) |
+<<<<<<< HEAD
 | `AUTH0_DOMAIN` | Auth0 tenant domain (no https://) | `dev-8gdhwvzwi8t7kmnz.us.auth0.com` |
+=======
+| `AUTH0_DOMAIN` | Auth0 tenant domain (no https://) | `dev-xxxxxxxx.us.auth0.com` |
+>>>>>>> 007ad2a36dd5a9f1496b8543ffa3454c5d0ffd20
 | `AUTH0_CLIENT_ID` | Auth0 application client ID | Found in Auth0 dashboard |
 | `AUTH0_CLIENT_SECRET` | Auth0 application secret | Found in Auth0 dashboard |
 
@@ -200,11 +212,19 @@ Ask the team lead for Auth0 credentials via:
 
 **Step 4: Paste values into `.env.local`**
 ```env
+<<<<<<< HEAD
 AUTH0_SECRET=<get_from_team_lead>
 APP_BASE_URL=http://localhost:3000
 AUTH0_DOMAIN=<get_from_team_lead>
 AUTH0_CLIENT_ID=<get_from_team_lead>
 AUTH0_CLIENT_SECRET=<get_from_team_lead>
+=======
+AUTH0_SECRET=<get_from_team_lead>  # 32-character hex string
+APP_BASE_URL=http://localhost:3000
+AUTH0_DOMAIN=<get_from_team_lead>  # Auth0 tenant domain
+AUTH0_CLIENT_ID=<get_from_team_lead>  # Auth0 client ID
+AUTH0_CLIENT_SECRET=<get_from_team_lead>  # Auth0 client secret
+>>>>>>> 007ad2a36dd5a9f1496b8543ffa3454c5d0ffd20
 NEXT_PUBLIC_API_ROOT=http://localhost:8010
 ```
 
@@ -267,9 +287,15 @@ https://busbook.com
 # Auth0 Configuration - PRODUCTION
 AUTH0_SECRET=<GENERATE_NEW_SECRET>  # ⚠️ Generate new secret!
 APP_BASE_URL=https://busbook.com
+<<<<<<< HEAD
 AUTH0_DOMAIN=dev-8gdhwvzwi8t7kmnz.us.auth0.com
 AUTH0_CLIENT_ID=rZVyYwqoyYALuHCkGofr5L1Kg4CJwp1u
 AUTH0_CLIENT_SECRET=QN_HjpHOIHaqT-FpC1R7N6igr7QVF1kSKK_HdL89dSMaJd8J5Zxe5bFZFNu3yvvb
+=======
+AUTH0_DOMAIN=<your_auth0_domain>  # e.g., dev-xxxxxxxx.us.auth0.com
+AUTH0_CLIENT_ID=<your_production_client_id>
+AUTH0_CLIENT_SECRET=<your_production_client_secret>
+>>>>>>> 007ad2a36dd5a9f1496b8543ffa3454c5d0ffd20
 
 # Production API
 NEXT_PUBLIC_API_ROOT=https://api.busbook.com
@@ -303,7 +329,11 @@ If using Google Cloud Console directly:
 2. Navigate to **APIs & Services** → **Credentials**
 3. Update **Authorized redirect URIs**:
    ```
+<<<<<<< HEAD
    https://dev-8gdhwvzwi8t7kmnz.us.auth0.com/login/callback
+=======
+   https://<your_auth0_domain>/login/callback
+>>>>>>> 007ad2a36dd5a9f1496b8543ffa3454c5d0ffd20
    ```
 
 ---
