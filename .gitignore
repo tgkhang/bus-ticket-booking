@@ -148,6 +148,10 @@ vite.config.ts.timestamp-*
 
 .vscode
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 SECURITY_INCIDENT_RESPONSE.md
 >>>>>>> 007ad2a36dd5a9f1496b8543ffa3454c5d0ffd20
+=======
+SECURITY_INCIDENT_RESPONSE.md
+>>>>>>> 7bfe75f098c7a5f95fe4d4d643b132794a045931
