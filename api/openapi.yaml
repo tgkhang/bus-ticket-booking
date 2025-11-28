@@ -1,0 +1,264 @@
+openapi: 3.0.3
+info:
+  title: Bus Ticket Booking API
+  version: 1.0.0
+  description: OpenAPI documentation for Routes and Stops management.
+servers:
+  - url: http://localhost:8010/v1
+    description: Local dev server
+security:
+  - cookieAuth: []
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: accessToken
+  schemas:
+    Stop:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        address: { type: string, nullable: true }
+        active: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    StopCreate:
+      type: object
+      required: [name, latitude, longitude]
+      properties:
+        name: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        address: { type: string }
+        active: { type: boolean }
+    StopUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        address: { type: string }
+        active: { type: boolean }
+    RouteStopItem:
+      type: object
+      required: [stopId, sequence]
+      properties:
+        stopId: { type: string, format: uuid }
+        sequence: { type: integer, minimum: 1 }
+        isPickup: { type: boolean }
+        isDropoff: { type: boolean }
+        note: { type: string }
+    Route:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        operatorId: { type: string, format: uuid }
+        originStopId: { type: string, format: uuid }
+        destinationStopId: { type: string, format: uuid }
+        distanceKm: { type: number }
+        estimatedMinutes: { type: integer }
+        active: { type: boolean }
+        originStop: { $ref: '#/components/schemas/Stop' }
+        destinationStop: { $ref: '#/components/schemas/Stop' }
+        stops:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              routeId: { type: string, format: uuid }
+              stopId: { type: string, format: uuid }
+              sequence: { type: integer }
+              isPickup: { type: boolean }
+              isDropoff: { type: boolean }
+              note: { type: string }
+              stop: { $ref: '#/components/schemas/Stop' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    RouteCreate:
+      type: object
+      required: [name, operatorId, originStopId, destinationStopId]
+      properties:
+        name: { type: string }
+        operatorId: { type: string, format: uuid }
+        originStopId: { type: string, format: uuid }
+        destinationStopId: { type: string, format: uuid }
+        distanceKm: { type: number }
+        estimatedMinutes: { type: integer }
+        active: { type: boolean }
+        stops:
+          type: array
+          items: { $ref: '#/components/schemas/RouteStopItem' }
+    RouteUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        operatorId: { type: string, format: uuid }
+        originStopId: { type: string, format: uuid }
+        destinationStopId: { type: string, format: uuid }
+        distanceKm: { type: number }
+        estimatedMinutes: { type: integer }
+        active: { type: boolean }
+        stops:
+          type: array
+          items: { $ref: '#/components/schemas/RouteStopItem' }
+paths:
+  /stops:
+    get:
+      summary: List stops
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Stop' }
+    post:
+      summary: Create stop
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StopCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Stop' }
+  /stops/{id}:
+    get:
+      summary: Get stop by id
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Stop' }
+    put:
+      summary: Update stop
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/StopUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Stop' }
+    delete:
+      summary: Delete stop
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+  /routes:
+    get:
+      summary: List routes
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Route' }
+    post:
+      summary: Create route
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RouteCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Route' }
+  /routes/{id}:
+    get:
+      summary: Get route
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Route' }
+    put:
+      summary: Update route
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RouteUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Route' }
+    delete:
+      summary: Delete route
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }

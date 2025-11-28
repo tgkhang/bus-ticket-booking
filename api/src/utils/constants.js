@@ -31,21 +31,41 @@ export const PERMISSIONS = {
   READ_MESSAGE_A: 'read-message-a',
   WRITE_MESSAGE_A: 'write-message-a',
   DELETE_MESSAGE_A: 'delete-message-a',
+  // Transport domain permissions
+  READ_STOPS: 'read-stops',
+  MANAGE_STOPS: 'manage-stops',
+  READ_ROUTES: 'read-routes',
+  MANAGE_ROUTES: 'manage-routes',
 }
 
 // Mock Roles with Permissions (RBAC)
 export const MOCK_ROLES = [
   {
     name: USER_ROLES.ADMIN,
-    permissions: [PERMISSIONS.READ_MESSAGE_A, PERMISSIONS.WRITE_MESSAGE_A, PERMISSIONS.DELETE_MESSAGE_A],
+    permissions: [
+      PERMISSIONS.READ_MESSAGE_A,
+      PERMISSIONS.WRITE_MESSAGE_A,
+      PERMISSIONS.DELETE_MESSAGE_A,
+      PERMISSIONS.READ_STOPS,
+      PERMISSIONS.MANAGE_STOPS,
+      PERMISSIONS.READ_ROUTES,
+      PERMISSIONS.MANAGE_ROUTES,
+    ],
   },
   {
     name: USER_ROLES.OPERATOR,
-    permissions: [PERMISSIONS.READ_MESSAGE_A, PERMISSIONS.WRITE_MESSAGE_A],
+    permissions: [
+      PERMISSIONS.READ_MESSAGE_A,
+      PERMISSIONS.WRITE_MESSAGE_A,
+      PERMISSIONS.READ_STOPS,
+      PERMISSIONS.MANAGE_STOPS,
+      PERMISSIONS.READ_ROUTES,
+      PERMISSIONS.MANAGE_ROUTES,
+    ],
   },
   {
     name: USER_ROLES.CLIENT,
-    permissions: [PERMISSIONS.READ_MESSAGE_A],
+    permissions: [PERMISSIONS.READ_MESSAGE_A, PERMISSIONS.READ_STOPS, PERMISSIONS.READ_ROUTES],
   },
 ]
 

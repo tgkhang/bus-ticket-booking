@@ -1,10 +1,14 @@
 import express from 'express'
 import { userRoute } from '~/routes/v1/userRoute'
+import { routeRoute } from '~/routes/v1/routeRoute'
 
 const Router = express.Router()
 
-// Use user routes
+// User routes
 Router.use('/users', userRoute)
+
+// Transport configuration routes (routes & stops)
+Router.use('/', routeRoute)
 
 // Health check endpoint
 Router.get('/health', (req, res) => {

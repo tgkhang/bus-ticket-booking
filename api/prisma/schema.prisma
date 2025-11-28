@@ -94,19 +94,72 @@ model Operator {
 }
 
 // Route and Transportation
+model Stop {
+  id        String   @id @default(uuid())
+  name      String
+  latitude  Float
+  longitude Float
+  address   String?
+  active    Boolean  @default(true)
+
+  // Relations
+  originRoutes      Route[] @relation("OriginStop")
+  destinationRoutes Route[] @relation("DestinationStop")
+  routeStops        RouteStop[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+  @@index([latitude, longitude])
+  @@map("stops")
+}
+
 model Route {
   id                String @id @default(uuid())
-  operator_id       String
-  origin            String
-  destination       String
-  distance_km       Int
-  estimated_minutes Int
+  name              String
+  operatorId        String @map("operator_id")
+  originStopId      String
+  destinationStopId String
+  distanceKm        Float? @map("distance_km")
+  estimatedMinutes  Int?   @map("estimated_minutes")
+  active            Boolean @default(true)
 
   // Relationships
-  operator Operator @relation(fields: [operator_id], references: [id], onDelete: Cascade)
-  trips    Trip[]
+  operator          Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  trips             Trip[]
+  originStop        Stop   @relation("OriginStop", fields: [originStopId], references: [id])
+  destinationStop   Stop   @relation("DestinationStop", fields: [destinationStopId], references: [id])
+  stops             RouteStop[]
 
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([active])
+  @@index([originStopId, destinationStopId])
   @@map("routes")
+}
+
+model RouteStop {
+  id        String  @id @default(uuid())
+  routeId   String
+  stopId    String
+  sequence  Int     // order along the route (1..n)
+  isPickup  Boolean @default(true)
+  isDropoff Boolean @default(true)
+  note      String?
+
+  // Relations
+  route     Route @relation(fields: [routeId], references: [id])
+  stop      Stop  @relation(fields: [stopId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([routeId, sequence])
+  @@unique([routeId, stopId])
+  @@index([stopId])
+  @@map("route_stops")
 }
 
 model Bus {

@@ -50,26 +50,64 @@ async function main() {
   })
 
   // Create sample operator
-  const operator = await prisma.operator.create({
-    data: {
-      name: 'Green Bus Lines',
-      contact_email: 'contact@greenbus.com',
-      contact_phone: '+1555000111',
-      status: 'approved',
-      approved_at: new Date(),
-    },
-  })
+  let operator = await prisma.operator.findFirst({ where: { name: 'Green Bus Lines' } })
+  if (!operator) {
+    operator = await prisma.operator.create({
+      data: {
+        name: 'Green Bus Lines',
+        contact_email: 'contact@greenbus.com',
+        contact_phone: '+1555000111',
+        status: 'approved',
+        approved_at: new Date(),
+      },
+    })
+  }
 
-  // Create sample route
-  const route = await prisma.route.create({
-    data: {
-      operator_id: operator.id,
-      origin: 'Ho Chi Minh City',
-      destination: 'Da Lat',
-      distance_km: 300,
-      estimated_minutes: 360,
+  // Create sample stops (HCMC, Dong Nai, Da Lat)
+  const ensureStop = async (name, latitude, longitude, address) => {
+    const existing = await prisma.stop.findFirst({ where: { name, latitude, longitude } })
+    if (existing) return existing
+    return prisma.stop.create({
+      data: { name, latitude, longitude, address, active: true },
+    })
+  }
+
+  const hcm = await ensureStop('Ho Chi Minh City', 10.776, 106.700, 'HCMC')
+  const dongNai = await ensureStop('Dong Nai', 10.945, 106.824, 'Dong Nai')
+  const daLat = await ensureStop('Da Lat', 11.940, 108.458, 'Lam Dong')
+
+  // Create sample route using stops
+  // Try to find existing route by operator + origin/destination
+  let route = await prisma.route.findFirst({
+    where: {
+      operatorId: operator.id,
+      originStopId: hcm.id,
+      destinationStopId: daLat.id,
     },
   })
+  if (!route) {
+    route = await prisma.route.create({
+      data: {
+        name: 'HCMC to Da Lat',
+        operatorId: operator.id,
+        originStopId: hcm.id,
+        destinationStopId: daLat.id,
+        distanceKm: 300,
+        estimatedMinutes: 360,
+        active: true,
+      },
+    })
+
+    // Create ordered RouteStops: HCMC -> Dong Nai -> Da Lat
+    await prisma.routeStop.createMany({
+      data: [
+        { routeId: route.id, stopId: hcm.id, sequence: 1, isPickup: true, isDropoff: false },
+        { routeId: route.id, stopId: dongNai.id, sequence: 2, isPickup: true, isDropoff: true },
+        { routeId: route.id, stopId: daLat.id, sequence: 3, isPickup: false, isDropoff: true },
+      ],
+      skipDuplicates: true,
+    })
+  }
 
   // Create sample bus
   const bus = await prisma.bus.upsert({
