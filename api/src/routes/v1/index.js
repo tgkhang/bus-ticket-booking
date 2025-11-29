@@ -1,14 +1,9 @@
 import express from 'express'
 import { userRoute } from '~/routes/v1/userRoute'
 import { routeRoute } from '~/routes/v1/routeRoute'
+import { busRoute } from './busRoute'
 
 const Router = express.Router()
-
-// User routes
-Router.use('/users', userRoute)
-
-// Transport configuration routes (routes & stops)
-Router.use('/', routeRoute)
 
 // Health check endpoint
 Router.get('/health', (req, res) => {
@@ -18,5 +13,13 @@ Router.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
   })
 })
+
+// User routes
+Router.use('/users', userRoute)
+
+Router.use('/buses', busRoute)
+
+// Transport configuration routes (routes & stops)
+Router.use('/', routeRoute)
 
 export const APIs_V1 = Router
