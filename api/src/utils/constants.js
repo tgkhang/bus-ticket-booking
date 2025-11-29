@@ -36,6 +36,9 @@ export const PERMISSIONS = {
   MANAGE_STOPS: 'manage-stops',
   READ_ROUTES: 'read-routes',
   MANAGE_ROUTES: 'manage-routes',
+  // Bus permissions
+  READ_BUSES: 'read-buses',
+  MANAGE_BUSES: 'manage-buses',
 }
 
 // Mock Roles with Permissions (RBAC)
@@ -50,6 +53,8 @@ export const MOCK_ROLES = [
       PERMISSIONS.MANAGE_STOPS,
       PERMISSIONS.READ_ROUTES,
       PERMISSIONS.MANAGE_ROUTES,
+      PERMISSIONS.READ_BUSES,
+      PERMISSIONS.MANAGE_BUSES,
     ],
   },
   {
@@ -61,11 +66,13 @@ export const MOCK_ROLES = [
       PERMISSIONS.MANAGE_STOPS,
       PERMISSIONS.READ_ROUTES,
       PERMISSIONS.MANAGE_ROUTES,
+      PERMISSIONS.READ_BUSES,
+      PERMISSIONS.MANAGE_BUSES,
     ],
   },
   {
     name: USER_ROLES.CLIENT,
-    permissions: [PERMISSIONS.READ_MESSAGE_A, PERMISSIONS.READ_STOPS, PERMISSIONS.READ_ROUTES],
+    permissions: [PERMISSIONS.READ_MESSAGE_A, PERMISSIONS.READ_STOPS, PERMISSIONS.READ_ROUTES, PERMISSIONS.READ_BUSES],
   },
 ]
 

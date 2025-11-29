@@ -107,6 +107,84 @@ components:
         stops:
           type: array
           items: { $ref: '#/components/schemas/RouteStopItem' }
+    Bus:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        operator_id: { type: string, format: uuid }
+        plate_number: { type: string }
+        model: { type: string }
+        seat_capacity: { type: integer }
+        amenities_json: { type: string }
+        amenities:
+          type: object
+          properties:
+            wifi: { type: boolean }
+            ac: { type: boolean }
+            restroom: { type: boolean }
+            entertainment: { type: boolean }
+            usb_charging: { type: boolean }
+            reclining_seats: { type: boolean }
+            reading_light: { type: boolean }
+            blanket: { type: boolean }
+            water: { type: boolean }
+    BusCreate:
+      type: object
+      required: [operatorId, plateNumber, model, seatCapacity]
+      properties:
+        operatorId: { type: string, format: uuid }
+        plateNumber: { type: string, pattern: '^[A-Z0-9-]+$' }
+        model: { type: string }
+        seatCapacity: { type: integer, minimum: 1, maximum: 100 }
+        amenities:
+          type: object
+          properties:
+            wifi: { type: boolean }
+            ac: { type: boolean }
+            restroom: { type: boolean }
+            entertainment: { type: boolean }
+            usb_charging: { type: boolean }
+            reclining_seats: { type: boolean }
+            reading_light: { type: boolean }
+            blanket: { type: boolean }
+            water: { type: boolean }
+    BusUpdate:
+      type: object
+      properties:
+        plateNumber: { type: string, pattern: '^[A-Z0-9-]+$' }
+        model: { type: string }
+        seatCapacity: { type: integer, minimum: 1, maximum: 100 }
+        amenities:
+          type: object
+          properties:
+            wifi: { type: boolean }
+            ac: { type: boolean }
+            restroom: { type: boolean }
+            entertainment: { type: boolean }
+            usb_charging: { type: boolean }
+            reclining_seats: { type: boolean }
+    Seat:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        bus_id: { type: string, format: uuid }
+        seat_number: { type: string }
+        seat_type: { type: string, enum: [regular, premium, sleeper] }
+        is_active: { type: boolean }
+    SeatItem:
+      type: object
+      required: [seatNumber]
+      properties:
+        seatNumber: { type: string, pattern: '^[A-Z0-9]+$' }
+        seatType: { type: string, enum: [regular, premium, sleeper] }
+        isActive: { type: boolean }
+    PaginationResponse:
+      type: object
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
 paths:
   /stops:
     get:
@@ -262,3 +340,289 @@ paths:
                 type: object
                 properties:
                   deleted: { type: boolean }
+  /buses:
+    get:
+      summary: List buses with pagination
+      tags: [Buses]
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: operatorId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: plateNumber
+          schema: { type: string }
+        - in: query
+          name: minCapacity
+          schema: { type: integer }
+        - in: query
+          name: search
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Bus' }
+                  pagination: { $ref: '#/components/schemas/PaginationResponse' }
+    post:
+      summary: Create bus
+      tags: [Buses]
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BusCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bus' }
+  /buses/search:
+    get:
+      summary: Search buses (public)
+      tags: [Buses]
+      parameters:
+        - in: query
+          name: originStopId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: destinationStopId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: date
+          schema: { type: string, format: date }
+        - in: query
+          name: seatType
+          schema: { type: string }
+        - in: query
+          name: minSeats
+          schema: { type: integer }
+        - in: query
+          name: amenities
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Bus' }
+  /buses/{id}:
+    get:
+      summary: Get bus details
+      tags: [Buses]
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bus' }
+    put:
+      summary: Update bus
+      tags: [Buses]
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BusUpdate' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bus' }
+    delete:
+      summary: Delete bus
+      tags: [Buses]
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+  /buses/{busId}/seats:
+    get:
+      summary: List seats
+      tags: [Seats]
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: busId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: includeInactive
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Seat' }
+    post:
+      summary: Create seats
+      tags: [Seats]
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: busId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                seats:
+                  type: array
+                  items: { $ref: '#/components/schemas/SeatItem' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Seat' }
+  /buses/{busId}/seats/generate:
+    post:
+      summary: Auto-generate seats
+      tags: [Seats]
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: busId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [layout, rows]
+              properties:
+                layout: { type: string, enum: ['2-2', '2-3', '1-2', '2-1'] }
+                rows: { type: integer, minimum: 1, maximum: 20 }
+                seatType: { type: string, enum: [regular, premium, sleeper] }
+                startRow: { type: integer, default: 1 }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Seat' }
+  /buses/{busId}/seats/{seatId}:
+    put:
+      summary: Update seat
+      tags: [Seats]
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: busId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: seatId
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                seatNumber: { type: string }
+                seatType: { type: string, enum: [regular, premium, sleeper] }
+                isActive: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Seat' }
+    delete:
+      summary: Delete seat
+      tags: [Seats]
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - in: path
+          name: busId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: seatId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+  /buses/{busId}/layout:
+    get:
+      summary: Get seat layout (public)
+      tags: [Buses]
+      parameters:
+        - in: path
+          name: busId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: tripId
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Seat' }
