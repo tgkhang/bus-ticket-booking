@@ -5,20 +5,23 @@ import { usePermission } from '@/hooks/usePermission'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { User, Shield, Calendar, TrendingUp, Users, Bus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useRouter } from 'next/navigation'
 
 export default function DashboardPage() {
   const { user } = useAuth()
   const { hasPermission, hasRole } = usePermission()
 
   const isAdmin = hasRole('admin')
+  const router = useRouter()
 
   return (
     <div className="space-y-8">
+      <Button className='w-full h-15 bg-blue-600 text-white' onClick={() => router.push('/admin')}>GO TO MAIN ADMIN DESIGN</Button>
+
       <div>
         <h1 className="text-4xl font-bold">Welcome back{user?.username ? `, ${user.username}` : ''}!</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-2">
-          Here&apos;s what&apos;s happening with your account
-        </p>
+        <p className="text-gray-500 dark:text-gray-400 mt-2">Here&apos;s what&apos;s happening with your account</p>
       </div>
 
       {/* User Info Card */}
@@ -44,9 +47,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Role</p>
-              <Badge variant={isAdmin ? 'info' : 'default'}>
-                {user?.role}
-              </Badge>
+              <Badge variant={isAdmin ? 'info' : 'default'}>{user?.role}</Badge>
             </div>
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Account ID</p>
