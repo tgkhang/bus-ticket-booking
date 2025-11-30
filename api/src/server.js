@@ -9,9 +9,6 @@ import { corsOptions } from '~/config/cors.js'
 import { CONNECT_DB, CLOSE_DB } from '~/config/prisma.js'
 import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
-import swaggerUi from 'swagger-ui-express'
-import YAML from 'yamljs'
-import path from 'path'
 
 const START_SERVER = () => {
   const app = express()
@@ -29,20 +26,20 @@ const START_SERVER = () => {
   app.use(express.json())
 
   // Swagger UI Documentation
-  try {
-    const swaggerDocument = YAML.load(path.join(__dirname, '../openapi.yaml'))
-    app.use(
-      '/api-docs',
-      swaggerUi.serve,
-      swaggerUi.setup(swaggerDocument, {
-        customCss: '.swagger-ui .topbar { display: none }',
-        customSiteTitle: 'Bus Ticket Booking API Docs',
-      })
-    )
-    console.log('3.Swagger UI available at /api-docs')
-  } catch (error) {
-    console.warn('Warning: Could not load OpenAPI spec. Swagger UI will not be available.', error.message)
-  }
+  // try {
+  //   const swaggerDocument = YAML.load(path.join(__dirname, '../openapi/openapi.yaml'))
+  //   app.use(
+  //     '/api-docs',
+  //     swaggerUi.serve,
+  //     swaggerUi.setup(swaggerDocument, {
+  //       customCss: '.swagger-ui .topbar { display: none }',
+  //       customSiteTitle: 'Bus Ticket Booking API Docs',
+  //     })
+  //   )
+  //   console.log('3.Swagger UI available at /api-docs')
+  // } catch (error) {
+  //   console.warn('Warning: Could not load OpenAPI spec. Swagger UI will not be available.', error.message)
+  // }
 
   app.use('/v1', APIs_V1)
   app.use(errorHandlingMiddleware)

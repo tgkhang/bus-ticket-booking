@@ -2,6 +2,7 @@ import express from 'express'
 import { userRoute } from '~/routes/v1/userRoute'
 import { routeRoute } from '~/routes/v1/routeRoute'
 import { busRoute } from './busRoute'
+import { operatorRoute } from './operatorRoute'
 
 const Router = express.Router()
 
@@ -18,6 +19,8 @@ Router.get('/health', (req, res) => {
 Router.use('/users', userRoute)
 
 Router.use('/buses', busRoute)
+
+Router.use('/operators', operatorRoute)
 
 // Transport configuration routes (routes & stops)
 Router.use('/', routeRoute)
