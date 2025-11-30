@@ -1,8 +1,6 @@
 import { StatusCodes } from 'http-status-codes'
 import { busService } from '~/services/busService'
-
-const DEFAULT_PAGE = 1
-const DEFAULT_ITEMS_PER_PAGE = 20
+import { DEFAULT_ITEMS_PER_PAGE, DEFAULT_PAGE } from '~/utils/constants'
 
 // ============================================
 // BUS CRUD CONTROLLERS

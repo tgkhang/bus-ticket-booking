@@ -72,9 +72,9 @@ async function main() {
     })
   }
 
-  const hcm = await ensureStop('Ho Chi Minh City', 10.776, 106.700, 'HCMC')
+  const hcm = await ensureStop('Ho Chi Minh City', 10.776, 106.7, 'HCMC')
   const dongNai = await ensureStop('Dong Nai', 10.945, 106.824, 'Dong Nai')
-  const daLat = await ensureStop('Da Lat', 11.940, 108.458, 'Lam Dong')
+  const daLat = await ensureStop('Da Lat', 11.94, 108.458, 'Lam Dong')
 
   // Create sample route using stops
   // Try to find existing route by operator + origin/destination
@@ -118,7 +118,17 @@ async function main() {
       plate_number: 'GBL-001',
       model: 'Mercedes Sprinter',
       seat_capacity: 16,
-      amenities_json: JSON.stringify(['WiFi', 'AC', 'Reclining Seats', 'Reading Lights']),
+      amenities_json: JSON.stringify({
+        wifi: true,
+        ac: true,
+        restroom: true,
+        entertainment: true,
+        usb_charging: true,
+        reclining_seats: true,
+        reading_light: true,
+        blanket: true,
+        water: true,
+      }),
     },
   })
 
