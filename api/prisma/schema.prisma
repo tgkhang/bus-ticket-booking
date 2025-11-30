@@ -211,6 +211,10 @@ model Trip {
   feedbacks     Feedback[]
 
   @@map("trips")
+  @@index([route_id, departure_time])
+  @@index([departure_time])
+  @@index([base_price])
+  @@index([status])
 }
 
 model SeatStatus {

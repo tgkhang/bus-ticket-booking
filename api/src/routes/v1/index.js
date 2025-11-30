@@ -3,6 +3,7 @@ import { userRoute } from '~/routes/v1/userRoute'
 import { routeRoute } from '~/routes/v1/routeRoute'
 import { busRoute } from './busRoute'
 import { operatorRoute } from './operatorRoute'
+import { tripRoute } from './tripRoute'
 
 const Router = express.Router()
 
@@ -24,5 +25,8 @@ Router.use('/operators', operatorRoute)
 
 // Transport configuration routes (routes & stops)
 Router.use('/', routeRoute)
+
+// Trip search route
+Router.use('/', tripRoute)
 
 export const APIs_V1 = Router

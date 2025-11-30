@@ -42,6 +42,8 @@ export const PERMISSIONS = {
   // Operator permissions
   READ_OPERATORS: 'read-operators',
   MANAGE_OPERATORS: 'manage-operators',
+  // Trip permissions
+  READ_TRIPS: 'read-trips',
 }
 
 // Mock Roles with Permissions (RBAC)
@@ -60,6 +62,7 @@ export const MOCK_ROLES = [
       PERMISSIONS.MANAGE_BUSES,
       PERMISSIONS.READ_OPERATORS,
       PERMISSIONS.MANAGE_OPERATORS,
+      PERMISSIONS.READ_TRIPS,
     ],
   },
   {
@@ -74,6 +77,7 @@ export const MOCK_ROLES = [
       PERMISSIONS.READ_BUSES,
       PERMISSIONS.MANAGE_BUSES,
       PERMISSIONS.READ_OPERATORS,
+      PERMISSIONS.READ_TRIPS,
     ],
   },
   {
@@ -84,6 +88,7 @@ export const MOCK_ROLES = [
       PERMISSIONS.READ_ROUTES,
       PERMISSIONS.READ_BUSES,
       PERMISSIONS.READ_OPERATORS,
+      PERMISSIONS.READ_TRIPS,
     ],
   },
 ]
