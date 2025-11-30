@@ -82,6 +82,7 @@ const seatItemSchema = Joi.object({
 })
 
 const createSeats = async (req, _res, next) => {
+  console.log('Validating createSeats with body:', req.body)
   const schema = Joi.object({
     seats: Joi.array().items(seatItemSchema).min(1).required()
   }).custom((value, helpers) => {

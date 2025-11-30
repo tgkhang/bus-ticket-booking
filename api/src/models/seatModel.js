@@ -11,7 +11,7 @@ const createSeats = async (busId, seats) => {
     return await prisma.$transaction(async (tx) => {
       // Create all seats
       const createdSeats = await tx.seat.createMany({
-        data: seats.map(seat => ({
+        data: seats.map((seat) => ({
           bus_id: busId,
           seat_number: seat.seatNumber.toUpperCase(),
           seat_type: seat.seatType || 'regular',
@@ -54,7 +54,7 @@ const generateSeatsAuto = async (busId, layout, rows, seatType = 'regular', star
       }
 
       // Skip column for aisle
-      colIndex++
+      // colIndex++
 
       // Right side seats
       for (let i = 0; i < rightSeats; i++) {
@@ -197,20 +197,20 @@ const getSeatLayout = async (busId, tripId = null) => {
       const seatStatuses = await prisma.seatStatus.findMany({
         where: {
           trip_id: tripId,
-          seat_id: { in: seats.map(s => s.id) },
+          seat_id: { in: seats.map((s) => s.id) },
         },
       })
 
       // Map status to each seat
       const statusMap = {}
-      seatStatuses.forEach(ss => {
+      seatStatuses.forEach((ss) => {
         statusMap[ss.seat_id] = {
           status: ss.status,
           locked_until: ss.locked_until,
         }
       })
 
-      return seats.map(seat => ({
+      return seats.map((seat) => ({
         ...seat,
         availability: statusMap[seat.id] || { status: 'available' },
       }))
