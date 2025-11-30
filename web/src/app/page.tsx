@@ -7,7 +7,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {
   ArrowRight,
-  Bus,
   Shield,
   Zap,
   Users,
@@ -18,21 +17,24 @@ import {
   Clock,
   Wifi,
   Sparkles,
-  TrendingUp,
   ThumbsUp,
-  Smartphone
+  Smartphone,
 } from 'lucide-react'
 
 export default function Home() {
-  const { isAuthenticated, isInitialized } = useAuth()
+  const { isAuthenticated, isInitialized, user } = useAuth()
   const router = useRouter()
 
   // auto redirect to dashboard if authenticated
   useEffect(() => {
     if (isInitialized && isAuthenticated) {
-      router.push('/dashboard')
+      if (user?.role === 'admin') {
+        router.push('/admin')
+      } else {
+        router.push('/dashboard')
+      }
     }
-  }, [isAuthenticated, isInitialized, router])
+  }, [isAuthenticated, isInitialized, user, router])
 
   if (!isInitialized) {
     return (
@@ -48,9 +50,12 @@ export default function Home() {
       <section className="relative bg-linear-to-br from-[#2563EB] to-[#1e40af] text-white py-20 lg:py-32 overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }}></div>
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            }}
+          ></div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -60,10 +65,13 @@ export default function Home() {
               <span className="text-sm text-white">Trusted by 500,000+ travelers</span>
             </div>
             <h1 className="text-white mb-6 text-4xl lg:text-6xl leading-tight font-bold">
-              Your Journey,<br />Our Priority
+              Your Journey,
+              <br />
+              Our Priority
             </h1>
             <p className="text-xl lg:text-2xl text-blue-100 max-w-3xl mx-auto">
-              Book comfortable and affordable bus tickets across Vietnam with real-time availability and instant confirmation
+              Book comfortable and affordable bus tickets across Vietnam with real-time availability and instant
+              confirmation
             </p>
           </div>
 
@@ -114,7 +122,8 @@ export default function Home() {
               {
                 icon: Zap,
                 title: 'Instant Booking',
-                description: 'Book your tickets in seconds with our lightning-fast platform and get instant confirmation',
+                description:
+                  'Book your tickets in seconds with our lightning-fast platform and get instant confirmation',
                 color: 'bg-yellow-100 text-yellow-600',
               },
               {
@@ -152,7 +161,9 @@ export default function Home() {
                 key={index}
                 className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all p-8 border border-gray-100 group"
               >
-                <div className={`inline-flex items-center justify-center w-16 h-16 ${feature.color} rounded-2xl mb-6 group-hover:scale-110 transition-transform`}>
+                <div
+                  className={`inline-flex items-center justify-center w-16 h-16 ${feature.color} rounded-2xl mb-6 group-hover:scale-110 transition-transform`}
+                >
                   <feature.icon className="w-8 h-8" />
                 </div>
                 <h3 className="text-gray-900 mb-3 font-semibold">{feature.title}</h3>
@@ -168,9 +179,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-gray-900 mb-4">How It Works</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Book your bus tickets in three simple steps
-            </p>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">Book your bus tickets in three simple steps</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
@@ -235,24 +244,30 @@ export default function Home() {
                 role: 'Frequent Traveler',
                 image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
                 rating: 5,
-                comment: 'BusBook has completely changed how I travel. The booking process is so smooth, and the buses are always on time. Highly recommended!',
+                comment:
+                  'BusBook has completely changed how I travel. The booking process is so smooth, and the buses are always on time. Highly recommended!',
               },
               {
                 name: 'Michael Chen',
                 role: 'Business Professional',
                 image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
                 rating: 5,
-                comment: 'I travel for work weekly, and BusBook makes it hassle-free. The Wi-Fi on buses is excellent, and customer service is top-notch.',
+                comment:
+                  'I travel for work weekly, and BusBook makes it hassle-free. The Wi-Fi on buses is excellent, and customer service is top-notch.',
               },
               {
                 name: 'Emily Rodriguez',
                 role: 'Tourist',
                 image: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop',
                 rating: 5,
-                comment: 'As a tourist, I was worried about navigating bus travel, but BusBook made it incredibly easy. The app is intuitive and support is amazing!',
+                comment:
+                  'As a tourist, I was worried about navigating bus travel, but BusBook made it incredibly easy. The app is intuitive and support is amazing!',
               },
             ].map((testimonial, index) => (
-              <div key={index} className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all p-8 border border-gray-100">
+              <div
+                key={index}
+                className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all p-8 border border-gray-100"
+              >
                 <div className="flex gap-1 mb-4">
                   {[...Array(testimonial.rating)].map((_, i) => (
                     <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
@@ -281,9 +296,12 @@ export default function Home() {
       {/* Download App CTA */}
       <section className="py-20 bg-linear-to-br from-[#2563EB] to-[#1e40af] text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }}></div>
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            }}
+          ></div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -295,7 +313,8 @@ export default function Home() {
               </div>
               <h2 className="text-white mb-6 text-4xl font-bold">Get the BusBook App</h2>
               <p className="text-xl text-blue-100 mb-8">
-                Download our mobile app and enjoy exclusive deals, faster bookings, and seamless travel management on the go.
+                Download our mobile app and enjoy exclusive deals, faster bookings, and seamless travel management on
+                the go.
               </p>
 
               <div className="space-y-4 mb-8">
@@ -315,7 +334,7 @@ export default function Home() {
               <div className="flex flex-wrap gap-4">
                 <button className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-3">
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                    <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
                   </svg>
                   <div className="text-left">
                     <div className="text-xs">Download on the</div>
@@ -324,7 +343,7 @@ export default function Home() {
                 </button>
                 <button className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-3">
                   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.53,12.9 20.18,13.18L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/>
+                    <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.53,12.9 20.18,13.18L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z" />
                   </svg>
                   <div className="text-left">
                     <div className="text-xs">Get it on</div>
