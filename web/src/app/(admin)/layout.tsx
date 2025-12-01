@@ -46,11 +46,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (isInitialized && !isAuthenticated) {
-      router.push('/login')
-    } else if (isInitialized && user?.role !== 'admin') {
-      router.push('/dashboard')
+      // Store current path as callback URL
+      const currentPath = pathname
+      const callbackUrl = encodeURIComponent(currentPath)
+      router.push(`/login?callbackUrl=${callbackUrl}`)
+    } else if (isInitialized && isAuthenticated && user?.role !== 'admin') {
+      // Only redirect non-admin users away from admin pages
+      router.push('/')
     }
-  }, [isAuthenticated, isInitialized, user, router])
+  }, [isAuthenticated, isInitialized, user?.role, router, pathname])
 
   // Load sidebar state from localStorage
   useEffect(() => {
@@ -112,10 +116,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-20 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
+        <div className="fixed inset-0 bg-black/50 z-20 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
@@ -128,9 +129,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
           <div className={`flex items-center gap-2 ${sidebarCollapsed ? 'justify-center w-full' : ''}`}>
             <Bus className="w-8 h-8 text-blue-600 shrink-0" />
-            {!sidebarCollapsed && (
-              <span className="text-xl font-bold text-gray-900 dark:text-white">BusBooking</span>
-            )}
+            {!sidebarCollapsed && <span className="text-xl font-bold text-gray-900 dark:text-white">BusBooking</span>}
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -190,9 +189,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10">
                 <AvatarImage src={user?.avatar} alt={user?.username || user?.email} />
-                <AvatarFallback className="bg-blue-600 text-white">
-                  {getUserInitials()}
-                </AvatarFallback>
+                <AvatarFallback className="bg-blue-600 text-white">{getUserInitials()}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
@@ -248,9 +245,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <DropdownMenuContent align="end" className="w-80">
                   <DropdownMenuLabel>Notifications</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <div className="p-4 text-sm text-gray-600 dark:text-gray-400 text-center">
-                    No new notifications
-                  </div>
+                  <div className="p-4 text-sm text-gray-600 dark:text-gray-400 text-center">No new notifications</div>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -260,9 +255,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <Button variant="ghost" className="flex items-center gap-2 px-2">
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={user?.avatar} alt={user?.username || user?.email} />
-                      <AvatarFallback className="bg-blue-600 text-white text-xs">
-                        {getUserInitials()}
-                      </AvatarFallback>
+                      <AvatarFallback className="bg-blue-600 text-white text-xs">{getUserInitials()}</AvatarFallback>
                     </Avatar>
                     <div className="hidden md:block text-left">
                       <p className="text-sm font-medium text-gray-900 dark:text-white">
@@ -282,7 +275,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push('/dashboard/profile')}>
+                  <DropdownMenuItem onClick={() => router.push('//profile')}>
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>

@@ -1,19 +1,23 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/layout/Header'
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isInitialized } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     if (isInitialized && !isAuthenticated) {
-      router.push('/login')
+      // Store current path as callback URL
+      const currentPath = pathname
+      const callbackUrl = encodeURIComponent(currentPath)
+      router.push(`/login?callbackUrl=${callbackUrl}`)
     }
-  }, [isAuthenticated, isInitialized, router])
+  }, [isAuthenticated, isInitialized, router, pathname])
 
   if (!isInitialized) {
     return (
