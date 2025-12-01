@@ -31,7 +31,7 @@ export default function Home() {
       if (user?.role === 'admin') {
         router.push('/admin')
       } else {
-        router.push('/dashboard')
+        router.push('/')
       }
     }
   }, [isAuthenticated, isInitialized, user, router])

@@ -1,6 +1,6 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Settings } from 'lucide-react'
 
 export default function SettingsPage() {
@@ -16,12 +16,8 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="text-center">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Coming Soon
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              Settings functionality will be available soon.
-            </p>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Coming Soon</h3>
+            <p className="text-gray-600 dark:text-gray-400">Settings functionality will be available soon.</p>
           </div>
         </CardContent>
       </Card>

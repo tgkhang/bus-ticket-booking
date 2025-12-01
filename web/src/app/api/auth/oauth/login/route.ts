@@ -45,8 +45,16 @@ export async function GET(request: NextRequest) {
       // Extract cookies from backend response
       const setCookieHeaders = backendResponse.headers['set-cookie'];
 
-      // Create redirect response
-      const redirectResponse = NextResponse.redirect(new URL('/auth/oauth-success', request.url));
+      // Preserve callback URL from original request if it exists
+      const url = new URL(request.url);
+      const callbackUrl = url.searchParams.get('callbackUrl');
+
+      // Create redirect response with callback URL if present
+      const successUrl = new URL('/auth/oauth-success', request.url);
+      if (callbackUrl) {
+        successUrl.searchParams.set('callbackUrl', callbackUrl);
+      }
+      const redirectResponse = NextResponse.redirect(successUrl);
 
       // Forward cookies to browser
       if (setCookieHeaders) {

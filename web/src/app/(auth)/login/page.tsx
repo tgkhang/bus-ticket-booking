@@ -22,15 +22,32 @@ export default function LoginPage() {
 
   const registeredEmail = searchParams.get('registeredEmail')
   const verifiedEmail = searchParams.get('verifiedEmail')
+  const callbackUrl = searchParams.get('callbackUrl')
+
+  // Build Google OAuth URL with callback URL if present
+  const googleOAuthUrl = callbackUrl
+    ? `/auth/login?connection=google-oauth2&prompt=select_account&callbackUrl=${callbackUrl}`
+    : '/auth/login?connection=google-oauth2&prompt=select_account'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      await login(formData.email, formData.password)
+      const user = await login(formData.email, formData.password)
       toast.success('Login successful!')
-      router.push('/dashboard')
+
+      // Get callback URL from search params
+      const callbackUrl = searchParams.get('callbackUrl')
+
+      // Role-based routing
+      if (callbackUrl) {
+        router.push(decodeURIComponent(callbackUrl))
+      } else if (user.role === 'admin') {
+        router.push('/admin')
+      } else {
+        router.push('/')
+      }
     } catch (error) {
       setIsLoading(false)
     }
@@ -64,7 +81,9 @@ export default function LoginPage() {
           <div className="space-y-8">
             <div>
               <h1 className="text-5xl text-white mb-4 leading-tight">
-                Your Journey<br />Starts Here
+                Your Journey
+                <br />
+                Starts Here
               </h1>
               <p className="text-xl text-blue-100 max-w-md">
                 Book comfortable bus tickets across the country with just a few clicks
@@ -105,7 +124,8 @@ export default function LoginPage() {
               ))}
             </div>
             <p className="text-blue-50 mb-3">
-              &quot;BusBook made my travel planning so easy! The booking process is smooth and the buses are always on time.&quot;
+              &quot;BusBook made my travel planning so easy! The booking process is smooth and the buses are always on
+              time.&quot;
             </p>
             <p className="text-sm">
               <span className="text-white font-semibold">Sarah Johnson</span>
@@ -228,7 +248,7 @@ export default function LoginPage() {
           {/* Social Login */}
           <div className="grid grid-cols-2 gap-3">
             <a
-              href="/auth/login?connection=google-oauth2&prompt=select_account"
+              href={googleOAuthUrl}
               className="flex items-center justify-center gap-2 border-2 border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -252,7 +272,10 @@ export default function LoginPage() {
               Google
             </a>
 
-            <button className="flex items-center justify-center gap-2 border-2 border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium opacity-50 cursor-not-allowed" disabled>
+            <button
+              className="flex items-center justify-center gap-2 border-2 border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium opacity-50 cursor-not-allowed"
+              disabled
+            >
               <svg className="w-5 h-5" fill="#1877F2" viewBox="0 0 24 24">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
               </svg>
