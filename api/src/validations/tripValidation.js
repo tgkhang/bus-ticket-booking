@@ -16,7 +16,7 @@ const search = async (req, res, next) => {
     maxPrice: Joi.number().min(0),
     busModel: Joi.string(),
     amenities: Joi.string(), // comma-separated
-    status: Joi.string().valid('scheduled', 'completed', 'cancelled'),
+    status: Joi.string().valid('scheduled', 'active', 'completed', 'cancelled'),
     page: Joi.number().integer().min(1).default(1),
     limit: Joi.number().integer().min(1).max(100).default(20),
     sortBy: Joi.string().valid('price', 'departure', 'duration').default('departure'),

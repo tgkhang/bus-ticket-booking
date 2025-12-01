@@ -271,7 +271,7 @@ paths:
           description: Comma-separated required amenities (e.g., wifi,ac,toilet).
         - in: query
           name: status
-          schema: { type: string, enum: [scheduled, cancelled, completed] }
+          schema: { type: string, enum: [scheduled, active, completed, cancelled] }
         - in: query
           name: sortBy
           schema: { type: string, enum: [price, departure, duration] }
