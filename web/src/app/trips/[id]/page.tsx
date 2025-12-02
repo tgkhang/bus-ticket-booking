@@ -208,8 +208,8 @@ export default function TripDetailsPage() {
                         <div>
                           <h4 className="font-medium text-gray-900">{stop.stop.name}</h4>
                           <p className="text-sm text-gray-500">{stop.stop.address}</p>
-                          {stop.type === 'pickup' && <Badge variant="outline" className="mt-1 text-blue-600 border-blue-200 bg-blue-50">Pickup Point</Badge>}
-                          {stop.type === 'dropoff' && <Badge variant="outline" className="mt-1 text-green-600 border-green-200 bg-green-50">Dropoff Point</Badge>}
+                          {stop.type === 'pickup' && <Badge variant="default" className="mt-1 text-blue-600 border-blue-200 bg-blue-50">Pickup Point</Badge>}
+                          {stop.type === 'dropoff' && <Badge variant="default" className="mt-1 text-green-600 border-green-200 bg-green-50">Dropoff Point</Badge>}
                         </div>
                         {stop.time && (
                           <div className="text-right">
