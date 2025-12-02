@@ -122,6 +122,76 @@ const findUsedStopIds = async (id) => {
   }
 }
 
+const getRoutes = async (filters = {}, pagination = {}) => {
+  try {
+    const prisma = GET_DB()
+    const { operatorId, name, originStopId, destinationStopId, active, estimatedMinutes, search } = filters
+    const { page = 1, limit = 20 } = pagination
+
+    const skip = (page - 1) * limit
+    const take = parseInt(limit)
+    const where = {}
+
+    if (operatorId) {
+      where.operatorId = operatorId
+    }
+
+    if (name) {
+      where.name = {
+        contains: name,
+        mode: 'insensitive',
+      }
+    }
+
+    if (originStopId) {
+      where.originStopId = originStopId
+    }
+
+    if (destinationStopId) {
+      where.destinationStopId = destinationStopId
+    }
+
+    if (active !== undefined) {
+      where.active = active
+    }
+
+    if (estimatedMinutes) {
+      where.estimatedMinutes = parseInt(estimatedMinutes)
+    }
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { originStop: { name: { contains: search, mode: 'insensitive' } } },
+        { destinationStop: { name: { contains: search, mode: 'insensitive' } } },
+      ]
+    }
+
+    // Get total count
+    const total = await prisma.route.count({ where })
+
+    // Get routes
+    const routes = await prisma.route.findMany({
+      where,
+      skip,
+      take,
+      include: includeRelation,
+      orderBy: { name: 'asc' },
+    })
+
+    return {
+      data: routes,
+      pagination: {
+        page: parseInt(page),
+        limit: take,
+        total,
+        totalPages: Math.ceil(total / take),
+      },
+    }
+  } catch (error) {
+    throw new Error(error)
+  }
+}
 
 export const routeModel = {
   createRoute,
@@ -130,4 +200,5 @@ export const routeModel = {
   findById,
   findMany,
   findUsedStopIds,
+  getRoutes,
 }

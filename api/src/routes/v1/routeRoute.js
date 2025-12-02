@@ -7,7 +7,6 @@ import { PERMISSIONS } from '~/utils/constants'
 
 const Router = express.Router()
 
-// Routes endpoints
 Router.post(
   '/',
   authMiddleware.isAuthorized,

@@ -12,9 +12,29 @@ const createRoute = async (req, res, next) => {
   }
 }
 
-const listRoutes = async (_req, res, next) => {
+const listRoutes = async (req, res, next) => {
   try {
-    const result = await routeService.listRoutes()
+    const userOperatorId = req.jwtDecoded.operatorId || null
+    const filters = {
+      operatorId: req.query.operatorId,
+      name: req.query.name,
+      originStopId: req.query.originStopId,
+      destinationStopId: req.query.destinationStopId,
+      active: req.query.active !== undefined ? req.query.active === 'true' : undefined,
+      estimatedMinutes: req.query.estimatedMinutes,
+      search: req.query.search,
+    }
+
+    let { page, limit } = req.query
+    if (!page) page = DEFAULT_PAGE
+    if (!limit) limit = DEFAULT_ITEMS_PER_PAGE
+
+    const pagination = {
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+    }
+
+    const result = await routeService.listRoutes(filters, pagination)
     res.status(StatusCodes.OK).json(result)
   } catch (error) {
     next(error)
@@ -63,7 +83,7 @@ const listStops = async (req, res, next) => {
     const filters = {
       name: req.query.name,
       address: req.query.address,
-      active: req.query.active,
+      active: req.query.active !== undefined ? req.query.active === 'true' : undefined,
       search: req.query.search,
     }
 

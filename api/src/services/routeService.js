@@ -64,11 +64,44 @@ const listStops = async (filters, pagination) => {
 
 // Routes CRUD
 const createRoute = async (payload) => {
+  // Validate operator exists
   await ensureOperatorExists(payload.operatorId)
+
+  // Validate origin and destination stops exist
   await ensureStopsExist([payload.originStopId, payload.destinationStopId])
+
+  // Validate all stops in the stops array exist
   if (payload.stops?.length) {
-    await ensureStopsExist(payload.stops.map((s) => s.stopId))
+    const stopIds = payload.stops.map((s) => s.stopId)
+    await ensureStopsExist(stopIds)
+
+    // Additional business logic: Check if origin and destination are in the stops array
+    const hasOrigin = stopIds.includes(payload.originStopId)
+    const hasDestination = stopIds.includes(payload.destinationStopId)
+
+    if (!hasOrigin || !hasDestination) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        'Origin and destination stops must be included in the stops array'
+      )
+    }
+
+    // Validate that stops are active
+    const prisma = GET_DB()
+    const stops = await prisma.stop.findMany({
+      where: { id: { in: stopIds } },
+      select: { id: true, active: true, name: true },
+    })
+
+    const inactiveStops = stops.filter((s) => !s.active)
+    if (inactiveStops.length > 0) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        `Cannot create route with inactive stops: ${inactiveStops.map((s) => s.name).join(', ')}`
+      )
+    }
   }
+
   const mapped = mapRoutePayload(payload)
   return await routeModel.createRoute(mapped, payload.stops || [])
 }
@@ -99,8 +132,8 @@ const getRoute = async (id) => {
   return route
 }
 
-const listRoutes = async () => {
-  return await routeModel.findMany({})
+const listRoutes = async (filters, pagination) => {
+  return await routeModel.getRoutes(filters, pagination)
 }
 
 export const routeService = {
