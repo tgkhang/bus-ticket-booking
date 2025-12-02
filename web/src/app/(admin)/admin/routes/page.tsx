@@ -20,8 +20,10 @@ import type { Route, RouteStop, Stop } from '@/types/routeAndStop'
 import { listOperatorsAPI } from '@/lib/api'
 import { toast } from 'sonner'
 import type { Operator } from '@/types/api'
+import { useRouter } from 'next/navigation'
 
 export default function RoutesPage() {
+  const router = useRouter()
   const [routes, setRoutes] = useState<Route[]>([
     {
       id: '1',
@@ -443,7 +445,11 @@ export default function RoutesPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {routes.map((route) => (
-                    <tr key={route.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <tr
+                      key={route.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                      onClick={() => router.push(`/admin/routes/${route.id}`)}
+                    >
                       <td className="px-6 py-4">
                         <span className="text-base text-gray-900 dark:text-white font-medium">{route.name}</span>
                       </td>
