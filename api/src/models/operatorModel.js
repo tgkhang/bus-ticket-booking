@@ -2,7 +2,7 @@ import { GET_DB } from '~/config/prisma'
 
 const includeRelations = {
   buses: {
-    orderBy: { plate_number: 'asc' }
+    orderBy: { plateNumber: 'asc' }
   },
   routes: {
     orderBy: { name: 'asc' }
@@ -20,10 +20,10 @@ const createOperator = async (data) => {
     return await prisma.operator.create({
       data: {
         name: data.name,
-        contact_email: data.contactEmail,
-        contact_phone: data.contactPhone || null,
+        contactEmail: data.contactEmail,
+        contactPhone: data.contactPhone || null,
         status: data.status || 'pending',
-        approved_at: data.status === 'approved' ? new Date() : null,
+        approvedAt: data.status === 'approved' ? new Date() : null,
       },
       include: includeRelations,
     })
@@ -48,7 +48,7 @@ const findOperatorByEmail = async (email) => {
   try {
     const prisma = GET_DB()
     return await prisma.operator.findFirst({
-      where: { contact_email: email },
+      where: { contactEmail: email },
     })
   } catch (error) {
     throw new Error(error)
@@ -74,8 +74,8 @@ const findAllOperators = async (filters = {}, pagination = {}) => {
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
-        { contact_email: { contains: search, mode: 'insensitive' } },
-        { contact_phone: { contains: search, mode: 'insensitive' } },
+        { contactEmail: { contains: search, mode: 'insensitive' } },
+        { contactPhone: { contains: search, mode: 'insensitive' } },
       ]
     }
 
@@ -112,13 +112,13 @@ const updateOperator = async (id, data) => {
     const updateData = {}
 
     if (data.name) updateData.name = data.name
-    if (data.contactEmail) updateData.contact_email = data.contactEmail
-    if (data.contactPhone !== undefined) updateData.contact_phone = data.contactPhone || null
+    if (data.contactEmail) updateData.contactEmail = data.contactEmail
+    if (data.contactPhone !== undefined) updateData.contactPhone = data.contactPhone || null
     if (data.status) {
       updateData.status = data.status
       // Set approved_at when status changes to approved
       if (data.status === 'approved') {
-        updateData.approved_at = new Date()
+        updateData.approvedAt = new Date()
       }
     }
 
@@ -155,7 +155,7 @@ const checkOperatorHasActiveResources = async (operatorId) => {
 
     // Check for buses
     const busCount = await prisma.bus.count({
-      where: { operator_id: operatorId },
+      where: { operatorId: operatorId },
     })
 
     // Check for routes
@@ -185,10 +185,10 @@ const getOperatorWithDetails = async (operatorId) => {
       where: { id: operatorId },
       include: {
         buses: {
-          orderBy: { plate_number: 'asc' },
+          orderBy: { plateNumber: 'asc' },
           include: {
             seats: {
-              where: { is_active: true },
+              where: { isActive: true },
             },
           },
         },
@@ -213,7 +213,7 @@ const getOperatorStatistics = async (operatorId) => {
     const prisma = GET_DB()
 
     const [busCount, routeCount, tripCount] = await Promise.all([
-      prisma.bus.count({ where: { operator_id: operatorId } }),
+      prisma.bus.count({ where: { operatorId: operatorId } }),
       prisma.route.count({ where: { operatorId: operatorId } }),
       prisma.trip.count({
         where: {

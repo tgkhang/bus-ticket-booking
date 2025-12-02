@@ -111,25 +111,25 @@ export interface PaginatedResponse<T> {
 export interface Operator {
   id: string
   name: string
-  contact_email: string
-  contact_phone?: string
+  contactEmail: string
+  contactPhone?: string
   status: 'pending' | 'approved' | 'suspended'
-  approved_at?: string
+  approvedAt?: string
   createdAt?: string
   updatedAt?: string
 }
 
 export interface CreateOperatorData {
   name: string
-  contact_email: string
-  contact_phone?: string
+  contactEmail: string
+  contactPhone?: string
   status?: 'pending' | 'approved' | 'suspended'
 }
 
 export interface UpdateOperatorData {
   name?: string
-  contact_email?: string
-  contact_phone?: string
+  contactEmail?: string
+  contactPhone?: string
   status?: 'pending' | 'approved' | 'suspended'
 }
 

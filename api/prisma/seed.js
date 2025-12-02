@@ -57,10 +57,10 @@ async function main() {
     operator = await prisma.operator.create({
       data: {
         name: 'Green Bus Lines',
-        contact_email: 'contact@greenbus.com',
-        contact_phone: '+1555000111',
+        contactEmail: 'contact@greenbus.com',
+        contactPhone: '+1555000111',
         status: 'approved',
-        approved_at: new Date(),
+        approvedAt: new Date(),
       },
     })
   }
@@ -185,14 +185,14 @@ async function main() {
 
   // Create sample bus
   const bus = await prisma.bus.upsert({
-    where: { plate_number: 'GBL-001' },
+    where: { plateNumber: 'GBL-001' },
     update: {},
     create: {
-      operator_id: operator.id,
-      plate_number: 'GBL-001',
+      operatorId: operator.id,
+      plateNumber: 'GBL-001',
       model: 'Mercedes Sprinter',
-      seat_capacity: 16,
-      amenities_json: JSON.stringify({
+      seatCapacity: 16,
+      amenities: JSON.stringify({
         wifi: true,
         ac: true,
         restroom: true,
@@ -212,17 +212,17 @@ async function main() {
   for (const seatNumber of seatNumbers) {
     await prisma.seat.upsert({
       where: {
-        bus_id_seat_number: {
-          bus_id: bus.id,
-          seat_number: seatNumber,
+        busId_seatNumber: {
+          busId: bus.id,
+          seatNumber: seatNumber,
         },
       },
       update: {},
       create: {
-        bus_id: bus.id,
-        seat_number: seatNumber,
-        seat_type: seatNumber.startsWith('A') ? 'premium' : 'regular',
-        is_active: true,
+        busId: bus.id,
+        seatNumber: seatNumber,
+        seatType: seatNumber.startsWith('A') ? 'premium' : 'regular',
+        isActive: true,
       },
     })
   }
@@ -248,16 +248,16 @@ async function main() {
       // Arrival based on estimatedMinutes
       arr.setMinutes(arr.getMinutes() + (r.estimatedMinutes || 60))
       const exists = await prisma.trip.findFirst({
-        where: { route_id: r.id, bus_id: bus.id, departure_time: dep },
+        where: { routeId: r.id, busId: bus.id, departureTime: dep },
       })
       if (!exists) {
         await prisma.trip.create({
           data: {
-            route_id: r.id,
-            bus_id: bus.id,
-            departure_time: dep,
-            arrival_time: arr,
-            base_price: w.price,
+            routeId: r.id,
+            busId: bus.id,
+            departureTime: dep,
+            arrivalTime: arr,
+            basePrice: w.price,
             status: 'scheduled',
           },
         })
@@ -266,33 +266,23 @@ async function main() {
   }
 
   // Create seat statuses for all upcoming trips on the bus
-  const seats = await prisma.seat.findMany({ where: { bus_id: bus.id } })
-  const tripsForBus = await prisma.trip.findMany({ where: { bus_id: bus.id } })
+  const seats = await prisma.seat.findMany({ where: { busId: bus.id } })
+  const tripsForBus = await prisma.trip.findMany({ where: { busId: bus.id } })
   for (const t of tripsForBus) {
     for (const seat of seats) {
       await prisma.seatStatus.upsert({
         where: {
-          trip_id_seat_id: { trip_id: t.id, seat_id: seat.id },
+          tripId_seatId: { tripId: t.id, seatId: seat.id },
         },
         update: {},
         create: {
-          trip_id: t.id,
-          seat_id: seat.id,
+          tripId: t.id,
+          seatId: seat.id,
           status: 'available',
         },
       })
     }
   }
-
-  // Create sample payment method
-  await prisma.paymentMethod.create({
-    data: {
-      user_id: user1.id,
-      provider: 'stripe',
-      token: 'card_1234567890abcdef',
-      is_default: true,
-    },
-  })
 
   console.log('✅ Database seeding completed!')
 }

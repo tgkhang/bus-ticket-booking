@@ -63,15 +63,15 @@ model RefreshToken {
 }
 
 model PaymentMethod {
-  id         String  @id @default(uuid())
-  user_id    String
-  provider   String  // stripe, paypal, vnpay, etc.
-  token      String  // encrypted token/card details
-  is_default Boolean @default(false)
-  created_at DateTime @default(now())
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  provider    String   // stripe, paypal, vnpay, etc.
+  token       String   // encrypted token/card details
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   // Relationships
-  user          User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   notifications Notification[]
 
   @@map("payment_methods")
@@ -79,12 +79,14 @@ model PaymentMethod {
 
 // Operator Management
 model Operator {
-  id            String    @id @default(uuid())
-  name          String
-  contact_email String
-  contact_phone String?
-  status        String    @default("pending") // pending, approved, suspended
-  approved_at   DateTime?
+  id           String    @id @default(uuid())
+  name         String
+  contactEmail String    @map("contact_email")
+  contactPhone String?   @map("contact_phone")
+  status       String    @default("pending") // pending, approved, suspended
+  approvedAt   DateTime? @map("approved_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   // Relationships
   routes Route[]
@@ -163,15 +165,18 @@ model RouteStop {
 }
 
 model Bus {
-  id             String @id @default(uuid())
-  operator_id    String
-  plate_number   String @unique
-  model          String
-  seat_capacity  Int
-  amenities_json String? // JSON string for amenities like WiFi, AC, etc.
+  id            String   @id @default(uuid())
+  operatorId    String   @map("operator_id")
+  plateNumber   String   @unique @map("plate_number")
+  model         String
+  seatCapacity  Int      @map("seat_capacity")
+  amenities     String?  @map("amenities_json") // JSON string for amenities like WiFi, AC, etc.
+  status        String   @default("active") // active, inactive, maintenance
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relationships
-  operator Operator @relation(fields: [operator_id], references: [id], onDelete: Cascade)
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
   seats    Seat[]
   trips    Trip[]
 
@@ -179,134 +184,134 @@ model Bus {
 }
 
 model Seat {
-  id          String  @id @default(uuid())
-  bus_id      String
-  seat_number String
-  seat_type   String  @default("regular") // regular, premium, sleeper
-  is_active   Boolean @default(true)
+  id         String  @id @default(uuid())
+  busId      String  @map("bus_id")
+  seatNumber String  @map("seat_number")
+  seatType   String  @default("regular") @map("seat_type") // regular, premium, sleeper
+  isActive   Boolean @default(true) @map("is_active")
 
   // Relationships
-  bus          Bus          @relation(fields: [bus_id], references: [id], onDelete: Cascade)
-  seat_statuses SeatStatus[]
+  bus         Bus          @relation(fields: [busId], references: [id], onDelete: Cascade)
+  seatStatuses SeatStatus[]
 
-  @@unique([bus_id, seat_number])
+  @@unique([busId, seatNumber])
   @@map("seats")
 }
 
 // Trip and Booking Management
 model Trip {
-  id             String    @id @default(uuid())
-  route_id       String
-  bus_id         String
-  departure_time DateTime
-  arrival_time   DateTime
-  base_price     Decimal   @db.Decimal(10, 2)
-  status         String    @default("scheduled") // scheduled, active, completed, cancelled
+  id            String   @id @default(uuid())
+  routeId       String   @map("route_id")
+  busId         String   @map("bus_id")
+  departureTime DateTime @map("departure_time")
+  arrivalTime   DateTime @map("arrival_time")
+  basePrice     Decimal  @db.Decimal(10, 2) @map("base_price")
+  status        String   @default("scheduled") // scheduled, active, completed, cancelled
 
   // Relationships
-  route         Route        @relation(fields: [route_id], references: [id], onDelete: Cascade)
-  bus           Bus          @relation(fields: [bus_id], references: [id], onDelete: Cascade)
-  seat_statuses SeatStatus[]
-  bookings      Booking[]
-  feedbacks     Feedback[]
+  route        Route        @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  bus          Bus          @relation(fields: [busId], references: [id], onDelete: Cascade)
+  seatStatuses SeatStatus[]
+  bookings     Booking[]
+  feedbacks    Feedback[]
 
   @@map("trips")
-  @@index([route_id, departure_time])
-  @@index([departure_time])
-  @@index([base_price])
+  @@index([routeId, departureTime])
+  @@index([departureTime])
+  @@index([basePrice])
   @@index([status])
 }
 
 model SeatStatus {
-  id           String    @id @default(uuid())
-  trip_id      String
-  seat_id      String
-  status       String    @default("available") // available, locked, booked
-  locked_until DateTime?
+  id          String    @id @default(uuid())
+  tripId      String    @map("trip_id")
+  seatId      String    @map("seat_id")
+  status      String    @default("available") // available, locked, booked
+  lockedUntil DateTime? @map("locked_until")
 
   // Relationships
-  trip Trip @relation(fields: [trip_id], references: [id], onDelete: Cascade)
-  seat Seat @relation(fields: [seat_id], references: [id], onDelete: Cascade)
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  seat Seat @relation(fields: [seatId], references: [id], onDelete: Cascade)
 
-  @@unique([trip_id, seat_id])
+  @@unique([tripId, seatId])
   @@map("seat_statuses")
 }
 
 model Booking {
-  id           String   @id @default(uuid())
-  user_id      String
-  trip_id      String
-  status       String   @default("pending") // pending, confirmed, cancelled, completed
-  total_amount Decimal  @db.Decimal(10, 2)
-  booked_at    DateTime @default(now())
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  tripId          String   @map("trip_id")
+  status          String   @default("pending") // pending, confirmed, cancelled, completed
+  totalAmount     Decimal  @db.Decimal(10, 2) @map("total_amount")
+  bookedAt        DateTime @default(now()) @map("booked_at")
 
   // Relationships
-  user             User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  trip             Trip              @relation(fields: [trip_id], references: [id], onDelete: Cascade)
-  payments         Payment[]
-  notifications    Notification[]
-  passenger_details PassengerDetail[]
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip            Trip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  payments        Payment[]
+  notifications   Notification[]
+  passengerDetails PassengerDetail[]
 
   @@map("bookings")
 }
 
 model Payment {
-  id              String    @id @default(uuid())
-  booking_id      String
-  provider        String    // stripe, paypal, vnpay, etc.
-  transaction_ref String?   @unique
-  amount          Decimal   @db.Decimal(10, 2)
-  status          String    @default("pending") // pending, completed, failed, refunded
-  processed_at    DateTime?
+  id             String    @id @default(uuid())
+  bookingId      String    @map("booking_id")
+  provider       String    // stripe, paypal, vnpay, etc.
+  transactionRef String?   @unique @map("transaction_ref")
+  amount         Decimal   @db.Decimal(10, 2)
+  status         String    @default("pending") // pending, completed, failed, refunded
+  processedAt    DateTime? @map("processed_at")
 
   // Relationships
-  booking Booking @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@map("payments")
 }
 
 model PassengerDetail {
-  id          String @id @default(uuid())
-  booking_id  String
-  full_name   String
-  document_id String // ID card, passport number
-  seat_code   String // e.g., "A1", "B5"
+  id         String @id @default(uuid())
+  bookingId  String @map("booking_id")
+  fullName   String @map("full_name")
+  documentId String @map("document_id") // ID card, passport number
+  seatCode   String @map("seat_code") // e.g., "A1", "B5"
 
   // Relationships
-  booking Booking @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@map("passenger_details")
 }
 
 // Notification and Feedback
 model Notification {
-  id               String    @id @default(uuid())
-  booking_id       String?
-  payment_method_id String?
-  channel          String    // email, sms, push
-  template         String    // booking_confirmed, payment_received, etc.
-  status           String    @default("pending") // pending, sent, failed
-  sent_at          DateTime?
+  id              String    @id @default(uuid())
+  bookingId       String?   @map("booking_id")
+  paymentMethodId String?   @map("payment_method_id")
+  channel         String    // email, sms, push
+  template        String    // booking_confirmed, payment_received, etc.
+  status          String    @default("pending") // pending, sent, failed
+  sentAt          DateTime? @map("sent_at")
 
   // Relationships
-  booking        Booking?       @relation(fields: [booking_id], references: [id], onDelete: Cascade)
-  payment_method PaymentMethod? @relation(fields: [payment_method_id], references: [id], onDelete: Cascade)
+  booking       Booking?       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
 }
 
 model Feedback {
-  id           String   @id @default(uuid())
-  trip_id      String
-  user_id      String
-  rating       Int      // 1-5 stars
-  comment      String?
-  submitted_at DateTime @default(now())
+  id          String   @id @default(uuid())
+  tripId      String   @map("trip_id")
+  userId      String   @map("user_id")
+  rating      Int      // 1-5 stars
+  comment     String?
+  submittedAt DateTime @default(now()) @map("submitted_at")
 
   // Relationships
-  trip Trip @relation(fields: [trip_id], references: [id], onDelete: Cascade)
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([trip_id, user_id]) // One feedback per user per trip
+  @@unique([tripId, userId]) // One feedback per user per trip
   @@map("feedbacks")
 }

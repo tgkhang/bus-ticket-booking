@@ -16,12 +16,6 @@ import type {
   ListOperatorsFilters,
 } from '@/types/api'
 import { toast } from 'sonner'
-import {
-  transformBusFromAPI,
-  transformBusesFromAPI,
-  transformBusForAPI,
-  transformOperatorsFromAPI,
-} from '@/lib/utils/transformers'
 
 //=================================
 // User Authentication API Calls
@@ -72,10 +66,9 @@ export const oauthGoogleLoginAPI = async (userData: OAuthGoogleData) => {
 //=================================
 
 export const createBusAPI = async (busData: CreateBusData) => {
-  const transformedData = transformBusForAPI(busData)
-  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/buses`, transformedData)
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/buses`, busData)
   toast.success('Bus created successfully')
-  return transformBusFromAPI(response.data)
+  return response.data
 }
 
 export const listBusesAPI = async (
@@ -87,15 +80,12 @@ export const listBusesAPI = async (
     ...pagination,
   }
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/buses`, { params })
-  return {
-    data: transformBusesFromAPI(response.data.data),
-    pagination: response.data.pagination,
-  }
+  return response.data
 }
 
 export const getBusDetailsAPI = async (busId: string): Promise<Bus> => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/buses/${busId}`)
-  return transformBusFromAPI(response.data)
+  return response.data
 }
 
 export const deleteBusAPI = async (busId: string) => {
@@ -108,13 +98,12 @@ export const searchBusesAPI = async (filters: SearchBusesFilters): Promise<Bus[]
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/buses/search`, {
     params: filters,
   })
-  return transformBusesFromAPI(response.data)
+  return response.data
 }
 
 export const updateBusAPI = async (busId: string, busData: UpdateBusData) => {
-  const transformedData = transformBusForAPI(busData)
-  const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/buses/${busId}`, transformedData)
-  return transformBusFromAPI(response.data)
+  const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/buses/${busId}`, busData)
+  return response.data
 }
 
 // // Update bus
@@ -139,13 +128,10 @@ export const listOperatorsAPI = async (
     ...pagination,
   }
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/operators`, { params })
-  return {
-    data: transformOperatorsFromAPI(response.data.data),
-    pagination: response.data.pagination,
-  }
+  return response.data
 }
 
 export const getOperatorDetailsAPI = async (operatorId: string): Promise<Operator> => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/operators/${operatorId}`)
-  return transformOperatorsFromAPI([response.data])[0]
+  return response.data
 }

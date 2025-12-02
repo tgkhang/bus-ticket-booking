@@ -106,6 +106,11 @@ const login = async (reqBody, req) => {
     const existingUser = await userModel.findOneByEmail(email)
     const invalidCredentialsError = new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid email or password')
 
+    // Check if user exists
+    if (!existingUser) {
+      throw invalidCredentialsError
+    }
+
     // Verify password
     if (!bcryptjs.compareSync(reqBody.password, existingUser.password)) {
       throw invalidCredentialsError

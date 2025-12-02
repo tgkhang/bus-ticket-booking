@@ -3,7 +3,7 @@ import { GET_DB } from '~/config/prisma'
 const includeRelations = {
   operator: true,
   seats: {
-    orderBy: { seat_number: 'asc' }
+    orderBy: { seatNumber: 'asc' }
   },
 }
 
@@ -20,11 +20,12 @@ const createBus = async (data) => {
 
     return await prisma.bus.create({
       data: {
-        operator_id: data.operator_id,
-        plate_number: data.plate_number.toUpperCase(),
+        operatorId: data.operatorId,
+        plateNumber: data.plateNumber.toUpperCase(),
         model: data.model,
-        seat_capacity: data.seat_capacity,
-        amenities_json: amenitiesJson,
+        seatCapacity: data.seatCapacity,
+        amenities: amenitiesJson,
+        status: data.status || 'active',
       },
       include: includeRelations,
     })
@@ -42,8 +43,8 @@ const findBusById = async (id) => {
     })
 
     // Parse amenities JSON
-    if (bus && bus.amenities_json) {
-      bus.amenities = JSON.parse(bus.amenities_json)
+    if (bus && bus.amenities) {
+      bus.amenities = JSON.parse(bus.amenities)
     }
 
     return bus
@@ -56,7 +57,7 @@ const findBusByPlateNumber = async (plateNumber) => {
   try {
     const prisma = GET_DB()
     return await prisma.bus.findUnique({
-      where: { plate_number: plateNumber.toUpperCase() },
+      where: { plateNumber: plateNumber.toUpperCase() },
     })
   } catch (error) {
     throw new Error(error)
@@ -76,25 +77,25 @@ const findAllBuses = async (filters = {}, pagination = {}) => {
     const where = {}
 
     if (operatorId) {
-      where.operator_id = operatorId
+      where.operatorId = operatorId
     }
 
     if (plateNumber) {
-      where.plate_number = {
+      where.plateNumber = {
         contains: plateNumber.toUpperCase(),
         mode: 'insensitive'
       }
     }
 
     if (minCapacity) {
-      where.seat_capacity = {
+      where.seatCapacity = {
         gte: parseInt(minCapacity)
       }
     }
 
     if (search) {
       where.OR = [
-        { plate_number: { contains: search, mode: 'insensitive' } },
+        { plateNumber: { contains: search, mode: 'insensitive' } },
         { model: { contains: search, mode: 'insensitive' } },
       ]
     }
@@ -108,13 +109,13 @@ const findAllBuses = async (filters = {}, pagination = {}) => {
       skip,
       take,
       include: includeRelations,
-      orderBy: { plate_number: 'asc' },
+      orderBy: { plateNumber: 'asc' },
     })
 
     // Parse amenities JSON for each bus
     buses.forEach(bus => {
-      if (bus.amenities_json) {
-        bus.amenities = JSON.parse(bus.amenities_json)
+      if (bus.amenities) {
+        bus.amenities = JSON.parse(bus.amenities)
       }
     })
 
@@ -138,11 +139,11 @@ const updateBus = async (id, data) => {
 
     const updateData = {}
 
-    if (data.plate_number) updateData.plate_number = data.plate_number.toUpperCase()
+    if (data.plateNumber) updateData.plateNumber = data.plateNumber.toUpperCase()
     if (data.model) updateData.model = data.model
-    if (data.seat_capacity) updateData.seat_capacity = data.seat_capacity
+    if (data.seatCapacity) updateData.seatCapacity = data.seatCapacity
     if (data.status) updateData.status = data.status
-    if (data.amenities) updateData.amenities_json = JSON.stringify(data.amenities)
+    if (data.amenities) updateData.amenities = JSON.stringify(data.amenities)
 
     const updated = await prisma.bus.update({
       where: { id },
@@ -151,8 +152,8 @@ const updateBus = async (id, data) => {
     })
 
     // Parse amenities JSON
-    if (updated && updated.amenities_json) {
-      updated.amenities = JSON.parse(updated.amenities_json)
+    if (updated && updated.amenities) {
+      updated.amenities = JSON.parse(updated.amenities)
     }
 
     return updated
@@ -181,7 +182,7 @@ const checkBusHasActiveTrips = async (busId) => {
     const prisma = GET_DB()
     const count = await prisma.trip.count({
       where: {
-        bus_id: busId,
+        busId: busId,
         status: { in: ['scheduled', 'active'] },
       },
     })
@@ -199,16 +200,16 @@ const getBusWithTrips = async (busId, filters = {}) => {
     const tripWhere = {}
     if (status) tripWhere.status = status
     if (startDate || endDate) {
-      tripWhere.departure_time = {}
-      if (startDate) tripWhere.departure_time.gte = new Date(startDate)
-      if (endDate) tripWhere.departure_time.lte = new Date(endDate)
+      tripWhere.departureTime = {}
+      if (startDate) tripWhere.departureTime.gte = new Date(startDate)
+      if (endDate) tripWhere.departureTime.lte = new Date(endDate)
     }
 
     const bus = await prisma.bus.findUnique({
       where: { id: busId },
       include: {
         operator: true,
-        seats: { orderBy: { seat_number: 'asc' } },
+        seats: { orderBy: { seatNumber: 'asc' } },
         trips: {
           where: tripWhere,
           include: {
@@ -219,14 +220,14 @@ const getBusWithTrips = async (busId, filters = {}) => {
               },
             },
           },
-          orderBy: { departure_time: 'asc' },
+          orderBy: { departureTime: 'asc' },
         },
       },
     })
 
     // Parse amenities JSON
-    if (bus && bus.amenities_json) {
-      bus.amenities = JSON.parse(bus.amenities_json)
+    if (bus && bus.amenities) {
+      bus.amenities = JSON.parse(bus.amenities)
     }
 
     return bus
@@ -263,7 +264,7 @@ const searchBuses = async (filters = {}) => {
         const endOfDay = new Date(date)
         endOfDay.setHours(23, 59, 59, 999)
 
-        where.trips.some.departure_time = {
+        where.trips.some.departureTime = {
           gte: startOfDay,
           lte: endOfDay,
         }
@@ -272,15 +273,15 @@ const searchBuses = async (filters = {}) => {
 
     // Filter by minimum seats
     if (minSeats) {
-      where.seat_capacity = { gte: parseInt(minSeats) }
+      where.seatCapacity = { gte: parseInt(minSeats) }
     }
 
     // Filter by seat type (has seats of this type)
     if (seatType) {
       where.seats = {
         some: {
-          seat_type: seatType,
-          is_active: true,
+          seatType: seatType,
+          isActive: true,
         },
       }
     }
@@ -289,7 +290,7 @@ const searchBuses = async (filters = {}) => {
       where,
       include: {
         operator: true,
-        seats: { where: { is_active: true } },
+        seats: { where: { isActive: true } },
         trips: {
           where: {
             status: { in: ['scheduled', 'active'] },
@@ -303,15 +304,15 @@ const searchBuses = async (filters = {}) => {
             },
           },
           take: 5, // Limit to next 5 trips
-          orderBy: { departure_time: 'asc' },
+          orderBy: { departureTime: 'asc' },
         },
       },
     })
 
     // Parse amenities and filter by amenities if requested
     let filteredBuses = buses.map(bus => {
-      if (bus.amenities_json) {
-        bus.amenities = JSON.parse(bus.amenities_json)
+      if (bus.amenities) {
+        bus.amenities = JSON.parse(bus.amenities)
       }
       return bus
     })
