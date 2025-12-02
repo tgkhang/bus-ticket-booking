@@ -46,6 +46,7 @@ const updateBus = async (req, _res, next) => {
       }),
     model: Joi.string().min(2).max(100).trim(),
     seatCapacity: Joi.number().integer().min(1).max(100),
+    status: Joi.string().valid('active', 'inactive', 'maintenance'),
     amenities: Joi.object({
       wifi: Joi.boolean(),
       ac: Joi.boolean(),
@@ -82,7 +83,7 @@ const seatItemSchema = Joi.object({
 })
 
 const createSeats = async (req, _res, next) => {
-  console.log('Validating createSeats with body:', req.body)
+  // console.log('Validating createSeats with body:', req.body)
   const schema = Joi.object({
     seats: Joi.array().items(seatItemSchema).min(1).required()
   }).custom((value, helpers) => {

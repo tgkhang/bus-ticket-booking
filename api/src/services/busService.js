@@ -27,7 +27,7 @@ const ensureBusExists = async (busId) => {
 
 const checkOperatorOwnership = async (busId, operatorId) => {
   const bus = await ensureBusExists(busId)
-  if (bus.operator_id !== operatorId) {
+  if (bus.operatorId !== operatorId) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You do not have permission to manage this bus')
   }
   return bus
@@ -79,7 +79,7 @@ const updateBus = async (busId, payload, userRole, userOperatorId = null) => {
 
   // Check ownership for operator role
   if (userRole === 'operator') {
-    if (!userOperatorId || bus.operator_id !== userOperatorId) {
+    if (!userOperatorId || bus.operatorId !== userOperatorId) {
       throw new ApiError(StatusCodes.FORBIDDEN, 'You can only update your own buses')
     }
   }
@@ -101,7 +101,7 @@ const deleteBus = async (busId, userRole, userOperatorId = null) => {
 
   // Check ownership for operator role
   if (userRole === 'operator') {
-    if (!userOperatorId || bus.operator_id !== userOperatorId) {
+    if (!userOperatorId || bus.operatorId !== userOperatorId) {
       throw new ApiError(StatusCodes.FORBIDDEN, 'You can only delete your own buses')
     }
   }
@@ -123,7 +123,7 @@ const deleteBus = async (busId, userRole, userOperatorId = null) => {
 const createSeats = async (busId, seatsData, userRole, userOperatorId = null) => {
   // Check bus exists and ownership
   const bus = await ensureBusExists(busId)
-  if (userRole === 'operator' && bus.operator_id !== userOperatorId) {
+  if (userRole === 'operator' && bus.operatorId !== userOperatorId) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You can only manage seats for your own buses')
   }
 
@@ -136,7 +136,7 @@ const createSeats = async (busId, seatsData, userRole, userOperatorId = null) =>
 
   // Check if any seat numbers already exist for this bus
   const existingSeats = await seatModel.findSeatsByBusId(busId, true)
-  const existingSeatNumbers = new Set(existingSeats.map((s) => s.seat_number))
+  const existingSeatNumbers = new Set(existingSeats.map((s) => s.seatNumber))
 
   const conflicts = seatNumbers.filter((num) => existingSeatNumbers.has(num.toUpperCase()))
   if (conflicts.length > 0) {
@@ -149,7 +149,7 @@ const createSeats = async (busId, seatsData, userRole, userOperatorId = null) =>
 const generateSeats = async (busId, payload, userRole, userOperatorId = null) => {
   // Check bus exists and ownership
   const bus = await ensureBusExists(busId)
-  if (userRole === 'operator' && bus.operator_id !== userOperatorId) {
+  if (userRole === 'operator' && bus.operatorId !== userOperatorId) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You can only manage seats for your own buses')
   }
 
@@ -160,10 +160,10 @@ const generateSeats = async (busId, payload, userRole, userOperatorId = null) =>
   const totalSeats = (leftSeats + rightSeats) * rows
 
   // Check if it exceeds bus capacity
-  if (totalSeats > bus.seat_capacity) {
+  if (totalSeats > bus.seatCapacity) {
     throw new ApiError(
       StatusCodes.BAD_REQUEST,
-      `Generated seats (${totalSeats}) would exceed bus capacity (${bus.seat_capacity})`
+      `Generated seats (${totalSeats}) would exceed bus capacity (${bus.seatCapacity})`
     )
   }
 
@@ -178,7 +178,7 @@ const listSeats = async (busId, includeInactive = false) => {
 const updateSeat = async (busId, seatId, payload, userRole, userOperatorId = null) => {
   // Check bus exists and ownership
   const bus = await ensureBusExists(busId)
-  if (userRole === 'operator' && bus.operator_id !== userOperatorId) {
+  if (userRole === 'operator' && bus.operatorId !== userOperatorId) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You can only manage seats for your own buses')
   }
 
@@ -187,7 +187,7 @@ const updateSeat = async (busId, seatId, payload, userRole, userOperatorId = nul
   if (!seat) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Seat not found')
   }
-  if (seat.bus_id !== busId) {
+  if (seat.busId !== busId) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Seat does not belong to this bus')
   }
 
@@ -205,7 +205,7 @@ const updateSeat = async (busId, seatId, payload, userRole, userOperatorId = nul
 const deleteSeat = async (busId, seatId, userRole, userOperatorId = null) => {
   // Check bus exists and ownership
   const bus = await ensureBusExists(busId)
-  if (userRole === 'operator' && bus.operator_id !== userOperatorId) {
+  if (userRole === 'operator' && bus.operatorId !== userOperatorId) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You can only manage seats for your own buses')
   }
 
@@ -214,7 +214,7 @@ const deleteSeat = async (busId, seatId, userRole, userOperatorId = null) => {
   if (!seat) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Seat not found')
   }
-  if (seat.bus_id !== busId) {
+  if (seat.busId !== busId) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Seat does not belong to this bus')
   }
 
@@ -254,7 +254,7 @@ const checkAvailability = async (busId, startDate, endDate) => {
 
   return {
     busId: bus.id,
-    plateNumber: bus.plate_number,
+    plateNumber: bus.plateNumber,
     trips: bus.trips,
     hasAvailability: bus.trips.length === 0, // Simplified check
   }
