@@ -62,6 +62,24 @@ const listStops = async (filters, pagination) => {
   return await stopModel.getStops(filters, pagination)
 }
 
+const autocompleteStops = async (query, limit = 10) => {
+  try {
+    if (!query || query.trim().length === 0) {
+      return []
+    }
+    const stops = await stopModel.searchStops(query.trim(), limit)
+    return stops.map((stop) => ({
+      id: stop.id,
+      name: stop.name,
+      address: stop.address,
+      latitude: stop.latitude,
+      longitude: stop.longitude,
+    }))
+  } catch (error) {
+    throw error
+  }
+}
+
 // Routes CRUD
 const createRoute = async (payload) => {
   // Validate operator exists
@@ -143,6 +161,7 @@ export const routeService = {
   deleteStop,
   getStop,
   listStops,
+  autocompleteStops,
   // Routes
   createRoute,
   updateRoute,

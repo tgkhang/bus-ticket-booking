@@ -271,7 +271,7 @@ paths:
           description: Comma-separated required amenities (e.g., wifi,ac,toilet).
         - in: query
           name: status
-          schema: { type: string, enum: [scheduled, cancelled, completed] }
+          schema: { type: string, enum: [scheduled, active, completed, cancelled] }
         - in: query
           name: sortBy
           schema: { type: string, enum: [price, departure, duration] }
@@ -293,6 +293,38 @@ paths:
         '400': { description: Validation error }
         '401': { description: Unauthorized }
         '403': { description: Forbidden }
+        '500': { description: Server error }
+  /stops/autocomplete:
+    get:
+      summary: Autocomplete stops (public)
+      description: Search stops by name or address for autocomplete. No authentication required.
+      tags: [Stops]
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string, minLength: 1 }
+          description: Search query for stop name or address
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+          description: Maximum number of results to return
+      responses:
+        '200':
+          description: List of matching stops
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    name: { type: string }
+                    address: { type: string }
+                    latitude: { type: number }
+                    longitude: { type: number }
+        '400': { description: Invalid query parameters }
         '500': { description: Server error }
   /stops:
     get:

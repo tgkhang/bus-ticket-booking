@@ -12,24 +12,24 @@ const buildWhere = (filters) => {
     // date boundary; timeFrom/timeTo refine
     const dayStart = new Date(`${filters.date}T00:00:00.000Z`)
     const dayEnd = new Date(`${filters.date}T23:59:59.999Z`)
-    where.departure_time = { gte: dayStart, lte: dayEnd }
+    where.departureTime = { gte: dayStart, lte: dayEnd }
     if (filters.timeFrom) {
       const [h, m] = filters.timeFrom.split(':')
       const from = new Date(dayStart)
       from.setUTCHours(Number(h), Number(m), 0, 0)
-      if (from > where.departure_time.gte) where.departure_time.gte = from
+      if (from > where.departureTime.gte) where.departureTime.gte = from
     }
     if (filters.timeTo) {
       const [h, m] = filters.timeTo.split(':')
       const to = new Date(dayStart)
       to.setUTCHours(Number(h), Number(m), 59, 999)
-      if (to < where.departure_time.lte) where.departure_time.lte = to
+      if (to < where.departureTime.lte) where.departureTime.lte = to
     }
   }
   if (filters.minPrice || filters.maxPrice) {
-    where.base_price = {}
-    if (filters.minPrice) where.base_price.gte = filters.minPrice
-    if (filters.maxPrice) where.base_price.lte = filters.maxPrice
+    where.basePrice = {}
+    if (filters.minPrice) where.basePrice.gte = filters.minPrice
+    if (filters.maxPrice) where.basePrice.lte = filters.maxPrice
   }
   if (filters.status) {
     where.status = filters.status
@@ -39,7 +39,7 @@ const buildWhere = (filters) => {
     if (filters.busModel) where.bus.model = { contains: filters.busModel, mode: 'insensitive' }
     if (filters.amenities?.length) {
       // Match each amenity key set to true in the serialized JSON
-      const amenityClauses = filters.amenities.map((a) => ({ amenities_json: { contains: `"${a}":true` } }))
+      const amenityClauses = filters.amenities.map((a) => ({ amenities: { contains: `"${a}":true` } }))
       // Combine with existing bus filters using AND semantics
       if (amenityClauses.length === 1) {
         where.bus = { ...where.bus, ...amenityClauses[0] }
@@ -60,12 +60,12 @@ const searchTrips = async (filters) => {
   // Sorting
   let orderBy
   if (filters.sortBy === 'price') {
-    orderBy = { base_price: filters.sortOrder }
+    orderBy = { basePrice: filters.sortOrder }
   } else if (filters.sortBy === 'departure') {
-    orderBy = { departure_time: filters.sortOrder }
+    orderBy = { departureTime: filters.sortOrder }
   } else {
     // duration sort later in memory
-    orderBy = { departure_time: 'asc' }
+    orderBy = { departureTime: 'asc' }
   }
 
   const [total, rows] = await Promise.all([
@@ -83,8 +83,20 @@ const searchTrips = async (filters) => {
   ])
 
   let data = rows.map((t) => ({
-    ...t,
-    durationMinutes: Math.round((t.arrival_time.getTime() - t.departure_time.getTime()) / 60000),
+    id: t.id,
+    routeId: t.routeId,
+    busId: t.busId,
+    departureTime: t.departureTime,
+    arrivalTime: t.arrivalTime,
+    basePrice: t.basePrice,
+    status: t.status,
+    durationMinutes: Math.round((t.arrivalTime.getTime() - t.departureTime.getTime()) / 60000),
+    originStop: t.route.originStop,
+    destinationStop: t.route.destinationStop,
+    bus: {
+      model: t.bus.model,
+      amenities: t.bus.amenities ? JSON.parse(t.bus.amenities) : {},
+    },
   }))
 
   if (filters.sortBy === 'duration') {
@@ -100,4 +112,38 @@ const searchTrips = async (filters) => {
   }
 }
 
-export const tripModel = { searchTrips }
+const getTripById = async (id) => {
+  const prisma = GET_DB()
+  const trip = await prisma.trip.findUnique({
+    where: { id },
+    include: {
+      route: {
+        include: {
+          originStop: true,
+          destinationStop: true,
+          stops: {
+            include: { stop: true },
+            orderBy: { sequence: 'asc' },
+          },
+        },
+      },
+      bus: {
+        include: { operator: true },
+      },
+    },
+  })
+
+  if (trip) {
+    trip.durationMinutes = Math.round((trip.arrivalTime.getTime() - trip.departureTime.getTime()) / 60000)
+    if (trip.bus.amenities) {
+      try {
+        trip.bus.amenities = JSON.parse(trip.bus.amenities)
+      } catch (e) {
+        trip.bus.amenities = {}
+      }
+    }
+  }
+  return trip
+}
+
+export const tripModel = { searchTrips, getTripById }

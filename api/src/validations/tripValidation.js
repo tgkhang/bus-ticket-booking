@@ -16,7 +16,7 @@ const search = async (req, res, next) => {
     maxPrice: Joi.number().min(0),
     busModel: Joi.string(),
     amenities: Joi.string(), // comma-separated
-    status: Joi.string().valid('scheduled', 'completed', 'cancelled'),
+    status: Joi.string().valid('scheduled', 'active', 'completed', 'cancelled'),
     page: Joi.number().integer().min(1).default(1),
     limit: Joi.number().integer().min(1).max(100).default(20),
     sortBy: Joi.string().valid('price', 'departure', 'duration').default('departure'),
@@ -50,4 +50,16 @@ const search = async (req, res, next) => {
   }
 }
 
-export const tripValidation = { search }
+const getTripById = async (req, res, next) => {
+  const condition = Joi.object({
+    id: Joi.string().uuid().required(),
+  })
+  try {
+    await condition.validateAsync(req.params)
+    next()
+  } catch (error) {
+    next(new ApiError(StatusCodes.BAD_REQUEST, new Error(error).message))
+  }
+}
+
+export const tripValidation = { search, getTripById }

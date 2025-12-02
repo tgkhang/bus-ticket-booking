@@ -72,7 +72,7 @@ async function main() {
     return prisma.stop.create({ data: { name, latitude, longitude, address, active: true } })
   }
 
-  const stopsFile = path.resolve(__dirname, '../../data/stops.txt');
+  const stopsFile = path.resolve(__dirname, '../../data/hcmc_stops.txt');
   let importedStops = []
   if (fs.existsSync(stopsFile)) {
     const raw = fs.readFileSync(stopsFile, 'utf8')

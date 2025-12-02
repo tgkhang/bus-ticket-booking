@@ -64,6 +64,41 @@ export const oauthGoogleLoginAPI = async (userData: OAuthGoogleData) => {
   return response.data
 }
 
+// Stops API
+export const autocompleteStopsAPI = async (query: string, limit: number = 10) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/stops/autocomplete`, {
+    params: { q: query, limit },
+  })
+  return response.data
+}
+
+// Trips API
+export const searchTripsAPI = async (params: {
+  originStopId?: string
+  destinationStopId?: string
+  date?: string
+  startTime?: string
+  endTime?: string
+  minPrice?: number
+  maxPrice?: number
+  busModel?: string
+  amenities?: string
+  status?: string
+  sortBy?: string
+  sortOrder?: string
+  page?: number
+  limit?: number
+}) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/search`, { params })
+  return response.data
+}
+
+export const getTripByIdAPI = async (id: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${id}`)
+  return response.data
+}
+
+
 //=================================
 // Bus API Calls
 //=================================
@@ -230,12 +265,5 @@ export const updateTripAPI = async (tripId: string, tripData: UpdateTripData) =>
 export const deleteTripAPI = async (tripId: string) => {
   const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/trips/${tripId}`)
   toast.success('Trip deleted successfully')
-  return response.data
-}
-
-export const searchTripsAPI = async (filters: SearchTripsFilters): Promise<Trip[]> => {
-  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/search`, {
-    params: filters,
-  })
   return response.data
 }

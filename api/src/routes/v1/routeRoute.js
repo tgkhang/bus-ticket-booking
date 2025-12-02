@@ -7,6 +7,10 @@ import { PERMISSIONS } from '~/utils/constants'
 
 const Router = express.Router()
 
+// Stops endpoints
+// Public autocomplete endpoint (no auth required for search form)
+Router.get('/stops/autocomplete', routeController.autocompleteStops)
+
 Router.post(
   '/',
   authMiddleware.isAuthorized,
