@@ -7,6 +7,11 @@ import { PERMISSIONS } from '~/utils/constants'
 
 const Router = express.Router()
 
+Router.get(
+  '/autocomplete',
+  routeController.autocompleteStops
+)
+
 Router.post(
   '/',
   authMiddleware.isAuthorized,
