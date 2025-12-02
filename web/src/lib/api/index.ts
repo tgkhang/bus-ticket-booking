@@ -267,10 +267,3 @@ export const deleteTripAPI = async (tripId: string) => {
   toast.success('Trip deleted successfully')
   return response.data
 }
-
-export const searchTripsAPI = async (filters: SearchTripsFilters): Promise<Trip[]> => {
-  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/search`, {
-    params: filters,
-  })
-  return response.data
-}
