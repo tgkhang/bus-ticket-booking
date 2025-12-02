@@ -1,5 +1,11 @@
 import { GET_DB } from '~/config/prisma'
 
+const includeRelations = {
+  originRoutes: true,
+  destinationRoutes: true,
+  routeStops: true,
+}
+
 const createStop = async (data) => {
   try {
     const prisma = GET_DB()
@@ -56,10 +62,72 @@ const findMany = async (filter = {}) => {
   }
 }
 
+const getStops = async (filters = {}, pagination = {}) => {
+  try {
+    const prisma = GET_DB()
+    const { name, address, active, search } = filters
+    const { page = 1, limit = 20 } = pagination
+
+    const skip = (page - 1) * limit
+    const take = parseInt(limit)
+    const where = {}
+
+    if (name) {
+      where.name = {
+        contains: name,
+        mode: 'insensitive',
+      }
+    }
+
+    if (address) {
+      where.address = {
+        contains: address,
+        mode: 'insensitive',
+      }
+    }
+
+    if (active !== undefined) {
+      where.active = active
+    }
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { address: { contains: search, mode: 'insensitive' } },
+      ]
+    }
+
+    // Get total count
+    const total = await prisma.stop.count({ where })
+
+    // Get stops
+    const stops = await prisma.stop.findMany({
+      where,
+      skip,
+      take,
+      include: includeRelations,
+      orderBy: { name: 'asc' },
+    })
+
+    return {
+      data: stops,
+      pagination: {
+        page: parseInt(page),
+        limit: take,
+        total,
+        totalPages: Math.ceil(total / take),
+      },
+    }
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+
 export const stopModel = {
   createStop,
   updateStop,
   deleteStop,
   findById,
   findMany,
+  getStops,
 }

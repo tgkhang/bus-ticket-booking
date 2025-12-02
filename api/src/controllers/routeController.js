@@ -1,5 +1,6 @@
 import { StatusCodes } from 'http-status-codes'
 import { routeService } from '~/services/routeService'
+import { DEFAULT_ITEMS_PER_PAGE, DEFAULT_PAGE } from '~/utils/constants'
 
 // Routes
 const createRoute = async (req, res, next) => {
@@ -57,9 +58,25 @@ const createStop = async (req, res, next) => {
   }
 }
 
-const listStops = async (_req, res, next) => {
+const listStops = async (req, res, next) => {
   try {
-    const result = await routeService.listStops()
+    const filters = {
+      name: req.query.name,
+      address: req.query.address,
+      active: req.query.active,
+      search: req.query.search,
+    }
+
+    let { page, limit } = req.query
+    if (!page) page = DEFAULT_PAGE
+    if (!limit) limit = DEFAULT_ITEMS_PER_PAGE
+
+    const pagination = {
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+    }
+
+    const result = await routeService.listStops(filters, pagination)
     res.status(StatusCodes.OK).json(result)
   } catch (error) {
     next(error)

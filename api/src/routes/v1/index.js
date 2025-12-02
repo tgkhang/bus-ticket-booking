@@ -4,6 +4,7 @@ import { routeRoute } from '~/routes/v1/routeRoute'
 import { busRoute } from './busRoute'
 import { operatorRoute } from './operatorRoute'
 import { tripRoute } from './tripRoute'
+import { stopRoute } from './stopRoute'
 
 const Router = express.Router()
 
@@ -23,8 +24,9 @@ Router.use('/buses', busRoute)
 
 Router.use('/operators', operatorRoute)
 
-// Transport configuration routes (routes & stops)
-Router.use('/', routeRoute)
+Router.use('/stops', stopRoute);
+
+Router.use('/routes', routeRoute)
 
 // Trip search route
 Router.use('/', tripRoute)

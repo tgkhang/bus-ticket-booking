@@ -15,6 +15,7 @@ import type {
   Operator,
   ListOperatorsFilters,
 } from '@/types/api'
+import { Stop } from '@/types/routeAndStop'
 import { toast } from 'sonner'
 
 //=================================
@@ -114,6 +115,23 @@ export const updateBusAPI = async (busId: string, busData: UpdateBusData) => {
 //   busValidation.updateBus,
 //   busController.updateBus
 // )
+
+//=================================
+// Stops API Calls
+//=================================
+
+export const listStopsAPI = async (
+  filters?: ListOperatorsFilters,
+  pagination?: PaginationParams
+): Promise<PaginatedResponse<Stop>> => {
+  const params = {
+    ...filters,
+    ...pagination,
+  }
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/stops`, { params })
+  return response.data
+}
+
 
 //=================================
 // Operator API Calls

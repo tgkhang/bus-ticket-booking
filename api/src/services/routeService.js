@@ -55,8 +55,11 @@ const getStop = async (id) => {
   return stop
 }
 
-const listStops = async () => {
-  return await stopModel.findMany({})
+const listStops = async (filters, pagination) => {
+  // if (userRole === 'operator' && userOperatorId) {
+  //   filters.operatorId = userOperatorId
+  // }
+  return await stopModel.getStops(filters, pagination)
 }
 
 // Routes CRUD
