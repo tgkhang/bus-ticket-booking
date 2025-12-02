@@ -12,9 +12,12 @@ import type {
   SearchBusesFilters,
   PaginationParams,
   PaginatedResponse,
-  Operator,
-  ListOperatorsFilters,
+  ListStopsFilters,
+  ListRoutesFilters,
 } from '@/types/api'
+import type { Operator,ListOperatorsFilters } from '@/types/operator'
+import { CreateRouteData, Route, Stop } from '@/types/routeAndStop'
+import type { Trip, TripDetail, CreateTripData, UpdateTripData, ListTripsFilters, SearchTripsFilters } from '@/types/trip'
 import { toast } from 'sonner'
 
 //=================================
@@ -151,6 +154,22 @@ export const updateBusAPI = async (busId: string, busData: UpdateBusData) => {
 // )
 
 //=================================
+// Stops API Calls
+//=================================
+
+export const listStopsAPI = async (
+  filters?: ListStopsFilters,
+  pagination?: PaginationParams
+): Promise<PaginatedResponse<Stop>> => {
+  const params = {
+    ...filters,
+    ...pagination,
+  }
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/stops`, { params })
+  return response.data
+}
+
+//=================================
 // Operator API Calls
 //=================================
 
@@ -168,5 +187,90 @@ export const listOperatorsAPI = async (
 
 export const getOperatorDetailsAPI = async (operatorId: string): Promise<Operator> => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/operators/${operatorId}`)
+  return response.data
+}
+
+//=================================
+// Route API Calls
+//=================================
+
+export const listRoutesAPI = async (
+  filters?: ListRoutesFilters,
+  pagination?: PaginationParams
+): Promise<PaginatedResponse<Route>> => {
+  const params = {
+    ...filters,
+    ...pagination,
+  }
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/routes`, { params })
+  return response.data
+}
+
+export const deleteRouteAPI = async (routeId: string) => {
+  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/routes/${routeId}`)
+  // toast.success('Route deleted successfully')
+  return response.data
+}
+
+export const createRouteAPI = async (routeData: CreateRouteData) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/routes`, routeData)
+  toast.success('Route created successfully')
+  return response.data
+}
+
+export const updateRouteAPI = async (routeId: string, routeData: CreateRouteData) => {
+  const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/routes/${routeId}`, routeData)
+  toast.success('Route updated successfully')
+  return response.data
+}
+
+export const getRouteDetailsAPI = async (routeId: string): Promise<Route> => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/routes/${routeId}`)
+  return response.data
+}
+
+//=================================
+// Trip API Calls
+//=================================
+
+export const listTripsAPI = async (
+  filters?: ListTripsFilters,
+  pagination?: PaginationParams
+): Promise<PaginatedResponse<Trip>> => {
+  const params = {
+    ...filters,
+    ...pagination,
+  }
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips`, { params })
+  return response.data
+}
+
+export const getTripDetailsAPI = async (tripId: string): Promise<TripDetail> => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${tripId}`)
+  return response.data
+}
+
+export const createTripAPI = async (tripData: CreateTripData) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/trips`, tripData)
+  toast.success('Trip created successfully')
+  return response.data
+}
+
+export const updateTripAPI = async (tripId: string, tripData: UpdateTripData) => {
+  const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/trips/${tripId}`, tripData)
+  toast.success('Trip updated successfully')
+  return response.data
+}
+
+export const deleteTripAPI = async (tripId: string) => {
+  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/trips/${tripId}`)
+  toast.success('Trip deleted successfully')
+  return response.data
+}
+
+export const searchTripsAPI = async (filters: SearchTripsFilters): Promise<Trip[]> => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/search`, {
+    params: filters,
+  })
   return response.data
 }

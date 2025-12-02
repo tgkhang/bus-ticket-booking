@@ -20,10 +20,11 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { listBusesAPI, createBusAPI, updateBusAPI, deleteBusAPI, listOperatorsAPI } from '@/lib/api'
-import type { Bus, CreateBusData, UpdateBusData, BusAmenities, Operator } from '@/types/api'
+import type { Bus, CreateBusData, UpdateBusData, BusAmenities } from '@/types/api'
 import { toast } from 'sonner'
 import { ITEMS_PER_PAGE } from '@/utils/constants'
 import { useRouter } from 'next/navigation'
+import { Operator } from '@/types/operator'
 
 interface BusFormData {
   operatorId: string
