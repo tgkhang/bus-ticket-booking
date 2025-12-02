@@ -3,10 +3,10 @@
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Calendar } from 'lucide-react'
 
-export default function TripsPage() {
+export default function OperatorsPage() {
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">Trip Management</h1>
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">Operator Management</h1>
 
       <Card>
         <CardHeader>
@@ -20,7 +20,7 @@ export default function TripsPage() {
               Coming Soon
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              Trip management functionality will be available soon.
+              Operator management functionality will be available soon.
             </p>
           </div>
         </CardContent>

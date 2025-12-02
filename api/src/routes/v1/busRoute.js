@@ -112,21 +112,12 @@ Router.delete(
 // ============================================
 
 // Get seat layout for booking (public)
-Router.get(
-  '/:busId/layout',
-  busController.getSeatLayout
-)
+Router.get('/:busId/layout', busController.getSeatLayout)
 
 // Get bus schedule/trips
-Router.get(
-  '/:busId/trips',
-  busController.getBusTrips
-)
+Router.get('/:busId/trips', busController.getBusTrips)
 
 // Check bus availability
-Router.get(
-  '/:busId/availability',
-  busController.checkAvailability
-)
+Router.get('/:busId/availability', busController.checkAvailability)
 
 export const busRoute = Router

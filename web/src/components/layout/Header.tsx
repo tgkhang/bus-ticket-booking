@@ -25,14 +25,14 @@ export function Header() {
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-linear-to-br from-blue-600 to-purple-600" />
               <span className="font-bold text-xl">BusBooking</span>
             </Link>
 
             <nav className="hidden md:flex items-center gap-6">
               <Link
-                href="/dashboard"
+                href="/"
                 className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
               >
                 Dashboard
@@ -40,13 +40,13 @@ export function Header() {
               {user?.role === 'admin' && (
                 <>
                   <Link
-                    href="/dashboard/users"
+                    href="//users"
                     className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
                   >
                     Users
                   </Link>
                   <Link
-                    href="/dashboard/analytics"
+                    href="//analytics"
                     className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
                   >
                     Analytics
@@ -54,7 +54,7 @@ export function Header() {
                 </>
               )}
               <Link
-                href="/dashboard/bookings"
+                href="//bookings"
                 className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors"
               >
                 Bookings
@@ -74,7 +74,7 @@ export function Header() {
                     <span className="text-sm font-medium">{user.username || user.email}</span>
                     <Badge variant={user.role === 'admin' ? 'info' : 'default'}>{user.role}</Badge>
                   </div>
-                  <Link href="/dashboard/profile">
+                  <Link href="//profile">
                     <Button variant="ghost" size="icon">
                       <User className="h-5 w-5" />
                     </Button>
@@ -97,7 +97,7 @@ export function Header() {
           <div className="md:hidden border-t border-gray-200 dark:border-gray-800 py-4">
             <nav className="flex flex-col gap-4">
               <Link
-                href="/dashboard"
+                href="/"
                 className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
                 onClick={() => setShowMenu(false)}
               >
@@ -106,14 +106,14 @@ export function Header() {
               {user?.role === 'admin' && (
                 <>
                   <Link
-                    href="/dashboard/users"
+                    href="//users"
                     className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
                     onClick={() => setShowMenu(false)}
                   >
                     Users
                   </Link>
                   <Link
-                    href="/dashboard/analytics"
+                    href="//analytics"
                     className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
                     onClick={() => setShowMenu(false)}
                   >
@@ -122,14 +122,14 @@ export function Header() {
                 </>
               )}
               <Link
-                href="/dashboard/bookings"
+                href="//bookings"
                 className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
                 onClick={() => setShowMenu(false)}
               >
                 Bookings
               </Link>
               <Link
-                href="/dashboard/profile"
+                href="//profile"
                 className="text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
                 onClick={() => setShowMenu(false)}
               >
