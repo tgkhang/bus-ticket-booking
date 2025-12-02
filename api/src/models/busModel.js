@@ -20,10 +20,10 @@ const createBus = async (data) => {
 
     return await prisma.bus.create({
       data: {
-        operator_id: data.operatorId,
-        plate_number: data.plateNumber.toUpperCase(),
+        operator_id: data.operator_id,
+        plate_number: data.plate_number.toUpperCase(),
         model: data.model,
-        seat_capacity: data.seatCapacity,
+        seat_capacity: data.seat_capacity,
         amenities_json: amenitiesJson,
       },
       include: includeRelations,
@@ -138,9 +138,10 @@ const updateBus = async (id, data) => {
 
     const updateData = {}
 
-    if (data.plateNumber) updateData.plate_number = data.plateNumber.toUpperCase()
+    if (data.plate_number) updateData.plate_number = data.plate_number.toUpperCase()
     if (data.model) updateData.model = data.model
-    if (data.seatCapacity) updateData.seat_capacity = data.seatCapacity
+    if (data.seat_capacity) updateData.seat_capacity = data.seat_capacity
+    if (data.status) updateData.status = data.status
     if (data.amenities) updateData.amenities_json = JSON.stringify(data.amenities)
 
     const updated = await prisma.bus.update({

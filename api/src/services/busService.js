@@ -39,15 +39,15 @@ const checkOperatorOwnership = async (busId, operatorId) => {
 
 const createBus = async (payload, userRole, userOperatorId = null) => {
   // Validate operator exists
-  await ensureOperatorExists(payload.operatorId)
+  await ensureOperatorExists(payload.operator_id)
 
   // Check if operator role user is trying to create bus for another operator
-  if (userRole === 'operator' && userOperatorId !== payload.operatorId) {
+  if (userRole === 'operator' && userOperatorId !== payload.operator_id) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You can only create buses for your own operator')
   }
 
   // Check if plate number already exists
-  const existing = await busModel.findBusByPlateNumber(payload.plateNumber)
+  const existing = await busModel.findBusByPlateNumber(payload.plate_number)
   if (existing) {
     throw new ApiError(StatusCodes.CONFLICT, 'Bus with this plate number already exists')
   }
@@ -85,8 +85,8 @@ const updateBus = async (busId, payload, userRole, userOperatorId = null) => {
   }
 
   // If updating plate number, check it doesn't conflict
-  if (payload.plateNumber) {
-    const existing = await busModel.findBusByPlateNumber(payload.plateNumber)
+  if (payload.plate_number) {
+    const existing = await busModel.findBusByPlateNumber(payload.plate_number)
     if (existing && existing.id !== busId) {
       throw new ApiError(StatusCodes.CONFLICT, 'Another bus with this plate number already exists')
     }
@@ -128,7 +128,7 @@ const createSeats = async (busId, seatsData, userRole, userOperatorId = null) =>
   }
 
   // Check for duplicate seat numbers in payload
-  const seatNumbers = seatsData.seats.map((s) => s.seatNumber.toUpperCase())
+  const seatNumbers = seatsData.seats.map((s) => s.seat_number.toUpperCase())
   const uniqueNumbers = new Set(seatNumbers)
   if (uniqueNumbers.size !== seatNumbers.length) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Duplicate seat numbers in request')
@@ -192,8 +192,8 @@ const updateSeat = async (busId, seatId, payload, userRole, userOperatorId = nul
   }
 
   // If updating seat number, check it doesn't conflict
-  if (payload.seatNumber) {
-    const existing = await seatModel.findSeatByNumber(busId, payload.seatNumber)
+  if (payload.seat_number) {
+    const existing = await seatModel.findSeatByNumber(busId, payload.seat_number)
     if (existing && existing.id !== seatId) {
       throw new ApiError(StatusCodes.CONFLICT, 'Seat number already exists on this bus')
     }

@@ -8,14 +8,14 @@ import ApiError from '~/utils/ApiError'
 
 const createNewBus = async (req, _res, next) => {
   const schema = Joi.object({
-    operatorId: Joi.string().uuid().required(),
-    plateNumber: Joi.string().min(5).max(20).required().trim()
+    operator_id: Joi.string().uuid().required(),
+    plate_number: Joi.string().min(5).max(20).required().trim()
       .pattern(/^[A-Z0-9-]+$/)
       .messages({
         'string.pattern.base': 'Plate number must contain only uppercase letters, numbers, and hyphens'
       }),
     model: Joi.string().min(2).max(100).required().trim(),
-    seatCapacity: Joi.number().integer().min(1).max(100).required(),
+    seat_capacity: Joi.number().integer().min(1).max(100).required(),
     amenities: Joi.object({
       wifi: Joi.boolean().default(false),
       ac: Joi.boolean().default(false),
@@ -39,13 +39,14 @@ const createNewBus = async (req, _res, next) => {
 
 const updateBus = async (req, _res, next) => {
   const schema = Joi.object({
-    plateNumber: Joi.string().min(5).max(20).trim()
+    plate_number: Joi.string().min(5).max(20).trim()
       .pattern(/^[A-Z0-9-]+$/)
       .messages({
         'string.pattern.base': 'Plate number must contain only uppercase letters, numbers, and hyphens'
       }),
     model: Joi.string().min(2).max(100).trim(),
-    seatCapacity: Joi.number().integer().min(1).max(100),
+    seat_capacity: Joi.number().integer().min(1).max(100),
+    status: Joi.string().valid('active', 'inactive', 'maintenance'),
     amenities: Joi.object({
       wifi: Joi.boolean(),
       ac: Joi.boolean(),
@@ -72,22 +73,22 @@ const updateBus = async (req, _res, next) => {
 // ============================================
 
 const seatItemSchema = Joi.object({
-  seatNumber: Joi.string().min(1).max(10).required().trim()
+  seat_number: Joi.string().min(1).max(10).required().trim()
     .pattern(/^[A-Z0-9]+$/)
     .messages({
       'string.pattern.base': 'Seat number must contain only uppercase letters and numbers (e.g., A1, VIP1)'
     }),
-  seatType: Joi.string().valid('regular', 'premium', 'sleeper').default('regular'),
-  isActive: Joi.boolean().default(true),
+  seat_type: Joi.string().valid('regular', 'premium', 'sleeper').default('regular'),
+  is_active: Joi.boolean().default(true),
 })
 
 const createSeats = async (req, _res, next) => {
-  console.log('Validating createSeats with body:', req.body)
+  // console.log('Validating createSeats with body:', req.body)
   const schema = Joi.object({
     seats: Joi.array().items(seatItemSchema).min(1).required()
   }).custom((value, helpers) => {
     // Check for duplicate seat numbers
-    const seatNumbers = value.seats.map(s => s.seatNumber.toUpperCase())
+    const seatNumbers = value.seats.map(s => s.seat_number.toUpperCase())
     if (new Set(seatNumbers).size !== seatNumbers.length) {
       return helpers.error('any.invalid', { message: 'Duplicate seat numbers found' })
     }
@@ -109,8 +110,8 @@ const generateSeats = async (req, _res, next) => {
         'any.only': 'Layout must be one of: 2-2, 2-3, 1-2, 2-1'
       }),
     rows: Joi.number().integer().min(1).max(20).required(),
-    seatType: Joi.string().valid('regular', 'premium', 'sleeper').default('regular'),
-    startRow: Joi.number().integer().min(1).default(1),
+    seat_type: Joi.string().valid('regular', 'premium', 'sleeper').default('regular'),
+    start_row: Joi.number().integer().min(1).default(1),
   })
 
   try {
@@ -123,13 +124,13 @@ const generateSeats = async (req, _res, next) => {
 
 const updateSeat = async (req, _res, next) => {
   const schema = Joi.object({
-    seatNumber: Joi.string().min(1).max(10).trim()
+    seat_number: Joi.string().min(1).max(10).trim()
       .pattern(/^[A-Z0-9]+$/)
       .messages({
         'string.pattern.base': 'Seat number must contain only uppercase letters and numbers'
       }),
-    seatType: Joi.string().valid('regular', 'premium', 'sleeper'),
-    isActive: Joi.boolean(),
+    seat_type: Joi.string().valid('regular', 'premium', 'sleeper'),
+    is_active: Joi.boolean(),
   }).min(1) // At least one field must be provided
 
   try {
