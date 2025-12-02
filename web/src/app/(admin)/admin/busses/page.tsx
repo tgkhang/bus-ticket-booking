@@ -4,10 +4,26 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Plus, Edit, Trash2, X, Wifi, Wind, Droplet, Usb, Tv, Lightbulb, User } from 'lucide-react'
+import {
+  Plus,
+  Edit,
+  Trash2,
+  X,
+  Wifi,
+  Wind,
+  Droplet,
+  Usb,
+  Tv,
+  Lightbulb,
+  User,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
 import { listBusesAPI, createBusAPI, updateBusAPI, deleteBusAPI, listOperatorsAPI } from '@/lib/api'
 import type { Bus, CreateBusData, UpdateBusData, BusAmenities, Operator } from '@/types/api'
 import { toast } from 'sonner'
+import { ITEMS_PER_PAGE } from '@/utils/constants'
+import { useRouter } from 'next/navigation'
 
 interface BusFormData {
   operatorId: string
@@ -28,6 +44,9 @@ export default function BusManagementPage() {
   const [editingBus, setEditingBus] = useState<Bus | null>(null)
   const [deletingBus, setDeletingBus] = useState<Bus | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
 
   const {
     register,
@@ -220,10 +239,27 @@ export default function BusManagementPage() {
     }
   }
 
+  // Pagination calculations
+  const totalPages = Math.ceil(buses.length / ITEMS_PER_PAGE)
+  const indexOfLastItem = currentPage * ITEMS_PER_PAGE
+  const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE
+  const currentBuses = buses.slice(indexOfFirstItem, indexOfLastItem)
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const router = useRouter()
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Bus Management</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Bus Management</h1>
+          <p className="text-gray-600">Manage your fleet of buses</p>
+        </div>
+
         <Button
           onClick={() => handleOpenModal()}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-6 text-base"
@@ -270,14 +306,18 @@ export default function BusManagementPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {buses.map((bus) => {
+                  {currentBuses.map((bus) => {
                     const activeAmenities = Object.entries(bus.amenities)
                       // eslint-disable-next-line @typescript-eslint/no-unused-vars
                       .filter(([_, value]) => value)
                       .map(([key]) => key)
 
                     return (
-                      <tr key={bus.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      <tr
+                        key={bus.id}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        onClick={() => router.push(`/admin/busses/${bus.id}`)}
+                      >
                         <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">{bus.plateNumber}</td>
                         <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">{bus.model}</td>
                         <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">
@@ -325,6 +365,44 @@ export default function BusManagementPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {!loading && buses.length > 0 && totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, buses.length)} of {buses.length} buses
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => handlePageChange(page)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           )}
         </CardContent>
