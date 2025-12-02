@@ -50,4 +50,16 @@ const search = async (req, res, next) => {
   }
 }
 
-export const tripValidation = { search }
+const getTripById = async (req, res, next) => {
+  const condition = Joi.object({
+    id: Joi.string().uuid().required(),
+  })
+  try {
+    await condition.validateAsync(req.params)
+    next()
+  } catch (error) {
+    next(new ApiError(StatusCodes.BAD_REQUEST, new Error(error).message))
+  }
+}
+
+export const tripValidation = { search, getTripById }

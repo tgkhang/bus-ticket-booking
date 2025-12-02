@@ -11,4 +11,14 @@ const search = async (req, res, next) => {
   }
 }
 
-export const tripController = { search }
+const getTripById = async (req, res, next) => {
+  try {
+    const { id } = req.params
+    const trip = await tripService.getTripById(id)
+    res.status(StatusCodes.OK).json(trip)
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const tripController = { search, getTripById }

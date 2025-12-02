@@ -1,4 +1,6 @@
 import { tripModel } from '~/models/tripModel'
+import ApiError from '~/utils/ApiError'
+import { StatusCodes } from 'http-status-codes'
 
 const searchTrips = async (query) => {
   // Prepare filters with defaults
@@ -6,8 +8,8 @@ const searchTrips = async (query) => {
     originStopId: query.originStopId,
     destinationStopId: query.destinationStopId,
     date: query.date,
-    timeFrom: query.timeFrom,
-    timeTo: query.timeTo,
+    timeFrom: query.timeFrom || query.startTime,
+    timeTo: query.timeTo || query.endTime,
     minPrice: query.minPrice ? Number(query.minPrice) : undefined,
     maxPrice: query.maxPrice ? Number(query.maxPrice) : undefined,
     busModel: query.busModel,
@@ -21,4 +23,10 @@ const searchTrips = async (query) => {
   return tripModel.searchTrips(filters)
 }
 
-export const tripService = { searchTrips }
+const getTripById = async (id) => {
+  const trip = await tripModel.getTripById(id)
+  if (!trip) throw new ApiError(StatusCodes.NOT_FOUND, 'Trip not found')
+  return trip
+}
+
+export const tripService = { searchTrips, getTripById }

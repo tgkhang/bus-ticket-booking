@@ -90,6 +90,11 @@ export const searchTripsAPI = async (params: {
   return response.data
 }
 
+export const getTripByIdAPI = async (id: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${id}`)
+  return response.data
+}
+
 
 //=================================
 // Bus API Calls

@@ -14,4 +14,11 @@ Router.get('/trips/search',
   tripController.search
 )
 
+Router.get('/trips/:id',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.READ_TRIPS]),
+  tripValidation.getTripById,
+  tripController.getTripById
+)
+
 export const tripRoute = Router
