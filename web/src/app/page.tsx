@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import Image from 'next/image'
+import TripSearchForm from '@/components/common/TripSearchForm'
 import {
   ArrowRight,
   Shield,
@@ -89,7 +90,19 @@ export default function Home() {
               </button>
             </Link>
           </div>
+        </div>
+      </section>
 
+      {/* Search Form Section */}
+      <section className="py-12 -mt-24 relative z-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <TripSearchForm />
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="py-12 bg-linear-to-br from-blue-600 to-blue-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Quick Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
             {[
@@ -325,7 +338,7 @@ export default function Home() {
                   'Instant notifications and updates',
                 ].map((feature, index) => (
                   <div key={index} className="flex items-center gap-3">
-                    <CheckCircle className="w-6 h-6 text-green-300 flex-shrink-0" />
+                    <CheckCircle className="w-6 h-6 text-green-300 shrink-0" />
                     <span className="text-white">{feature}</span>
                   </div>
                 ))}

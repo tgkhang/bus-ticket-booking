@@ -45,3 +45,32 @@ export const oauthGoogleLoginAPI = async (userData: {
   const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/users/oauth/google`, userData)
   return response.data
 }
+
+// Stops API
+export const autocompleteStopsAPI = async (query: string, limit: number = 10) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/stops/autocomplete`, {
+    params: { q: query, limit },
+  })
+  return response.data
+}
+
+// Trips API
+export const searchTripsAPI = async (params: {
+  originStopId?: string
+  destinationStopId?: string
+  date?: string
+  startTime?: string
+  endTime?: string
+  minPrice?: number
+  maxPrice?: number
+  busModel?: string
+  amenities?: string
+  status?: string
+  sortBy?: string
+  sortOrder?: string
+  page?: number
+  limit?: number
+}) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/search`, { params })
+  return response.data
+}

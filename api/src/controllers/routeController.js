@@ -93,6 +93,16 @@ const deleteStop = async (req, res, next) => {
   }
 }
 
+const autocompleteStops = async (req, res, next) => {
+  try {
+    const { q, limit } = req.query
+    const result = await routeService.autocompleteStops(q, limit ? parseInt(limit) : 10)
+    res.status(StatusCodes.OK).json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const routeController = {
   // Routes
   createRoute,
@@ -106,4 +116,5 @@ export const routeController = {
   getStop,
   updateStop,
   deleteStop,
+  autocompleteStops,
 }

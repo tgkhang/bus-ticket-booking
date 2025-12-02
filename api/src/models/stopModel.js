@@ -56,10 +56,34 @@ const findMany = async (filter = {}) => {
   }
 }
 
+const searchStops = async (query, limit = 10) => {
+  try {
+    const prisma = GET_DB()
+    return await prisma.stop.findMany({
+      where: {
+        AND: [
+          { active: true },
+          {
+            OR: [
+              { name: { contains: query, mode: 'insensitive' } },
+              { address: { contains: query, mode: 'insensitive' } },
+            ],
+          },
+        ],
+      },
+      orderBy: { name: 'asc' },
+      take: limit,
+    })
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+
 export const stopModel = {
   createStop,
   updateStop,
   deleteStop,
   findById,
   findMany,
+  searchStops,
 }
