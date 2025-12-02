@@ -10,37 +10,38 @@ const Router = express.Router()
 Router.post(
   '/',
   authMiddleware.isAuthorized,
-  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_ROUTES]),
-  routeValidation.createRoute,
-  routeController.createRoute
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_STOPS]),
+  routeValidation.createStop,
+  routeController.createStop
 )
 
 Router.get(
   '/',
   authMiddleware.isAuthorized,
-  rbacMiddleware.isValidPermission([PERMISSIONS.READ_ROUTES]),
-  routeController.listRoutes
+  rbacMiddleware.isValidPermission([PERMISSIONS.READ_STOPS]),
+  routeController.listStops
 )
 
 Router.get(
   '/:id',
   authMiddleware.isAuthorized,
-  rbacMiddleware.isValidPermission([PERMISSIONS.READ_ROUTES]),
-  routeController.getRoute
+  rbacMiddleware.isValidPermission([PERMISSIONS.READ_STOPS]),
+  routeController.getStop
 )
+
 Router.put(
   '/:id',
   authMiddleware.isAuthorized,
-  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_ROUTES]),
-  routeValidation.updateRoute,
-  routeController.updateRoute
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_STOPS]),
+  routeValidation.updateStop,
+  routeController.updateStop
 )
 
 Router.delete(
-  '/:id',
+  '/stops/:id',
   authMiddleware.isAuthorized,
-  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_ROUTES]),
-  routeController.deleteRoute
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_STOPS]),
+  routeController.deleteStop
 )
 
-export const routeRoute = Router
+export const stopRoute = Router

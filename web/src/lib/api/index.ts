@@ -12,9 +12,11 @@ import type {
   SearchBusesFilters,
   PaginationParams,
   PaginatedResponse,
-  Operator,
-  ListOperatorsFilters,
+  ListStopsFilters,
+  ListRoutesFilters,
 } from '@/types/api'
+import type { Operator,ListOperatorsFilters } from '@/types/operator'
+import { CreateRouteData, Route, Stop } from '@/types/routeAndStop'
 import { toast } from 'sonner'
 
 //=================================
@@ -116,6 +118,22 @@ export const updateBusAPI = async (busId: string, busData: UpdateBusData) => {
 // )
 
 //=================================
+// Stops API Calls
+//=================================
+
+export const listStopsAPI = async (
+  filters?: ListStopsFilters,
+  pagination?: PaginationParams
+): Promise<PaginatedResponse<Stop>> => {
+  const params = {
+    ...filters,
+    ...pagination,
+  }
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/stops`, { params })
+  return response.data
+}
+
+//=================================
 // Operator API Calls
 //=================================
 
@@ -133,5 +151,44 @@ export const listOperatorsAPI = async (
 
 export const getOperatorDetailsAPI = async (operatorId: string): Promise<Operator> => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/operators/${operatorId}`)
+  return response.data
+}
+
+//=================================
+// Route API Calls
+//=================================
+
+export const listRoutesAPI = async (
+  filters?: ListRoutesFilters,
+  pagination?: PaginationParams
+): Promise<PaginatedResponse<Route>> => {
+  const params = {
+    ...filters,
+    ...pagination,
+  }
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/routes`, { params })
+  return response.data
+}
+
+export const deleteRouteAPI = async (routeId: string) => {
+  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/routes/${routeId}`)
+  // toast.success('Route deleted successfully')
+  return response.data
+}
+
+export const createRouteAPI = async (routeData: CreateRouteData) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/routes`, routeData)
+  toast.success('Route created successfully')
+  return response.data
+}
+
+export const updateRouteAPI = async (routeId: string, routeData: CreateRouteData) => {
+  const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/routes/${routeId}`, routeData)
+  toast.success('Route updated successfully')
+  return response.data
+}
+
+export const getRouteDetailsAPI = async (routeId: string): Promise<Route> => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/routes/${routeId}`)
   return response.data
 }
