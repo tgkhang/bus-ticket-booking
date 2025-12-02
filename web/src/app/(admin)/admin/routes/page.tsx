@@ -57,10 +57,10 @@ export default function RoutesPage() {
   const [currentPage, setCurrentPage] = useState(1)
 
   // Pagination calculations
-  const totalPages = Math.ceil(routes.length / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil((routes?.length || 0) / ITEMS_PER_PAGE)
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE
-  const currentRoutes = routes.slice(indexOfFirstItem, indexOfLastItem)
+  const currentRoutes = routes?.slice(indexOfFirstItem, indexOfLastItem) || []
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -329,7 +329,7 @@ export default function RoutesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">Total Routes</p>
-                <p className="text-gray-900 dark:text-white text-2xl font-bold">{routes.length}</p>
+                <p className="text-gray-900 dark:text-white text-2xl font-bold">{routes?.length || 0}</p>
               </div>
               <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
                 <Navigation className="w-6 h-6 text-blue-600 dark:text-blue-400" />
@@ -344,7 +344,7 @@ export default function RoutesPage() {
               <div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">Active Routes</p>
                 <p className="text-gray-900 dark:text-white text-2xl font-bold">
-                  {routes.filter((r) => r.active).length}
+                  {routes?.filter((r) => r.active).length || 0}
                 </p>
               </div>
               <div className="bg-green-100 dark:bg-green-900 p-3 rounded-lg">
@@ -359,7 +359,7 @@ export default function RoutesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">Total Stops</p>
-                <p className="text-gray-900 dark:text-white text-2xl font-bold">{availableStops.length}</p>
+                <p className="text-gray-900 dark:text-white text-2xl font-bold">{availableStops?.length || 0}</p>
               </div>
               <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-lg">
                 <MapPin className="w-6 h-6 text-purple-600 dark:text-purple-400" />
@@ -374,7 +374,7 @@ export default function RoutesPage() {
               <div>
                 <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">Avg. Distance</p>
                 <p className="text-gray-900 dark:text-white text-2xl font-bold">
-                  {routes.length > 0 ? Math.round(routes.reduce((acc, r) => acc + r.distanceKm, 0) / routes.length) : 0}{' '}
+                  {routes?.length > 0 ? Math.round(routes.reduce((acc, r) => acc + r.distanceKm, 0) / routes.length) : 0}{' '}
                   km
                 </p>
               </div>
@@ -394,7 +394,7 @@ export default function RoutesPage() {
               <div className="flex items-center justify-center py-12">
                 <div className="text-gray-500 dark:text-gray-400">Loading routes...</div>
               </div>
-            ) : routes.length === 0 ? (
+            ) : !routes || routes.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-gray-500 dark:text-gray-400">No routes found. Add one to get started!</div>
               </div>
@@ -547,10 +547,10 @@ export default function RoutesPage() {
               </div>
             )}
             {/* Pagination */}
-            {!loading && routes.length > 0 && totalPages > 1 && (
+            {!loading && routes && routes.length > 0 && totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, routes.length)} of {routes.length} routes
+                  Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, routes?.length || 0)} of {routes?.length || 0} routes
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -650,7 +650,7 @@ export default function RoutesPage() {
                       required
                     >
                       <option value="">Select Operator</option>
-                      {operators.map((op) => (
+                      {operators?.map((op) => (
                         <option key={op.id} value={op.id}>
                           {op.name}
                         </option>
@@ -672,7 +672,7 @@ export default function RoutesPage() {
                       required
                     >
                       <option value="">Select Origin</option>
-                      {availableStops.map((stop) => (
+                      {availableStops?.map((stop) => (
                         <option key={stop.id} value={stop.id}>
                           {stop.name}
                         </option>
@@ -691,7 +691,7 @@ export default function RoutesPage() {
                       required
                     >
                       <option value="">Select Destination</option>
-                      {availableStops.map((stop) => (
+                      {availableStops?.map((stop) => (
                         <option key={stop.id} value={stop.id}>
                           {stop.name}
                         </option>
@@ -793,7 +793,7 @@ export default function RoutesPage() {
                                   required
                                 >
                                   <option value="">Select Stop</option>
-                                  {availableStops.map((s) => (
+                                  {availableStops?.map((s) => (
                                     <option key={s.id} value={s.id}>
                                       {s.name}
                                     </option>
