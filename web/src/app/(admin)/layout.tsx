@@ -73,7 +73,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    { name: 'Operators', href: '/admin/operators', icon: Users },
     { name: 'Buses', href: '/admin/busses', icon: Bus },
+    { name: 'Stop', href: '/admin/stops', icon: Users },
     { name: 'Routes', href: '/admin/routes', icon: Route },
     { name: 'Trips', href: '/admin/trips', icon: Calendar },
     { name: 'Bookings', href: '/admin/bookings', icon: Ticket },
