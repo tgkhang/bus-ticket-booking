@@ -67,6 +67,20 @@ export interface Bus {
   status: 'active' | 'inactive' | 'maintenance'
   createdAt: string
   updatedAt: string
+  operator?: {
+    id: string
+    name: string
+    contactEmail: string
+    contactPhone?: string
+    status: string
+    approvedAt?: string
+  }
+  seats?: Array<{
+    id: string
+    seatNumber: string
+    seatType: string
+    isActive: boolean
+  }>
 }
 
 // =================================

@@ -11,6 +11,29 @@ export interface Operator {
   approvedAt?: string
   createdAt?: string
   updatedAt?: string
+  buses?: Array<{
+    id: string
+    operatorId: string
+    plateNumber: string
+    model: string
+    seatCapacity: number
+    status: string
+    amenities?: any
+    createdAt?: string
+    updatedAt?: string
+  }>
+  routes?: Array<{
+    id: string
+    name: string
+    operatorId: string
+    originStopId: string
+    destinationStopId: string
+    distanceKm?: number
+    estimatedMinutes?: number
+    active: boolean
+    createdAt?: string
+    updatedAt?: string
+  }>
 }
 
 export interface CreateOperatorData {
