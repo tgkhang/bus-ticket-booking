@@ -16,7 +16,7 @@ const START_SERVER = () => {
   const hostname = env.LOCAL_DEV_APP_HOST || 'localhost'
   const PORT = env.PORT || env.LOCAL_DEV_APP_PORT || 3000
 
-  app.use((req, res, next) => {
+  app.use((_req, res, next) => {
     res.set('Cache-Control', 'no-store')
     next()
   })
@@ -24,24 +24,41 @@ const START_SERVER = () => {
   app.use(cookieParser())
   app.use(cors(corsOptions))
   app.use(express.json())
+
+  // Swagger UI Documentation
+  // try {
+  //   const swaggerDocument = YAML.load(path.join(__dirname, '../openapi/openapi.yaml'))
+  //   app.use(
+  //     '/api-docs',
+  //     swaggerUi.serve,
+  //     swaggerUi.setup(swaggerDocument, {
+  //       customCss: '.swagger-ui .topbar { display: none }',
+  //       customSiteTitle: 'Bus Ticket Booking API Docs',
+  //     })
+  //   )
+  //   console.log('3.Swagger UI available at /api-docs')
+  // } catch (error) {
+  //   console.warn('Warning: Could not load OpenAPI spec. Swagger UI will not be available.', error.message)
+  // }
+
   app.use('/v1', APIs_V1)
   app.use(errorHandlingMiddleware)
 
   if (env.BUILD_MODE === 'production') {
     // Listen on 0.0.0.0 for Render/public cloud
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`3.Production: Server is running on http://0.0.0.0:${PORT}`)
+      console.log(`4.Production: Server is running on http://0.0.0.0:${PORT}`)
     })
   } else {
     app.listen(PORT, hostname, () => {
-      console.log(`3.Local: Server is running on http://${hostname}:${PORT}`)
+      console.log(`4.Local: Server is running on http://${hostname}:${PORT}`)
     })
   }
 
   exitHook(async (callback) => {
-    console.log('\n4.Exiting application, closing DB connection...')
+    console.log('\n5.Exiting application, closing DB connection...')
     await CLOSE_DB()
-    console.log('5.PostgreSQL connection closed.')
+    console.log('6.PostgreSQL connection closed.')
     callback()
   })
 }

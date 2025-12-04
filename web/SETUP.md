@@ -80,11 +80,11 @@ web/
 - `/forgot-password` - Password recovery
 
 ### Protected Routes (Requires Authentication)
-- `/dashboard` - Main dashboard (role-based content)
-- `/dashboard/profile` - User profile
-- `/dashboard/users` - User management (Admin only)
-- `/dashboard/analytics` - Analytics (Admin only)
-- `/dashboard/bookings` - Bookings management
+- `/` - Main dashboard (role-based content)
+- `//profile` - User profile
+- `//users` - User management (Admin only)
+- `//analytics` - Analytics (Admin only)
+- `//bookings` - Bookings management
 
 ## User Roles
 

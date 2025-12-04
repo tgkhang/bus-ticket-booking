@@ -99,7 +99,7 @@ model User {
 11. OAuth Success Page:
     - Waits for AuthContext to initialize
     - AuthContext calls /me API using cookies
-    - Once authenticated, redirects to /dashboard
+    - Once authenticated, redirects to /
     ↓
 12. User is logged in! 🎉
 ```
@@ -377,7 +377,7 @@ If using Google Cloud Console directly:
 
 ### Issue: Redirect loop after OAuth login
 
-**Problem:** User redirects between /dashboard and /login
+**Problem:** User redirects between / and /login
 
 **Solution:**
 - Check cookies are being set (inspect Network tab → Response headers)
@@ -448,7 +448,7 @@ This adds:
 4. **Select Google account**
 
 5. **Check for success:**
-   - Should redirect to /dashboard
+   - Should redirect to /
    - Check cookies in DevTools → Application → Cookies
    - Should see `accessToken` and `refreshToken`
 

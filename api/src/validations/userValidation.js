@@ -94,6 +94,44 @@ const resetPassword = async (req, _res, next) => {
   }
 }
 
+const createByAdmin = async (req, _res, next) => {
+  const correctCondition = Joi.object({
+    username: Joi.string().alphanum().min(3).max(30).required().trim(),
+    email: Joi.string().email().required().trim().message(EMAIL_RULE_MESSAGE),
+    password: Joi.string().required().pattern(PASSWORD_RULE).message(PASSWORD_RULE_MESSAGE),
+    displayName: Joi.string().trim().optional(),
+    role: Joi.string().valid('client', 'operator', 'admin').optional(),
+    isActive: Joi.boolean().optional(),
+  })
+
+  try {
+    await correctCondition.validateAsync(req.body, { abortEarly: false })
+    next()
+  } catch (error) {
+    next(new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, new Error(error).message))
+  }
+}
+
+const updateByAdmin = async (req, _res, next) => {
+  const correctCondition = Joi.object({
+    name: Joi.string().trim().optional(),
+    displayName: Joi.string().trim().optional(),
+    username: Joi.string().alphanum().min(3).max(30).trim().optional(),
+    email: Joi.string().email().message(EMAIL_RULE_MESSAGE).trim().optional(),
+    password: Joi.string().pattern(PASSWORD_RULE).message(PASSWORD_RULE_MESSAGE).optional(),
+    role: Joi.string().valid('client', 'operator', 'admin').optional(),
+    active: Joi.boolean().optional(),
+    isActive: Joi.boolean().optional(),
+  })
+
+  try {
+    await correctCondition.validateAsync(req.body, { abortEarly: false })
+    next()
+  } catch (error) {
+    next(new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, new Error(error).message))
+  }
+}
+
 export const userValidation = {
   createNew,
   verifyAccount,
@@ -101,4 +139,6 @@ export const userValidation = {
   update,
   forgotPassword,
   resetPassword,
+  createByAdmin,
+  updateByAdmin,
 }

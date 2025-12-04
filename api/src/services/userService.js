@@ -18,7 +18,7 @@ const getClientInfo = (req) => ({
   userAgent: req?.headers?.['user-agent'] || null,
 })
 
-const createNew = async (reqBody) => {
+const createNew = async (reqBody, isAdminCreating = false) => {
   try {
     const existingUser = await userModel.findOneByEmail(reqBody.email)
     if (existingUser) {
@@ -31,27 +31,35 @@ const createNew = async (reqBody) => {
       email: reqBody.email,
       password: bcryptjs.hashSync(reqBody.password, 10),
       username: reqBody.username,
-      displayName: nameFromEmail,
+      displayName: reqBody.displayName || nameFromEmail,
       verifyToken: uuidv4(),
       verifyTokenExpiry: new Date(Date.now() + VERIFY_TOKEN_EXPIRY_MS),
     }
 
+    // If admin is creating, allow setting role and isActive
+    if (isAdminCreating) {
+      if (reqBody.role) newUser.role = reqBody.role
+      if (reqBody.isActive !== undefined) newUser.isActive = reqBody.isActive
+    }
+
     const createdUser = await userModel.createNew(newUser)
 
-    // Send verification email
-    try {
-      const verificationLink = `${WEBSITE_DOMAIN}/account/verification?email=${createdUser.email}&token=${createdUser.verifyToken}`
-      const emailSubject = 'Please verify your email'
-      const textContent = `Here is your verification link: ${verificationLink}\n\nThank you for registering!`
-      const htmlContent = `
-        <h3>Here is your verification link:</h3>
-        <h3><a href="${verificationLink}">${verificationLink}</a></h3>
-        <h3>Thank you for registering!</h3>
-      `
-      await BrevoEmailProvider.sendEmail(createdUser.email, emailSubject, textContent, htmlContent)
-      // eslint-disable-next-line no-unused-vars
-    } catch (emailError) {
-      throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to send verification email')
+    // Send verification email only for non-admin created users
+    if (!isAdminCreating) {
+      try {
+        const verificationLink = `${WEBSITE_DOMAIN}/account/verification?email=${createdUser.email}&token=${createdUser.verifyToken}`
+        const emailSubject = 'Please verify your email'
+        const textContent = `Here is your verification link: ${verificationLink}\n\nThank you for registering!`
+        const htmlContent = `
+          <h3>Here is your verification link:</h3>
+          <h3><a href="${verificationLink}">${verificationLink}</a></h3>
+          <h3>Thank you for registering!</h3>
+        `
+        await BrevoEmailProvider.sendEmail(createdUser.email, emailSubject, textContent, htmlContent)
+        // eslint-disable-next-line no-unused-vars
+      } catch (emailError) {
+        throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to send verification email')
+      }
     }
     return pickUser(createdUser)
   } catch (error) {
@@ -105,6 +113,11 @@ const login = async (reqBody, req) => {
 
     const existingUser = await userModel.findOneByEmail(email)
     const invalidCredentialsError = new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid email or password')
+
+    // Check if user exists
+    if (!existingUser) {
+      throw invalidCredentialsError
+    }
 
     // Verify password
     if (!bcryptjs.compareSync(reqBody.password, existingUser.password)) {
@@ -437,6 +450,32 @@ const oauthGoogleLogin = async (reqBody, req) => {
   }
 }
 
+// Get list of users (admin)
+const listUsers = async (query) => {
+  return userModel.listUsers(query);
+}
+
+// Admin update user
+const updateByAdmin = async (id, data) => {
+  const updateData = { ...data };
+  if ('active' in updateData) {
+    updateData.isActive = updateData.active;
+    delete updateData.active;
+  }
+  
+  // Hash password if provided
+  if (updateData.password) {
+    updateData.password = bcryptjs.hashSync(updateData.password, 10);
+  }
+  
+  return userModel.updateByAdmin(id, updateData);
+}
+
+// Admin delete user
+const deleteUser = async (id) => {
+  return userModel.deleteUser(id);
+}
+
 export const userService = {
   createNew,
   verifyAccount,
@@ -449,4 +488,8 @@ export const userService = {
   update,
   getMe,
   oauthGoogleLogin,
+  listUsers,
+  updateByAdmin,
+  deleteUser,
 }
+  
