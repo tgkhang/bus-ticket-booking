@@ -116,6 +116,87 @@ const createOAuthUser = async (data) => {
   }
 }
 
+// Get list of users (admin)
+const listUsers = async (query) => {
+  try {
+    const prisma = GET_DB();
+    const { search, role, page = 1, limit = 20 } = query || {};
+    const where = {};
+    
+    // Search in email, username, and displayName (case insensitive)
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { username: { contains: search, mode: 'insensitive' } },
+        { displayName: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    
+    if (role) where.role = role;
+
+    // Get total count
+    const total = await prisma.user.count({ where });
+
+    // Get users
+    const users = await prisma.user.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      users,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  } catch (error) {
+    throw new Error(error);
+  }
+};
+
+// Admin update user
+const updateByAdmin = async (id, data) => {
+  try {
+    const prisma = GET_DB();
+    
+    // Remove invalid fields that don't exist in schema
+    const validData = { ...data };
+    delete validData.id;
+    delete validData.createdAt;
+    delete validData.updatedAt;
+    
+    // Map 'name' to 'displayName'
+    if (validData.name) {
+      validData.displayName = validData.name;
+      delete validData.name;
+    }
+    
+    return await prisma.user.update({
+      where: { id },
+      data: validData,
+    });
+  } catch (error) {
+    throw new Error(error);
+  }
+};
+
+// Admin delete user
+const deleteUser = async (id) => {
+  try {
+    const prisma = GET_DB();
+    return await prisma.user.delete({
+      where: { id },
+    });
+  } catch (error) {
+    throw new Error(error);
+  }
+};
+
 export const userModel = {
   USER_ROLES,
   createNew,
@@ -125,4 +206,7 @@ export const userModel = {
   findOneByOauthSub,
   createOAuthUser,
   update,
+  listUsers,
+  updateByAdmin,
+  deleteUser,
 }
