@@ -163,6 +163,46 @@ const oauthGoogleLogin = async (req, res, next) => {
   }
 }
 
+// List users (admin)
+const listUsers = async (req, res, next) => {
+  try {
+    const users = await userService.listUsers(req.query);
+    res.status(StatusCodes.OK).json(users);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Create user (admin)
+const createUser = async (req, res, next) => {
+  try {
+    const user = await userService.createNew(req.body, true);
+    res.status(StatusCodes.CREATED).json(user);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update user (admin)
+const updateUser = async (req, res, next) => {
+  try {
+    const user = await userService.updateByAdmin(req.params.id, req.body);
+    res.status(StatusCodes.OK).json(user);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Delete user (admin)
+const deleteUser = async (req, res, next) => {
+  try {
+    await userService.deleteUser(req.params.id);
+    res.status(StatusCodes.NO_CONTENT).end();
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const userController = {
   createNew,
   verifyAccount,
@@ -175,4 +215,8 @@ export const userController = {
   update,
   getMe,
   oauthGoogleLogin,
+  listUsers,
+  createUser,
+  updateUser,
+  deleteUser,
 }

@@ -154,4 +154,40 @@ Router.route('/test/update-message').put(
   }
 )
 
+// ============ Admin User Management ============
+// List users
+Router.get(
+  '/',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_USERS]),
+  userController.listUsers
+);
+
+// Create user
+Router.post(
+  '/',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_USERS]),
+  userValidation.createByAdmin,
+  userController.createUser
+);
+
+// Update user
+Router.put(
+  '/:id',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_USERS]),
+  userValidation.updateByAdmin,
+  userController.updateUser
+);
+
+// Delete user
+Router.delete(
+  '/:id',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_USERS]),
+  userController.deleteUser
+);
+
+
 export const userRoute = Router
