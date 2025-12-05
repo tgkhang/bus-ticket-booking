@@ -44,6 +44,11 @@ export const PERMISSIONS = {
   MANAGE_OPERATORS: 'manage-operators',
   // Trip permissions
   READ_TRIPS: 'read-trips',
+  // Booking permissions
+  READ_BOOKINGS: 'read-bookings',
+  CREATE_BOOKINGS: 'create-bookings',
+  UPDATE_BOOKINGS: 'update-bookings',
+  MANAGE_BOOKINGS: 'manage-bookings',
   // User management
   MANAGE_USERS: 'manage-users',
 }
@@ -65,6 +70,10 @@ export const MOCK_ROLES = [
       PERMISSIONS.READ_OPERATORS,
       PERMISSIONS.MANAGE_OPERATORS,
       PERMISSIONS.READ_TRIPS,
+      PERMISSIONS.READ_BOOKINGS,
+      PERMISSIONS.CREATE_BOOKINGS,
+      PERMISSIONS.UPDATE_BOOKINGS,
+      PERMISSIONS.MANAGE_BOOKINGS,
       PERMISSIONS.MANAGE_USERS,
     ],
   },
@@ -92,6 +101,9 @@ export const MOCK_ROLES = [
       PERMISSIONS.READ_BUSES,
       PERMISSIONS.READ_OPERATORS,
       PERMISSIONS.READ_TRIPS,
+      PERMISSIONS.READ_BOOKINGS,
+      PERMISSIONS.CREATE_BOOKINGS,
+      PERMISSIONS.UPDATE_BOOKINGS,
     ],
   },
 ]

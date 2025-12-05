@@ -267,3 +267,67 @@ export const deleteTripAPI = async (tripId: string) => {
   toast.success('Trip deleted successfully')
   return response.data
 }
+
+//=================================
+// Booking API Calls
+//=================================
+
+export const getSeatStatusesAPI = async (tripId: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${tripId}/seats`)
+  return response.data
+}
+
+export const lockSeatsAPI = async (tripId: string, seatIds: string[], lockDuration: number = 10) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/bookings/lock-seats`, {
+    tripId,
+    seatIds,
+    lockDuration,
+  })
+  return response.data
+}
+
+export const createBookingAPI = async (bookingData: {
+  tripId: string
+  seatIds: string[]
+  passengers: Array<{
+    fullName: string
+    documentId: string
+    seatCode: string
+  }>
+  totalAmount: number
+}) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/bookings`, bookingData)
+  return response.data
+}
+
+export const getBookingByIdAPI = async (bookingId: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/bookings/${bookingId}`)
+  return response.data
+}
+
+export const getUserBookingsAPI = async (params?: {
+  status?: string
+  page?: number
+  limit?: number
+}) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/bookings`, { params })
+  return response.data
+}
+
+export const confirmBookingAPI = async (bookingId: string, paymentData: {
+  provider?: string
+  transactionRef?: string
+}) => {
+  const response = await authorizedAxiosInstance.post(
+    `${API_ROOT}/v1/bookings/${bookingId}/confirm`,
+    paymentData
+  )
+  toast.success('Booking confirmed successfully!')
+  return response.data
+}
+
+export const cancelBookingAPI = async (bookingId: string) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/bookings/${bookingId}/cancel`)
+  toast.success('Booking cancelled successfully')
+  return response.data
+}
