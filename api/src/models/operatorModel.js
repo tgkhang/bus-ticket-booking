@@ -2,7 +2,7 @@ import { GET_DB } from '~/config/prisma'
 
 const includeRelations = {
   buses: {
-    orderBy: { plate_number: 'asc' }
+    orderBy: { plateNumber: 'asc' }
   },
   routes: {
     orderBy: { name: 'asc' }
@@ -185,7 +185,7 @@ const getOperatorWithDetails = async (operatorId) => {
       where: { id: operatorId },
       include: {
         buses: {
-          orderBy: { plate_number: 'asc' },
+          orderBy: { plateNumber: 'asc' },
           include: {
             seats: {
               where: { isActive: true },
