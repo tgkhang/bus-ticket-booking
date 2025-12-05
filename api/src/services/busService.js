@@ -3,6 +3,7 @@ import ApiError from '~/utils/ApiError'
 import { busModel } from '~/models/busModel'
 import { seatModel } from '~/models/seatModel'
 import { GET_DB } from '~/config/prisma'
+import { calculateSeatCount, getLayoutByCode } from '~/utils/baseBusType'
 
 // ============================================
 // HELPER FUNCTIONS
@@ -156,8 +157,19 @@ const generateSeats = async (busId, payload, userRole, userOperatorId = null) =>
   const { layout, rows, seatType, startRow } = payload
 
   // Calculate expected seat count
-  const [leftSeats, rightSeats] = layout.split('-').map(Number)
-  const totalSeats = (leftSeats + rightSeats) * rows
+  let totalSeats = 0
+  const busLayout = getLayoutByCode(layout)
+
+  if (busLayout) {
+    // Use the new bus type layout calculation
+    totalSeats = calculateSeatCount(layout, rows)
+  } else if (layout.includes('-')) {
+    // Fallback to simple layout calculation
+    const [leftSeats, rightSeats] = layout.split('-').map(Number)
+    totalSeats = (leftSeats + rightSeats) * rows
+  } else {
+    throw new ApiError(StatusCodes.BAD_REQUEST, `Invalid layout code: ${layout}`)
+  }
 
   // Check if it exceeds bus capacity
   if (totalSeats > bus.seatCapacity) {
@@ -228,6 +240,24 @@ const deleteSeat = async (busId, seatId, userRole, userOperatorId = null) => {
   return { deleted: true }
 }
 
+const deleteAllSeats = async (busId, userRole) => {
+  // Check bus exists and ownership
+  // const bus = await ensureBusExists(busId)
+  console.log('userRole:', userRole);
+  if (userRole !== 'admin' &&  userRole !== 'operator') {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Only admins or the bus operator can delete all seats for this bus')
+  }
+
+  console.log('Passed role check');
+  // Delete all seats for this bus
+  const result = await seatModel.deleteAllSeats(busId)
+  return {
+    deleted: true,
+    count: result.count,
+    message: `Successfully deleted ${result.count} seat(s) and their associated seat statuses`,
+  }
+}
+
 // ============================================
 // ADDITIONAL BUS SERVICES
 // ============================================
@@ -274,6 +304,7 @@ export const busService = {
   listSeats,
   updateSeat,
   deleteSeat,
+  deleteAllSeats,
 
   // Additional
   getSeatLayout,

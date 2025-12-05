@@ -15,9 +15,9 @@ import type {
   ListStopsFilters,
   ListRoutesFilters,
 } from '@/types/api'
-import type { Operator,ListOperatorsFilters } from '@/types/operator'
+import type { Operator, ListOperatorsFilters } from '@/types/operator'
 import { CreateRouteData, Route, Stop } from '@/types/routeAndStop'
-import type { Trip, TripDetail, CreateTripData, UpdateTripData, ListTripsFilters, SearchTripsFilters } from '@/types/trip'
+import type { Trip, TripDetail, CreateTripData, UpdateTripData, ListTripsFilters } from '@/types/trip'
 import { toast } from 'sonner'
 
 //=================================
@@ -98,7 +98,6 @@ export const getTripByIdAPI = async (id: string) => {
   return response.data
 }
 
-
 //=================================
 // Bus API Calls
 //=================================
@@ -144,14 +143,46 @@ export const updateBusAPI = async (busId: string, busData: UpdateBusData) => {
   return response.data
 }
 
-// // Update bus
-// Router.put(
-//   '/:id',
-//   authMiddleware.isAuthorized,
-//   rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_BUSES]),
-//   busValidation.updateBus,
-//   busController.updateBus
-// )
+export const deleteAllSeatsAPI = async (busId: string) => {
+  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/buses/${busId}/allSeats`)
+  toast.success('All seats deleted successfully')
+  return response.data
+}
+
+export const deleteSeatAPI = async (busId: string, seatId: string) => {
+  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/buses/${busId}/seats/${seatId}`)
+  toast.success('Seat deleted successfully')
+  return response.data
+}
+
+export const createSeatAPI = async (
+  busId: string,
+  seatData: {
+    seatNumber: string
+    seatType: 'regular' | 'premium' | 'sleeper'
+    isActive: boolean
+  }
+) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/buses/${busId}/seats`, {
+    seats: [seatData],
+  })
+  toast.success('Seat created successfully')
+  return response.data
+}
+
+export const generateSeatsAPI = async (
+  busId: string,
+  layoutData: {
+    layout: string
+    rows: number
+    seatType: 'regular' | 'premium' | 'sleeper'
+    startRow: number
+  }
+) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/buses/${busId}/seats/generate`, layoutData)
+  toast.success('Seats generated successfully')
+  return response.data
+}
 
 //=================================
 // Stops API Calls
