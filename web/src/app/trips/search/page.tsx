@@ -489,7 +489,10 @@ function SearchContent() {
                     <input
                       type="number"
                       value={editPassengers}
-                      onChange={(e) => setEditPassengers(parseInt(e.target.value) || 1)}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 1;
+                        setEditPassengers(Math.min(val, 10));
+                      }}
                       min="1"
                       max="10"
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"

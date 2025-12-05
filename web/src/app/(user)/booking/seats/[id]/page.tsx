@@ -18,15 +18,11 @@ interface Seat {
 }
 
 interface SeatStatusResponse {
-  tripId: string
+  id: string
   seatId: string
+  seatCode: string
   status: string
   lockedUntil: string | null
-  seat: {
-    id: string
-    code: string
-    seatType: string
-  }
 }
 
 export default function SeatSelectionPage() {
@@ -58,14 +54,15 @@ export default function SeatSelectionPage() {
           getSeatStatusesAPI(tripId),
         ])
 
-        setTrip(tripData.data)
+        // Backend returns trip directly (not wrapped in { data: ... })
+        setTrip(tripData)
 
-        // Transform seat statuses
-        const transformedSeats: Seat[] = seatStatusData.data.map((ss: SeatStatusResponse) => ({
+        // Backend returns array directly (not wrapped in { data: [...] })
+        const transformedSeats: Seat[] = (seatStatusData as SeatStatusResponse[]).map((ss: SeatStatusResponse) => ({
           id: ss.seatId,
-          code: ss.seat.code,
+          code: ss.seatCode,
           status: ss.status as SeatStatus,
-          price: tripData.data.basePrice,
+          price: tripData.basePrice,
         }))
 
         setSeats(transformedSeats)
@@ -170,6 +167,11 @@ export default function SeatSelectionPage() {
   const groupSeatsByRow = () => {
     const rows: { [key: number]: Seat[] } = {}
     seats.forEach((seat) => {
+      // Safety check: ensure seat.code exists before matching
+      if (!seat.code) {
+        console.warn('Seat without code:', seat)
+        return
+      }
       const match = seat.code.match(/([A-D])(\d+)/)
       if (match) {
         const row = parseInt(match[2])

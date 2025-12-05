@@ -101,7 +101,7 @@ const getSeatStatusesByTripId = async (tripId) => {
   return seatStatuses.map((ss) => ({
     id: ss.id,
     seatId: ss.seatId,
-    seatCode: ss.seat.seatCode,
+    seatCode: ss.seat.seatNumber, // Changed from seatCode to seatNumber to match schema
     status: ss.status,
     lockedUntil: ss.lockedUntil,
   }))
