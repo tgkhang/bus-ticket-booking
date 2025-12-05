@@ -9,20 +9,13 @@ import {
   Edit,
   Trash2,
   X,
-  Wifi,
-  Wind,
-  Droplet,
-  Usb,
-  Tv,
-  Lightbulb,
-  User,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
 import { listBusesAPI, createBusAPI, updateBusAPI, deleteBusAPI, listOperatorsAPI } from '@/lib/api'
 import type { Bus, CreateBusData, UpdateBusData, BusAmenities } from '@/types/api'
 import { toast } from 'sonner'
-import { ITEMS_PER_PAGE } from '@/utils/constants'
+import { amenityOptions, ITEMS_PER_PAGE } from '@/utils/constants'
 import { useRouter } from 'next/navigation'
 import { Operator } from '@/types/operator'
 
@@ -76,16 +69,6 @@ export default function BusManagementPage() {
       status: 'active',
     },
   })
-
-  const amenityOptions = [
-    { value: 'wifi', label: 'WiFi', icon: Wifi },
-    { value: 'ac', label: 'AC', icon: Wind },
-    { value: 'restroom', label: 'Restroom', icon: Droplet },
-    { value: 'usb_charging', label: 'USB Charging', icon: Usb },
-    { value: 'entertainment', label: 'Entertainment', icon: Tv },
-    { value: 'reclining_seats', label: 'Reclining Seats', icon: User },
-    { value: 'reading_light', label: 'Reading Light', icon: Lightbulb },
-  ]
 
   // Watch amenities for checkbox state
   const amenities = watch('amenities')
@@ -192,7 +175,7 @@ export default function BusManagementPage() {
       await fetchBuses()
       handleCloseModal()
     } catch (error) {
-      toast.error(editingBus ? 'Failed to update bus' : 'Failed to create bus')
+      //toast.error(editingBus ? 'Failed to update bus' : 'Failed to create bus')
       console.error('Error submitting bus:', error)
     }
   }
@@ -346,14 +329,20 @@ export default function BusManagementPage() {
                         <td className="px-6 py-4">
                           <div className="flex gap-2">
                             <button
-                              onClick={() => handleOpenModal(bus)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleOpenModal(bus)
+                              }}
                               className="text-blue-600 hover:text-blue-700 transition-colors"
                               title="Edit bus"
                             >
                               <Edit className="w-5 h-5" />
                             </button>
                             <button
-                              onClick={() => handleOpenDeleteModal(bus)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleOpenDeleteModal(bus)
+                              }}
                               className="text-red-600 hover:text-red-700 transition-colors"
                               title="Delete bus"
                             >

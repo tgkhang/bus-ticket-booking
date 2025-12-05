@@ -4,6 +4,7 @@ import { authMiddleware } from '~/middlewares/authMiddleware'
 import { rbacMiddleware } from '~/middlewares/rbacMiddleware'
 import { busValidation } from '~/validations/busValidation'
 import { PERMISSIONS } from '~/utils/constants'
+import { asyncHandler } from '~/helpers/asyncHandler'
 
 const Router = express.Router()
 
@@ -105,6 +106,14 @@ Router.delete(
   authMiddleware.isAuthorized,
   rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_BUSES]),
   busController.deleteSeat
+)
+
+// delete all seats for a bus, useful for regenerating layout
+Router.delete(
+  '/:busId/allSeats',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_BUSES]),
+  asyncHandler(busController.deleteAllSeats)
 )
 
 // ============================================

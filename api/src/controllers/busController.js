@@ -149,6 +149,14 @@ const deleteSeat = async (req, res, next) => {
   }
 }
 
+const deleteAllSeats = async (req, res, next) => {
+  const userRole = req.jwtDecoded.role
+  //const userOperatorId = req.jwtDecoded.operatorId || null
+  const busId = req.params.busId
+  const result = await busService.deleteAllSeats(busId, userRole)
+  res.status(StatusCodes.OK).json(result)
+}
+
 // ============================================
 // ADDITIONAL CONTROLLERS
 // ============================================
@@ -225,6 +233,7 @@ export const busController = {
   listSeats,
   updateSeat,
   deleteSeat,
+  deleteAllSeats,
 
   // Additional
   searchBuses,
