@@ -3,7 +3,7 @@ import { bookingService } from '~/services/bookingService'
 
 const createBooking = async (req, res, next) => {
   try {
-    const userId = req.user.id
+    const userId = req.jwtDecoded.id
     const bookingData = req.body
     const booking = await bookingService.createBooking(userId, bookingData)
     res.status(StatusCodes.CREATED).json(booking)
@@ -15,7 +15,7 @@ const createBooking = async (req, res, next) => {
 const getBookingById = async (req, res, next) => {
   try {
     const { id } = req.params
-    const userId = req.user.id
+    const userId = req.jwtDecoded.id
     const booking = await bookingService.getBookingById(id, userId)
     res.status(StatusCodes.OK).json(booking)
   } catch (error) {
@@ -25,7 +25,7 @@ const getBookingById = async (req, res, next) => {
 
 const getUserBookings = async (req, res, next) => {
   try {
-    const userId = req.user.id
+    const userId = req.jwtDecoded.id
     const filters = {
       status: req.query.status,
       page: parseInt(req.query.page) || 1,
@@ -61,7 +61,7 @@ const getSeatStatuses = async (req, res, next) => {
 const confirmBooking = async (req, res, next) => {
   try {
     const { id } = req.params
-    const userId = req.user.id
+    const userId = req.jwtDecoded.id
     const paymentData = req.body
     const booking = await bookingService.confirmBooking(id, userId, paymentData)
     res.status(StatusCodes.OK).json(booking)
@@ -73,7 +73,7 @@ const confirmBooking = async (req, res, next) => {
 const cancelBooking = async (req, res, next) => {
   try {
     const { id } = req.params
-    const userId = req.user.id
+    const userId = req.jwtDecoded.id
     const result = await bookingService.cancelBooking(id, userId)
     res.status(StatusCodes.OK).json(result)
   } catch (error) {

@@ -29,7 +29,8 @@ function ConfirmationContent() {
 
       try {
         const response = await getBookingByIdAPI(bookingId)
-        setBooking(response.data)
+        // Backend returns booking directly (not wrapped in { data: ... })
+        setBooking(response)
       } catch (err) {
         console.error('Failed to fetch booking:', err)
         toast.error('Failed to load booking details')
@@ -118,9 +119,9 @@ function ConfirmationContent() {
               <div>
                 <p className="text-gray-600 mb-2 text-sm">Route</p>
                 <p className="text-gray-900 text-xl font-semibold">
-                  {booking.trip?.originStop?.name}{' '}
+                  {booking.trip?.route?.originStop?.name}{' '}
                   <ArrowRight className="inline w-5 h-5 mx-2" />
-                  {booking.trip?.destinationStop?.name}
+                  {booking.trip?.route?.destinationStop?.name}
                 </p>
               </div>
               <div>
@@ -141,7 +142,7 @@ function ConfirmationContent() {
                     minute: '2-digit',
                   })}
                 </p>
-                <p className="text-gray-600">{booking.trip?.originStop?.address || 'N/A'}</p>
+                <p className="text-gray-600">{booking.trip?.route?.originStop?.address || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-gray-600 mb-2 text-sm">Arrival</p>
@@ -151,7 +152,7 @@ function ConfirmationContent() {
                     minute: '2-digit',
                   })}
                 </p>
-                <p className="text-gray-600">{booking.trip?.destinationStop?.address || 'N/A'}</p>
+                <p className="text-gray-600">{booking.trip?.route?.destinationStop?.address || 'N/A'}</p>
               </div>
             </div>
 
@@ -159,7 +160,7 @@ function ConfirmationContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 pb-6 border-b border-gray-200">
               <div>
                 <p className="text-gray-600 mb-2 text-sm">Bus Operator</p>
-                <p className="text-gray-900 font-medium">{booking.trip?.operator?.name || 'N/A'}</p>
+                <p className="text-gray-900 font-medium">{booking.trip?.bus?.operator?.name || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-gray-600 mb-2 text-sm">Bus Model</p>

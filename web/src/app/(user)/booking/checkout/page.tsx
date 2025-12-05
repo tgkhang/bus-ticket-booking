@@ -52,7 +52,8 @@ function CheckoutContent() {
 
         // Fetch trip details
         const tripData = await getTripByIdAPI(decoded.tripId)
-        setTrip(tripData.data)
+        // Backend returns trip directly (not wrapped in { data: ... })
+        setTrip(tripData)
       } catch (err) {
         console.error('Failed to initialize checkout:', err)
         toast.error('Failed to load booking data')
@@ -120,8 +121,10 @@ function CheckoutContent() {
           documentId: p.documentId,
           seatCode: seatIds[index], // Using seatId as code for now
         })),
-        totalAmount: bookingData.totalPrice,
+        totalAmount: Number(bookingData.totalPrice), // Ensure it's a number
       }
+
+      console.log('Creating booking with payload:', bookingPayload)
 
       // Create booking
       const response = await createBookingAPI(bookingPayload)
@@ -130,12 +133,14 @@ function CheckoutContent() {
       await new Promise((resolve) => setTimeout(resolve, 2000))
 
       // Navigate to confirmation
+      // Backend returns booking directly (not wrapped in { data: ... })
       router.push(
-        `/booking/confirmation?bookingId=${response.data.id}&bookingRef=${response.data.bookingReference}`
+        `/booking/confirmation?bookingId=${response.id}&bookingRef=${response.id}`
       )
-    } catch (err) {
+    } catch (err: any) {
       console.error('Payment failed:', err)
-      toast.error('Payment failed. Please try again.')
+      const errorMessage = err.response?.data?.message || err.message || 'Payment failed. Please try again.'
+      toast.error(errorMessage)
       setIsProcessing(false)
     }
   }
@@ -229,7 +234,7 @@ function CheckoutContent() {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Route:</span>
                     <span className="text-gray-900 font-medium">
-                      {trip.originStop?.name} → {trip.destinationStop?.name}
+                      {trip.route?.originStop?.name} → {trip.route?.destinationStop?.name}
                     </span>
                   </div>
                   <div className="flex justify-between">

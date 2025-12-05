@@ -42,7 +42,8 @@ function PassengerDetailsContent() {
 
       try {
         const tripData = await getTripByIdAPI(tripId)
-        setTrip(tripData.data)
+        // Backend returns trip directly (not wrapped in { data: ... })
+        setTrip(tripData)
 
         // Initialize passengers array
         const seatCodes = seatsParam.split(',')
@@ -132,7 +133,7 @@ function PassengerDetailsContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push(`/booking/seats/${tripId}?lockedSeats=${seatsParam}`)}
           className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -270,7 +271,7 @@ function PassengerDetailsContent() {
                   <div>
                     <p className="text-gray-600 text-sm">Route</p>
                     <p className="text-gray-900 font-medium">
-                      {trip.originStop?.name} → {trip.destinationStop?.name}
+                      {trip.route?.originStop?.name} → {trip.route?.destinationStop?.name}
                     </p>
                   </div>
                   <div>

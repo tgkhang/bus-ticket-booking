@@ -34,7 +34,11 @@ const getBookingById = async (id) => {
               destinationStop: true,
             },
           },
-          bus: true,
+          bus: {
+            include: {
+              operator: true,
+            },
+          },
         },
       },
       passengerDetails: true,

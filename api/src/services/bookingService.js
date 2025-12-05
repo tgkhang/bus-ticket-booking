@@ -7,50 +7,144 @@ import { GET_DB } from '~/config/prisma'
 
 const createBooking = async (userId, bookingData) => {
   const prisma = GET_DB()
-  const { tripId, seatIds, passengers, totalAmount } = bookingData
+  
+  try {
+    const { tripId, seatIds, passengers, totalAmount } = bookingData
 
-  // Validate trip exists
-  const trip = await tripModel.getTripById(tripId)
-  if (!trip) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Trip not found')
-  }
+    // Validate input
+    if (!tripId || !seatIds || !Array.isArray(seatIds) || seatIds.length === 0) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid booking data: tripId and seatIds are required')
+    }
 
-  // Check if seats are still available (should be locked by this user)
-  const available = await seatStatusModel.checkSeatsAvailability(tripId, seatIds)
-  if (!available) {
-    throw new ApiError(StatusCodes.CONFLICT, 'One or more seats are no longer available')
-  }
+    if (!passengers || !Array.isArray(passengers) || passengers.length === 0) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid booking data: passengers information is required')
+    }
 
-  // Create booking with passenger details in a transaction
-  const booking = await prisma.$transaction(async (tx) => {
-    // Create booking
-    const newBooking = await tx.booking.create({
-      data: {
-        userId,
-        tripId,
-        totalAmount,
-        status: 'pending',
-      },
-    })
+    if (!totalAmount || isNaN(totalAmount) || totalAmount <= 0) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid booking data: totalAmount must be a positive number')
+    }
 
-    // Create passenger details
-    await tx.passengerDetail.createMany({
-      data: passengers.map((p) => ({
+    if (seatIds.length !== passengers.length) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Number of seats must match number of passengers')
+    }
+
+    console.log('Creating booking:', { userId, tripId, seatIds: seatIds.length, passengers: passengers.length, totalAmount })
+
+    // Validate trip exists
+    const trip = await tripModel.getTripById(tripId)
+    if (!trip) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Trip not found')
+    }
+
+    // Check if trip is still bookable
+    if (trip.status !== 'scheduled') {
+      throw new ApiError(StatusCodes.BAD_REQUEST, `Trip is not available for booking (status: ${trip.status})`)
+    }
+
+    // Release expired locks first
+    await seatStatusModel.releaseExpiredLocks()
+
+    // Create booking with passenger details and seat updates in a single transaction
+    const booking = await prisma.$transaction(async (tx) => {
+      // Check seat availability within transaction
+      const seatStatuses = await tx.seatStatus.findMany({
+        where: {
+          tripId,
+          seatId: { in: seatIds },
+        },
+      })
+
+      if (seatStatuses.length !== seatIds.length) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'One or more seats do not exist for this trip')
+      }
+
+      const unavailableSeats = seatStatuses.filter(s => s.status !== 'available' && s.status !== 'locked')
+      if (unavailableSeats.length > 0) {
+        throw new ApiError(StatusCodes.CONFLICT, `Seats are no longer available: ${unavailableSeats.map(s => s.seatId).join(', ')}`)
+      }
+
+      // Create booking record
+      const newBooking = await tx.booking.create({
+        data: {
+          userId,
+          tripId,
+          totalAmount: parseFloat(totalAmount.toString()), // Ensure proper number format for Decimal
+          status: 'pending',
+        },
+      })
+
+      // Create passenger details
+      const passengerData = passengers.map((p, index) => ({
         bookingId: newBooking.id,
-        fullName: p.fullName,
-        documentId: p.documentId,
-        seatCode: p.seatCode,
-      })),
+        fullName: p.fullName.trim(),
+        documentId: p.documentId.trim(),
+        seatCode: p.seatCode || seatIds[index], // Use provided seatCode or fallback to seatId
+      }))
+
+      await tx.passengerDetail.createMany({
+        data: passengerData,
+      })
+
+      // Update seat statuses to booked
+      const updateResult = await tx.seatStatus.updateMany({
+        where: {
+          tripId,
+          seatId: { in: seatIds },
+          status: { in: ['available', 'locked'] }, // Can book if available or locked
+        },
+        data: {
+          status: 'booked',
+          lockedUntil: null,
+        },
+      })
+
+      if (updateResult.count !== seatIds.length) {
+        throw new ApiError(StatusCodes.CONFLICT, 'Failed to book all seats. Some seats may have been taken by another user.')
+      }
+
+      console.log('Booking created successfully:', newBooking.id)
+      return newBooking
     })
 
-    // Book the seats (change from locked to booked)
-    await seatStatusModel.bookSeats(tripId, seatIds)
-
-    return newBooking
-  })
-
-  // Fetch complete booking with relations
-  return bookingModel.getBookingById(booking.id)
+    // Fetch complete booking with all relations
+    const completeBooking = await bookingModel.getBookingById(booking.id)
+    
+    if (!completeBooking) {
+      throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Booking was created but could not be retrieved')
+    }
+    
+    return completeBooking
+    
+  } catch (error) {
+    // Log error details safely
+    console.error('Error creating booking:', {
+      message: error.message,
+      code: error.code,
+      name: error.name,
+      statusCode: error.statusCode
+    })
+    
+    // Re-throw ApiError as-is
+    if (error instanceof ApiError) {
+      throw error
+    }
+    
+    // Handle Prisma errors
+    if (error.code === 'P2002') {
+      throw new ApiError(StatusCodes.CONFLICT, 'Booking with this data already exists')
+    }
+    
+    if (error.code === 'P2003') {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid reference: Trip or User does not exist')
+    }
+    
+    if (error.code === 'P2025') {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Record not found')
+    }
+    
+    // Generic error
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, `Failed to create booking: ${error.message || 'Unknown error'}`)
+  }
 }
 
 const getBookingById = async (bookingId, userId) => {
@@ -73,22 +167,79 @@ const getUserBookings = async (userId, filters) => {
 }
 
 const lockSeats = async (tripId, seatIds, lockDuration = 10) => {
-  // Release expired locks first
-  await seatStatusModel.releaseExpiredLocks()
+  try {
+    // Validate input
+    if (!tripId || !seatIds || !Array.isArray(seatIds) || seatIds.length === 0) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid input: tripId and seatIds are required')
+    }
 
-  // Check if seats are available
-  const available = await seatStatusModel.checkSeatsAvailability(tripId, seatIds)
-  if (!available) {
-    throw new ApiError(StatusCodes.CONFLICT, 'One or more seats are not available')
-  }
+    if (lockDuration < 1 || lockDuration > 15) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Lock duration must be between 1 and 15 minutes')
+    }
 
-  // Lock the seats
-  const lockedUntil = await seatStatusModel.lockSeats(tripId, seatIds, lockDuration)
-  
-  return {
-    success: true,
-    lockedUntil,
-    message: `Seats locked until ${lockedUntil.toISOString()}`,
+    console.log('Locking seats:', { tripId, seatIds, lockDuration })
+
+    // Release expired locks first
+    await seatStatusModel.releaseExpiredLocks()
+
+    const prisma = GET_DB()
+    
+    // Lock seats in transaction to ensure atomicity
+    const result = await prisma.$transaction(async (tx) => {
+      // Check seat availability
+      const seatStatuses = await tx.seatStatus.findMany({
+        where: {
+          tripId,
+          seatId: { in: seatIds },
+        },
+      })
+
+      if (seatStatuses.length !== seatIds.length) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'One or more seats do not exist')
+      }
+
+      const unavailableSeats = seatStatuses.filter(s => s.status !== 'available')
+      if (unavailableSeats.length > 0) {
+        throw new ApiError(StatusCodes.CONFLICT, `Seats are not available: ${unavailableSeats.map(s => s.seatId).join(', ')}`)
+      }
+
+      // Lock the seats
+      const lockedUntil = new Date(Date.now() + lockDuration * 60 * 1000)
+      
+      const updateResult = await tx.seatStatus.updateMany({
+        where: {
+          tripId,
+          seatId: { in: seatIds },
+          status: 'available',
+        },
+        data: {
+          status: 'locked',
+          lockedUntil,
+        },
+      })
+
+      if (updateResult.count !== seatIds.length) {
+        throw new ApiError(StatusCodes.CONFLICT, 'Failed to lock all seats. Some may have been taken.')
+      }
+
+      return lockedUntil
+    })
+
+    console.log('Seats locked successfully until:', result)
+    
+    return {
+      success: true,
+      lockedUntil: result,
+      message: `Seats locked until ${result.toISOString()}`,
+    }
+  } catch (error) {
+    console.error('Error locking seats:', error.message)
+    
+    if (error instanceof ApiError) {
+      throw error
+    }
+    
+    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, `Failed to lock seats: ${error.message}`)
   }
 }
 

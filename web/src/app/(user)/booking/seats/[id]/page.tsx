@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { getSeatStatusesAPI, getTripByIdAPI, lockSeatsAPI } from '@/lib/api'
 import { ArrowLeft, Radio, AlertCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,7 @@ interface SeatStatusResponse {
 export default function SeatSelectionPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const tripId = params?.id as string
 
   const [trip, setTrip] = useState<any>(null)
@@ -66,6 +67,26 @@ export default function SeatSelectionPage() {
         }))
 
         setSeats(transformedSeats)
+        
+        // Check if user is returning from passenger details with locked seats
+        const returnedSeats = searchParams.get('lockedSeats')
+        if (returnedSeats) {
+          const lockedSeatIds = returnedSeats.split(',')
+          // Select seats that are locked (user's previous selection)
+          const seatsToSelect = lockedSeatIds.filter(seatId => {
+            const seat = transformedSeats.find(s => s.id === seatId)
+            return seat && seat.status === 'locked'
+          })
+          
+          if (seatsToSelect.length > 0) {
+            setSelectedSeats(seatsToSelect)
+            // Mark them as selected in the UI
+            setSeats(transformedSeats.map(s => 
+              seatsToSelect.includes(s.id) ? { ...s, status: 'selected' as SeatStatus } : s
+            ))
+            toast.info(`Restored ${seatsToSelect.length} previously selected seat(s)`)
+          }
+        }
       } catch (err) {
         console.error('Failed to fetch seat data:', err)
         setError('Failed to load seat information')
@@ -205,7 +226,7 @@ export default function SeatSelectionPage() {
             <div>
               <p className="text-gray-600 text-sm">Route</p>
               <p className="text-gray-900 font-medium">
-                {trip.originStop?.name} → {trip.destinationStop?.name}
+                {trip.route?.originStop?.name} → {trip.route?.destinationStop?.name}
               </p>
             </div>
             <div>
