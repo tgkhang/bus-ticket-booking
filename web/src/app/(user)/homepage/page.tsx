@@ -213,7 +213,7 @@ export default function UserHomePage() {
                           }}
                           className="w-full px-4 py-2 text-left hover:bg-blue-50 flex items-start gap-2"
                         >
-                          <MapPin className="w-4 h-4 text-blue-600 mt-1 flex-shrink-0" />
+                          <MapPin className="w-4 h-4 text-blue-600 mt-1 shrink-0" />
                           <div>
                             <p className="text-gray-900 font-medium">{stop.name}</p>
                             {stop.address && (
@@ -259,7 +259,7 @@ export default function UserHomePage() {
                           }}
                           className="w-full px-4 py-2 text-left hover:bg-blue-50 flex items-start gap-2"
                         >
-                          <MapPin className="w-4 h-4 text-blue-600 mt-1 flex-shrink-0" />
+                          <MapPin className="w-4 h-4 text-blue-600 mt-1 shrink-0" />
                           <div>
                             <p className="text-gray-900 font-medium">{stop.name}</p>
                             {stop.address && (
@@ -386,7 +386,7 @@ export default function UserHomePage() {
 
           {/* Right Column - User Stats */}
           <div className="space-y-4">
-            <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg shadow-md p-6 text-white">
+            <div className="bg-linear-to-br from-blue-600 to-blue-700 rounded-lg shadow-md p-6 text-white">
               <div className="flex items-center gap-3 mb-4">
                 <Ticket className="w-8 h-8" />
                 <div>
@@ -403,7 +403,7 @@ export default function UserHomePage() {
               </Button>
             </div>
 
-            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-md p-6 text-white">
+            <div className="bg-linear-to-br from-green-500 to-green-600 rounded-lg shadow-md p-6 text-white">
               <div className="flex items-center gap-3 mb-2">
                 <Ticket className="w-8 h-8" />
                 <div>
@@ -414,7 +414,7 @@ export default function UserHomePage() {
               <p className="text-green-100 text-sm">No trips scheduled</p>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-md p-6 text-white">
+            <div className="bg-linear-to-br from-purple-500 to-purple-600 rounded-lg shadow-md p-6 text-white">
               <div className="flex items-center gap-3 mb-2">
                 <Sparkles className="w-8 h-8" />
                 <div>

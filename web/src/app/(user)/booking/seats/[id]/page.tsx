@@ -36,7 +36,9 @@ export default function SeatSelectionPage() {
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [passengers, setPassengers] = useState(1)
+  
+  // Get passengers from URL params (from search page)
+  const passengers = parseInt(searchParams.get('passengers') || '1')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -329,7 +331,11 @@ export default function SeatSelectionPage() {
 
               <div className="space-y-4 mb-6">
                 <div>
-                  <p className="text-gray-600 text-sm">Selected Seats</p>
+                  <p className="text-gray-600 text-sm">Passengers</p>
+                  <p className="text-gray-900 font-medium">{passengers} {passengers === 1 ? 'person' : 'people'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600 text-sm">Selected Seats ({selectedSeats.length}/{passengers})</p>
                   <p className="text-gray-900 font-medium">
                     {selectedSeats.length > 0
                       ? seats
@@ -338,10 +344,6 @@ export default function SeatSelectionPage() {
                           .join(', ')
                       : 'None'}
                   </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 text-sm">Number of Passengers</p>
-                  <p className="text-gray-900 font-medium">{selectedSeats.length}</p>
                 </div>
               </div>
 

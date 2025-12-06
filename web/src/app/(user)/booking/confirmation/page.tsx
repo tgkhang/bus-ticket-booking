@@ -93,7 +93,7 @@ function ConfirmationContent() {
         </div>
 
         {/* Booking Reference */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-6 mb-8 text-center">
+        <div className="bg-linear-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-6 mb-8 text-center">
           <p className="text-blue-100 mb-2">Booking Reference Number</p>
           <h2 className="text-3xl font-bold text-white tracking-wider">{bookingRef}</h2>
           <p className="text-blue-100 mt-4">

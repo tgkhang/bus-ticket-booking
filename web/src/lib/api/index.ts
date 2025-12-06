@@ -77,6 +77,7 @@ export const searchTripsAPI = async (params: {
   originStopId?: string
   destinationStopId?: string
   date?: string
+  passengers?: number
   startTime?: string
   endTime?: string
   minPrice?: number

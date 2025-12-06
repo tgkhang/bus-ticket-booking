@@ -211,6 +211,7 @@ function SearchContent() {
           originStopId: originStopId || undefined,
           destinationStopId: destinationStopId || undefined,
           date,
+          passengers,
           page,
           limit: 5,
           status: 'scheduled',
@@ -371,7 +372,7 @@ function SearchContent() {
               </button>
             </div>
           ) : (
-            <div className="p-6 bg-gradient-to-br from-blue-50 to-white rounded-lg border border-blue-100">
+            <div className="p-6 bg-linear-to-br from-blue-50 to-white rounded-lg border border-blue-100">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Update Your Search</h3>
                 <button
@@ -606,7 +607,7 @@ function SearchContent() {
                   {trips.length > 0 && (
                     <div className="space-y-4">
                       {trips.map((trip) => (
-                        <TripCard key={trip.id} trip={trip} />
+                        <TripCard key={trip.id} trip={trip} passengers={passengers} />
                       ))}
                     </div>
                   )}

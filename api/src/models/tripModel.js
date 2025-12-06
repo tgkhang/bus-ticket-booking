@@ -56,6 +56,7 @@ const searchTrips = async (filters) => {
   const where = buildWhere(filters)
   const skip = (filters.page - 1) * filters.limit
   const take = filters.limit
+  const passengers = filters.passengers || 1
 
   // Sorting
   let orderBy
@@ -68,36 +69,50 @@ const searchTrips = async (filters) => {
     orderBy = { departureTime: 'asc' }
   }
 
-  const [total, rows] = await Promise.all([
-    prisma.trip.count({ where }),
-    prisma.trip.findMany({
-      where,
-      skip,
-      take,
-      orderBy,
-      include: {
-        route: { include: { originStop: true, destinationStop: true } },
-        bus: true,
+  // Fetch trips with seat status counts
+  const rows = await prisma.trip.findMany({
+    where,
+    orderBy,
+    include: {
+      route: { include: { originStop: true, destinationStop: true } },
+      bus: true,
+      seatStatuses: {
+        select: {
+          status: true,
+        },
       },
-    }),
-  ])
-
-  let data = rows.map((t) => ({
-    id: t.id,
-    routeId: t.routeId,
-    busId: t.busId,
-    departureTime: t.departureTime,
-    arrivalTime: t.arrivalTime,
-    basePrice: t.basePrice,
-    status: t.status,
-    durationMinutes: Math.round((t.arrivalTime.getTime() - t.departureTime.getTime()) / 60000),
-    originStop: t.route.originStop,
-    destinationStop: t.route.destinationStop,
-    bus: {
-      model: t.bus.model,
-      amenities: t.bus.amenities ? JSON.parse(t.bus.amenities) : {},
     },
-  }))
+  })
+
+  // Filter trips that have enough available seats
+  const filteredRows = rows.filter((trip) => {
+    const availableSeats = trip.seatStatuses.filter((ss) => ss.status === 'available').length
+    return availableSeats >= passengers
+  })
+
+  const total = filteredRows.length
+  const paginatedRows = filteredRows.slice(skip, skip + take)
+
+  let data = paginatedRows.map((t) => {
+    const availableSeats = t.seatStatuses.filter((ss) => ss.status === 'available').length
+    return {
+      id: t.id,
+      routeId: t.routeId,
+      busId: t.busId,
+      departureTime: t.departureTime,
+      arrivalTime: t.arrivalTime,
+      basePrice: t.basePrice,
+      status: t.status,
+      durationMinutes: Math.round((t.arrivalTime.getTime() - t.departureTime.getTime()) / 60000),
+      availableSeats,
+      originStop: t.route.originStop,
+      destinationStop: t.route.destinationStop,
+      bus: {
+        model: t.bus.model,
+        amenities: t.bus.amenities ? JSON.parse(t.bus.amenities) : {},
+      },
+    }
+  })
 
   if (filters.sortBy === 'duration') {
     data.sort((a, b) => (filters.sortOrder === 'asc' ? a.durationMinutes - b.durationMinutes : b.durationMinutes - a.durationMinutes))

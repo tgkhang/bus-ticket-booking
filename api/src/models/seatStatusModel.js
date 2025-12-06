@@ -87,8 +87,19 @@ const checkSeatsAvailability = async (tripId, seatIds) => {
     },
   })
 
-  const availableSeats = seatStatuses.filter((s) => s.status === 'available')
+  const availableSeats = seatStatuses.filter((s) => s.status === 'available' || s.status === 'locked')
   return availableSeats.length === seatIds.length
+}
+
+const getAvailableSeatsCount = async (tripId) => {
+  const prisma = GET_DB()
+  const count = await prisma.seatStatus.count({
+    where: {
+      tripId,
+      status: 'available',
+    },
+  })
+  return count
 }
 
 export const seatStatusModel = {
@@ -98,4 +109,5 @@ export const seatStatusModel = {
   bookSeats,
   releaseExpiredLocks,
   checkSeatsAvailability,
+  getAvailableSeatsCount,
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { getTripByIdAPI } from '@/lib/api'
+import { getTripByIdAPI, getSeatStatusesAPI } from '@/lib/api'
 import { ArrowLeft, Check, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Header } from '@/components/layout/Header'
@@ -41,16 +41,24 @@ function PassengerDetailsContent() {
       }
 
       try {
-        const tripData = await getTripByIdAPI(tripId)
+        const [tripData, seatStatusData] = await Promise.all([
+          getTripByIdAPI(tripId),
+          getSeatStatusesAPI(tripId),
+        ])
+
         // Backend returns trip directly (not wrapped in { data: ... })
         setTrip(tripData)
 
-        // Initialize passengers array
-        const seatCodes = seatsParam.split(',')
+        // Map seat IDs to seat codes
+        const seatIds = seatsParam.split(',')
+        const seatMap = new Map(
+          seatStatusData.map((ss: any) => [ss.seatId, ss.seatCode])
+        )
+
         setPassengers(
-          seatCodes.map((seatId, index) => ({
+          seatIds.map((seatId, index) => ({
             id: index + 1,
-            seatCode: seatId, // This will be the seat ID; we'd need to map to code
+            seatCode: String(seatMap.get(seatId) || seatId), // Ensure string type
             fullName: '',
             documentId: '',
           }))
@@ -133,7 +141,7 @@ function PassengerDetailsContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <button
-          onClick={() => router.push(`/booking/seats/${tripId}?lockedSeats=${seatsParam}`)}
+          onClick={() => router.push(`/booking/seats/${tripId}?lockedSeats=${seatsParam}&passengers=${passengersCount}`)}
           className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
