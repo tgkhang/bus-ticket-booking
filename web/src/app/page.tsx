@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 
 export default function Home() {
-  const { isAuthenticated, isInitialized, user } = useAuth()
+  const { isAuthenticated, isInitialized, user, logout  } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export default function Home() {
 
   const handleLogout = async () => {
     try {
-      // await logout()
+      await logout()
       router.push('/')
     } catch (error) {
       console.error('Logout failed:', error)

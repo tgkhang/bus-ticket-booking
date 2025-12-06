@@ -5,8 +5,8 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { getSeatStatusesAPI, getTripByIdAPI, lockSeatsAPI } from '@/lib/api'
 import { ArrowLeft, Radio, AlertCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Header } from '@/components/layout/Header'
 import { toast } from 'sonner'
+import { detectLayoutAndGroupSeats, detectLayoutPattern } from '@/utils/seatLayout'
 
 type SeatStatus = 'available' | 'booked' | 'locked' | 'selected'
 
@@ -39,6 +39,14 @@ export default function SeatSelectionPage() {
   
   // Get passengers from URL params (from search page)
   const passengers = parseInt(searchParams.get('passengers') || '1')
+
+  // Store returnUrl in session storage when arriving from search page
+  useEffect(() => {
+    const fromParam = searchParams.get('from')
+    if (fromParam) {
+      sessionStorage.setItem(`returnUrl_${tripId}`, fromParam)
+    }
+  }, [searchParams, tripId])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -160,8 +168,7 @@ export default function SeatSelectionPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
+      <div className="bg-gray-50 dark:bg-gray-900">
         <div className="flex items-center justify-center h-96">
           <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
         </div>
@@ -171,12 +178,11 @@ export default function SeatSelectionPage() {
 
   if (error || !trip) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
+      <div className="bg-gray-50 dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <p className="text-gray-600">{error || 'Trip not found'}</p>
+            <p className="text-gray-600 dark:text-gray-300">{error || 'Trip not found'}</p>
             <Button onClick={() => router.back()} className="mt-4">
               Go Back
             </Button>
@@ -186,35 +192,24 @@ export default function SeatSelectionPage() {
     )
   }
 
-  // Group seats by rows (assuming 4 seats per row: A, B, C, D)
-  const groupSeatsByRow = () => {
-    const rows: { [key: number]: Seat[] } = {}
-    seats.forEach((seat) => {
-      // Safety check: ensure seat.code exists before matching
-      if (!seat.code) {
-        console.warn('Seat without code:', seat)
-        return
-      }
-      const match = seat.code.match(/([A-D])(\d+)/)
-      if (match) {
-        const row = parseInt(match[2])
-        if (!rows[row]) rows[row] = []
-        rows[row].push(seat)
-      }
-    })
-    return rows
-  }
-
-  const seatRows = groupSeatsByRow()
+  // Detect layout pattern from seat codes and group seats by rows
+  const { rows: seatRows, columns } = detectLayoutAndGroupSeats(seats)
+  const layoutPattern = detectLayoutPattern(columns)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-
+    <div className="bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <button
-          onClick={() => router.back()}
+          onClick={() => {
+            // Check if we have search params from trip search or stored in session
+            const returnUrl = searchParams.get('returnUrl') || searchParams.get('from') || sessionStorage.getItem(`returnUrl_${tripId}`)
+            if (returnUrl) {
+              router.push(returnUrl)
+            } else {
+              router.back()
+            }
+          }}
           className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -222,28 +217,28 @@ export default function SeatSelectionPage() {
         </button>
 
         {/* Trip Summary */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Trip Summary</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Trip Summary</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <p className="text-gray-600 text-sm">Route</p>
-              <p className="text-gray-900 font-medium">
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Route</p>
+              <p className="text-gray-900 dark:text-white font-medium">
                 {trip.route?.originStop?.name} → {trip.route?.destinationStop?.name}
               </p>
             </div>
             <div>
-              <p className="text-gray-600 text-sm">Date & Time</p>
-              <p className="text-gray-900 font-medium">
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Date & Time</p>
+              <p className="text-gray-900 dark:text-white font-medium">
                 {new Date(trip.departureTime).toLocaleString()}
               </p>
             </div>
             <div>
-              <p className="text-gray-600 text-sm">Duration</p>
-              <p className="text-gray-900 font-medium">{trip.durationMinutes} minutes</p>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Duration</p>
+              <p className="text-gray-900 dark:text-white font-medium">{trip.durationMinutes} minutes</p>
             </div>
             <div>
-              <p className="text-gray-600 text-sm">Price per seat</p>
-              <p className="text-gray-900 font-medium">
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Price per seat</p>
+              <p className="text-gray-900 dark:text-white font-medium">
                 {new Intl.NumberFormat('vi-VN', {
                   style: 'currency',
                   currency: 'VND',
@@ -256,9 +251,9 @@ export default function SeatSelectionPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Seat Map */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Select Your Seats</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Select Your Seats</h2>
                 <div className="flex items-center gap-2 text-green-600">
                   <Radio className="w-4 h-4" />
                   <span className="text-sm">Live updates enabled</span>
@@ -268,8 +263,8 @@ export default function SeatSelectionPage() {
               {/* Bus Layout */}
               <div className="max-w-md mx-auto">
                 {/* Driver */}
-                <div className="flex justify-end mb-6 pb-4 border-b-2 border-gray-300">
-                  <div className="bg-gray-700 text-white px-6 py-2 rounded-t-lg text-sm font-medium">
+                <div className="flex justify-end mb-6 pb-4 border-b-2 border-gray-300 dark:border-gray-700">
+                  <div className="bg-gray-700 dark:bg-gray-600 text-white px-6 py-2 rounded-t-lg text-sm font-medium">
                     Driver
                   </div>
                 </div>
@@ -280,44 +275,89 @@ export default function SeatSelectionPage() {
                     .sort((a, b) => Number(a) - Number(b))
                     .map((rowNum) => {
                       const row = seatRows[Number(rowNum)]
-                      const sortedSeats = row.sort((a, b) => a.code.localeCompare(b.code))
 
                       return (
-                        <div key={rowNum} className="grid grid-cols-4 gap-3">
-                          {sortedSeats.map((seat) => (
-                            <button
-                              key={seat.id}
-                              onClick={() => handleSeatClick(seat.id)}
-                              disabled={seat.status === 'booked' || seat.status === 'locked'}
-                              className={`${getSeatColor(
-                                seat.status
-                              )} text-white font-medium py-3 rounded-lg transition-colors disabled:opacity-70`}
-                            >
-                              {seat.code}
-                            </button>
-                          ))}
+                        <div key={rowNum} className="flex items-center justify-center gap-3">
+                          {/* Left seats */}
+                          <div className="flex gap-2">
+                            {row.slice(0, layoutPattern.left).map((seat) => (
+                              <button
+                                key={seat.id}
+                                onClick={() => handleSeatClick(seat.id)}
+                                disabled={seat.status === 'booked' || seat.status === 'locked'}
+                                className={`${getSeatColor(
+                                  seat.status
+                                )} text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-70 min-w-[60px]`}
+                              >
+                                {seat.code}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Aisle */}
+                          <div className="w-8 shrink-0" />
+
+                          {/* Middle seats (for sleeper buses) */}
+                          {layoutPattern.hasMiddle && layoutPattern.middle && (
+                            <>
+                              <div className="flex gap-2">
+                                {row.slice(layoutPattern.left, layoutPattern.left + layoutPattern.middle).map((seat) => (
+                                  <button
+                                    key={seat.id}
+                                    onClick={() => handleSeatClick(seat.id)}
+                                    disabled={seat.status === 'booked' || seat.status === 'locked'}
+                                    className={`${getSeatColor(
+                                      seat.status
+                                    )} text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-70 min-w-[60px]`}
+                                  >
+                                    {seat.code}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="w-8 shrink-0" />
+                            </>
+                          )}
+
+                          {/* Right seats */}
+                          <div className="flex gap-2">
+                            {row.slice(layoutPattern.hasMiddle && layoutPattern.middle 
+                              ? layoutPattern.left + layoutPattern.middle 
+                              : layoutPattern.left
+                            ).map((seat) => (
+                              <button
+                                key={seat.id}
+                                onClick={() => handleSeatClick(seat.id)}
+                                disabled={seat.status === 'booked' || seat.status === 'locked'}
+                                className={`${getSeatColor(
+                                  seat.status
+                                )} text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-70 min-w-[60px]`}
+                              >
+                                {seat.code}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )
                     })}
                 </div>
 
                 {/* Legend */}
-                <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-gray-200">
+                <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 bg-green-500 rounded"></div>
-                    <span className="text-sm text-gray-700">Available</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Available</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 bg-amber-500 rounded"></div>
-                    <span className="text-sm text-gray-700">Selected</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Selected</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 bg-red-500 rounded"></div>
-                    <span className="text-sm text-gray-700">Booked</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Booked</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 bg-orange-500 rounded"></div>
-                    <span className="text-sm text-gray-700">Locked</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Locked</span>
                   </div>
                 </div>
               </div>
@@ -326,17 +366,17 @@ export default function SeatSelectionPage() {
 
           {/* Summary Panel */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-md p-6 sticky top-24">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Booking Summary</h3>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 sticky top-24">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Booking Summary</h3>
 
               <div className="space-y-4 mb-6">
                 <div>
-                  <p className="text-gray-600 text-sm">Passengers</p>
-                  <p className="text-gray-900 font-medium">{passengers} {passengers === 1 ? 'person' : 'people'}</p>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm">Passengers</p>
+                  <p className="text-gray-900 dark:text-white font-medium">{passengers} {passengers === 1 ? 'person' : 'people'}</p>
                 </div>
                 <div>
-                  <p className="text-gray-600 text-sm">Selected Seats ({selectedSeats.length}/{passengers})</p>
-                  <p className="text-gray-900 font-medium">
+                  <p className="text-gray-600 dark:text-gray-400 text-sm">Selected Seats ({selectedSeats.length}/{passengers})</p>
+                  <p className="text-gray-900 dark:text-white font-medium">
                     {selectedSeats.length > 0
                       ? seats
                           .filter((s) => selectedSeats.includes(s.id))
@@ -347,10 +387,10 @@ export default function SeatSelectionPage() {
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 pt-4 mb-6">
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-6">
                 <div className="flex justify-between items-center">
-                  <p className="text-gray-600">Total Price</p>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-gray-600 dark:text-gray-400">Total Price</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
                     {new Intl.NumberFormat('vi-VN', {
                       style: 'currency',
                       currency: 'VND',

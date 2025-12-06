@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { Search, Clock, TrendingUp, Ticket, ArrowRight, Sparkles, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Header } from '@/components/layout/Header'
 import { autocompleteStopsAPI } from '@/lib/api'
 
 interface Stop {
@@ -159,31 +158,29 @@ export default function UserHomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-
+    <div className="bg-gray-50 dark:bg-gray-900">
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             Welcome back, {user?.username}! 👋
           </h1>
-          <p className="text-xl text-gray-600">Find your next journey</p>
+          <p className="text-xl text-gray-600 dark:text-gray-300">Find your next journey</p>
         </div>
 
         {/* Search Card */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
           <div className="flex items-center gap-2 mb-6">
             <Search className="w-6 h-6 text-blue-600" />
-            <h2 className="text-2xl font-bold text-gray-900">Search Bus Tickets</h2>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Search Bus Tickets</h2>
           </div>
 
           <form onSubmit={handleSearch}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               {/* From */}
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-2">From</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -196,12 +193,12 @@ export default function UserHomePage() {
                     onFocus={() => setShowFromDropdown(true)}
                     onBlur={() => setTimeout(() => setShowFromDropdown(false), 200)}
                     placeholder="Select departure stop"
-                    className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-4 py-3 pl-10 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                   />
                   <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   
                   {showFromDropdown && fromSuggestions.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
                       {fromSuggestions.map((stop) => (
                         <button
                           key={stop.id}
@@ -211,13 +208,13 @@ export default function UserHomePage() {
                             setSelectedOriginStop(stop)
                             setShowFromDropdown(false)
                           }}
-                          className="w-full px-4 py-2 text-left hover:bg-blue-50 flex items-start gap-2"
+                          className="w-full px-4 py-2 text-left hover:bg-blue-50 dark:hover:bg-gray-700 flex items-start gap-2"
                         >
                           <MapPin className="w-4 h-4 text-blue-600 mt-1 shrink-0" />
                           <div>
-                            <p className="text-gray-900 font-medium">{stop.name}</p>
+                            <p className="text-gray-900 dark:text-white font-medium">{stop.name}</p>
                             {stop.address && (
-                              <p className="text-gray-500 text-sm">{stop.address}</p>
+                              <p className="text-gray-500 dark:text-gray-400 text-sm">{stop.address}</p>
                             )}
                           </div>
                         </button>
@@ -229,7 +226,7 @@ export default function UserHomePage() {
 
               {/* To */}
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-2">To</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">To</label>
                 <div className="relative">
                   <input
                     type="text"
@@ -242,12 +239,12 @@ export default function UserHomePage() {
                     onFocus={() => setShowToDropdown(true)}
                     onBlur={() => setTimeout(() => setShowToDropdown(false), 200)}
                     placeholder="Select destination stop"
-                    className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-4 py-3 pl-10 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                   />
                   <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   
                   {showToDropdown && toSuggestions.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
                       {toSuggestions.map((stop) => (
                         <button
                           key={stop.id}
@@ -257,13 +254,13 @@ export default function UserHomePage() {
                             setSelectedDestinationStop(stop)
                             setShowToDropdown(false)
                           }}
-                          className="w-full px-4 py-2 text-left hover:bg-blue-50 flex items-start gap-2"
+                          className="w-full px-4 py-2 text-left hover:bg-blue-50 dark:hover:bg-gray-700 flex items-start gap-2"
                         >
                           <MapPin className="w-4 h-4 text-blue-600 mt-1 shrink-0" />
                           <div>
-                            <p className="text-gray-900 font-medium">{stop.name}</p>
+                            <p className="text-gray-900 dark:text-white font-medium">{stop.name}</p>
                             {stop.address && (
-                              <p className="text-gray-500 text-sm">{stop.address}</p>
+                              <p className="text-gray-500 dark:text-gray-400 text-sm">{stop.address}</p>
                             )}
                           </div>
                         </button>
@@ -275,20 +272,20 @@ export default function UserHomePage() {
 
               {/* Date */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date</label>
                 <input
                   type="date"
                   value={searchData.date}
                   onChange={(e) => setSearchData({ ...searchData, date: e.target.value })}
                   min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                   required
                 />
               </div>
 
               {/* Passengers */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Passengers
                 </label>
                 <select
@@ -296,7 +293,7 @@ export default function UserHomePage() {
                   onChange={(e) =>
                     setSearchData({ ...searchData, passengers: parseInt(e.target.value) })
                   }
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                 >
                   {[1, 2, 3, 4, 5, 6].map((num) => (
                     <option key={num} value={num}>
@@ -322,10 +319,10 @@ export default function UserHomePage() {
           <div className="lg:col-span-2 space-y-8">
             {/* Recent Searches */}
             {recentSearches.length > 0 && (
-              <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Clock className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-xl font-bold text-gray-900">Recent Searches</h3>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Recent Searches</h3>
                 </div>
 
                 <div className="space-y-3">
@@ -337,17 +334,17 @@ export default function UserHomePage() {
                           `/trips/search?originStopId=${search.fromId}&destinationStopId=${search.toId}&date=${search.date}&passengers=1`
                         )
                       }
-                      className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-md hover:border-blue-600 hover:bg-blue-50 transition-colors"
+                      className="w-full flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-md hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         <div className="text-left">
-                          <p className="text-gray-900 font-medium">
+                          <p className="text-gray-900 dark:text-white font-medium">
                             {search.from} → {search.to}
                           </p>
-                          <p className="text-gray-600 text-sm">{search.date}</p>
+                          <p className="text-gray-600 dark:text-gray-400 text-sm">{search.date}</p>
                         </div>
                       </div>
-                      <ArrowRight className="w-5 h-5 text-gray-400" />
+                      <ArrowRight className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                     </button>
                   ))}
                 </div>
@@ -355,27 +352,27 @@ export default function UserHomePage() {
             )}
 
             {/* Popular Routes */}
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="w-5 h-5 text-green-600" />
-                <h3 className="text-xl font-bold text-gray-900">Popular Routes</h3>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Popular Routes</h3>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {popularRoutes.map((route) => (
                   <button
                     key={route.id}
-                    className="p-4 border border-gray-200 rounded-md hover:border-green-600 hover:bg-green-50 transition-colors text-left"
+                    className="p-4 border border-gray-200 dark:border-gray-700 rounded-md hover:border-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors text-left"
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <p className="text-gray-900 font-medium">
+                      <p className="text-gray-900 dark:text-white font-medium">
                         {route.from} → {route.to}
                       </p>
                       <span className="text-green-600 font-bold text-sm">
                         {formatCurrency(route.price)}
                       </span>
                     </div>
-                    <p className="text-gray-600 text-sm">
+                    <p className="text-gray-600 dark:text-gray-400 text-sm">
                       {route.duration} • {route.trips} trips/day
                     </p>
                   </button>
@@ -429,7 +426,7 @@ export default function UserHomePage() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   )
 }
