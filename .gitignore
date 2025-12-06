@@ -149,3 +149,5 @@ vite.config.ts.timestamp-*
 .vscode
 SECURITY_INCIDENT_RESPONSE.md
 docs/api/API_DOCUMENTATION_GUIDE.md
+.claude
+docs/api/TRIPS_API.md
