@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, ArrowRight, Calendar, Loader2 } from 'lucide-react'
+import { Search, ArrowRight, Calendar, Loader2, Users } from 'lucide-react'
 import StopAutocomplete from '@/components/common/StopAutocomplete'
 import { Button } from '@/components/ui/button'
 
@@ -19,6 +19,7 @@ export default function TripSearchForm() {
   const [originStop, setOriginStop] = useState<Stop | null>(null)
   const [destinationStop, setDestinationStop] = useState<Stop | null>(null)
   const [date, setDate] = useState('')
+  const [passengers, setPassengers] = useState(1)
   const [errors, setErrors] = useState<{ origin?: string; destination?: string; date?: string }>({})
   const [isSearching, setIsSearching] = useState(false)
 
@@ -52,7 +53,10 @@ export default function TripSearchForm() {
     const searchParams = new URLSearchParams({
       originStopId: originStop!.id,
       destinationStopId: destinationStop!.id,
+      fromText: originStop!.name,
+      toText: destinationStop!.name,
       date: date,
+      passengers: passengers.toString(),
     })
 
     // Redirect to search results page
@@ -137,17 +141,23 @@ export default function TripSearchForm() {
               {errors.date && <p className="mt-1 text-sm text-red-600">{errors.date}</p>}
             </div>
 
-            {/* Placeholder for future filters */}
+            {/* Passengers */}
             <div className="flex items-end">
               <div className="w-full">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Passengers (Coming Soon)
+                <label htmlFor="passengers" className="block text-sm font-medium text-gray-700 mb-1">
+                  Passengers
                 </label>
                 <input
+                  id="passengers"
                   type="number"
-                  disabled
-                  placeholder="1"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
+                  value={passengers}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 1
+                    setPassengers(Math.max(1, Math.min(val, 10)))
+                  }}
+                  min="1"
+                  max="10"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
             </div>

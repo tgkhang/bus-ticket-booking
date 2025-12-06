@@ -15,6 +15,7 @@ const searchTrips = async (query) => {
     busModel: query.busModel,
     amenities: query.amenities ? query.amenities.split(',').map((s) => s.trim()).filter(Boolean) : [],
     status: query.status,
+    passengers: query.passengers ? Number(query.passengers) : 1,
     page: Number(query.page),
     limit: Number(query.limit),
     sortBy: query.sortBy,

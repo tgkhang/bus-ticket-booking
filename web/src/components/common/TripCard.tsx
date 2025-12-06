@@ -15,6 +15,7 @@ interface Trip {
   arrivalTime: string
   basePrice: number
   durationMinutes: number
+  availableSeats?: number
   originStop: Stop
   destinationStop: Stop
   bus: {
@@ -26,6 +27,7 @@ interface Trip {
 
 interface TripCardProps {
   trip: Trip
+  passengers?: number
 }
 
 const amenityConfig: Record<string, { icon: React.ComponentType<{ className?: string }>, label: string }> = {
@@ -40,7 +42,7 @@ const amenityConfig: Record<string, { icon: React.ComponentType<{ className?: st
   blanket: { icon: Wind, label: 'Blanket' },
 }
 
-export default function TripCard({ trip }: TripCardProps) {
+export default function TripCard({ trip, passengers = 1 }: TripCardProps) {
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -75,7 +77,7 @@ export default function TripCard({ trip }: TripCardProps) {
           <div className="flex-1">
             <div className="flex items-center gap-6">
               {/* Departure */}
-              <div className="flex-shrink-0">
+              <div className="shrink-0">
                 <div className="text-3xl font-bold text-gray-900">
                   {formatTime(trip.departureTime)}
                 </div>
@@ -101,7 +103,7 @@ export default function TripCard({ trip }: TripCardProps) {
               </div>
 
               {/* Arrival */}
-              <div className="flex-shrink-0 text-right">
+              <div className="shrink-0 text-right">
                 <div className="text-3xl font-bold text-gray-900">
                   {formatTime(trip.arrivalTime)}
                 </div>
@@ -122,7 +124,7 @@ export default function TripCard({ trip }: TripCardProps) {
               </div>
               <div className="text-xs text-gray-500 mt-1">per seat</div>
             </div>
-            <Link href={`/trips/${trip.id}`} className="w-full sm:w-auto">
+            <Link href={`/booking/seats/${trip.id}?passengers=${passengers}`} className="w-full sm:w-auto">
               <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium flex items-center gap-2 group-hover:scale-105 transition-transform">
                 Select Seats
                 <ArrowRight className="w-4 h-4" />
@@ -142,7 +144,15 @@ export default function TripCard({ trip }: TripCardProps) {
                 </div>
                 <div>
                   <div className="text-sm font-medium text-gray-900">{trip.bus.model}</div>
-                  <div className="text-xs text-gray-500">Available</div>
+                  <div className="text-xs text-gray-500">
+                    {trip.availableSeats !== undefined ? (
+                      <span className={trip.availableSeats < passengers ? 'text-orange-600 font-medium' : 'text-green-600'}>
+                        {trip.availableSeats} {trip.availableSeats === 1 ? 'seat' : 'seats'} available
+                      </span>
+                    ) : (
+                      'Check availability'
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

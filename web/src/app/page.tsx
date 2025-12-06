@@ -21,24 +21,25 @@ import {
   Sparkles,
   ThumbsUp,
   Smartphone,
-  LogOut,
-  User,
 } from 'lucide-react'
 
 export default function Home() {
-  const { isAuthenticated, isInitialized, user, logout } = useAuth()
+  const { isAuthenticated, isInitialized, user } = useAuth()
   const router = useRouter()
 
-  // auto redirect to dashboard if authenticated and is admin
   useEffect(() => {
-    if (isInitialized && isAuthenticated && user?.role === 'admin') {
-      router.push('/admin')
+    if (!isInitialized || !isAuthenticated) return;
+
+    if (user?.role === 'admin') {
+      router.push('/admin');
+    } else {
+      router.push('/homepage');
     }
-  }, [isAuthenticated, isInitialized, user?.role, router])
+  }, [isAuthenticated, isInitialized, user?.role, router]);
 
   const handleLogout = async () => {
     try {
-      await logout()
+      // await logout()
       router.push('/')
     } catch (error) {
       console.error('Logout failed:', error)
@@ -85,52 +86,20 @@ export default function Home() {
             </p>
           </div>
 
-          {/* CTA Buttons - Show login/register OR user info with logout */}
-          {!isAuthenticated ? (
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-              <Link href="/login">
-                <button className="bg-white text-[#2563EB] px-8 py-4 rounded-lg hover:bg-gray-100 transition-all flex items-center gap-2 shadow-lg hover:shadow-xl font-semibold text-lg">
-                  Sign In
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-              </Link>
-              <Link href="/register">
-                <button className="bg-white/10 backdrop-blur-sm border-2 border-white text-white px-8 py-4 rounded-lg hover:bg-white/20 transition-all font-semibold text-lg">
-                  Create Account
-                </button>
-              </Link>
-            </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-              {/* User Info Card */}
-              <div className="bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white px-6 py-3 rounded-lg flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                  <User className="w-5 h-5" />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm text-blue-100">Welcome back,</p>
-                  <p className="font-semibold">{user?.email}</p>
-                </div>
-              </div>
-
-              {/* Dashboard Button */}
-              <Link href="/dashboard">
-                <button className="bg-white text-[#2563EB] px-8 py-4 rounded-lg hover:bg-gray-100 transition-all flex items-center gap-2 shadow-lg hover:shadow-xl font-semibold text-lg">
-                  Go to Dashboard
-                  <ArrowRight className="w-5 h-5" />
-                </button>
-              </Link>
-
-              {/* Logout Button */}
-              <button
-                onClick={handleLogout}
-                className="bg-white/10 backdrop-blur-sm border-2 border-white text-white px-8 py-4 rounded-lg hover:bg-white/20 transition-all flex items-center gap-2 font-semibold text-lg"
-              >
-                <LogOut className="w-5 h-5" />
-                Logout
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+            <Link href="/login">
+              <button className="bg-white text-[#2563EB] px-8 py-4 rounded-lg hover:bg-gray-100 transition-all flex items-center gap-2 shadow-lg hover:shadow-xl font-semibold text-lg">
+                Sign In
+                <ArrowRight className="w-5 h-5" />
               </button>
-            </div>
-          )}
+            </Link>
+            <Link href="/register">
+              <button className="bg-white/10 backdrop-blur-sm border-2 border-white text-white px-8 py-4 rounded-lg hover:bg-white/20 transition-all font-semibold text-lg">
+                Create Account
+              </button>
+            </Link>
+          </div>
         </div>
       </section>
 
