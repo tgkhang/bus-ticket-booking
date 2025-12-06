@@ -4,21 +4,55 @@ import { rbacMiddleware } from '~/middlewares/rbacMiddleware'
 import { tripController } from '~/controllers/tripController'
 import { tripValidation } from '~/validations/tripValidation'
 import { PERMISSIONS } from '~/utils/constants'
+import { asyncHandler } from '~/helpers/asyncHandler.js'
 
 const Router = express.Router()
 
-Router.get('/trips/search',
+Router.get(
+  '/search',
   authMiddleware.isAuthorized,
   rbacMiddleware.isValidPermission([PERMISSIONS.READ_TRIPS]),
   tripValidation.search,
   tripController.search
 )
 
-Router.get('/trips/:id',
-  authMiddleware.isAuthorized,
-  rbacMiddleware.isValidPermission([PERMISSIONS.READ_TRIPS]),
-  tripValidation.getTripById,
+Router.get(
+  '/:id',
+  //authMiddleware.isAuthorized,
+  //rbacMiddleware.isValidPermission([PERMISSIONS.READ_TRIPS]),
   tripController.getTripById
+)
+
+// create a new trip
+Router.post(
+  '/',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_TRIPS]),
+  tripValidation.createTrip,
+  asyncHandler(tripController.createTrip)
+)
+
+// get list of trips
+Router.get(
+  '/',
+  //authMiddleware.isAuthorized,
+  //rbacMiddleware.isValidPermission([PERMISSIONS.READ_TRIPS]),
+  asyncHandler(tripController.listTrips)
+)
+
+Router.put(
+  '/:id',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_TRIPS]),
+  tripValidation.updateTrip,
+  asyncHandler(tripController.updateTrip)
+)
+
+Router.delete(
+  '/:id',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_TRIPS]),
+  asyncHandler(tripController.deleteTrip)
 )
 
 export const tripRoute = Router

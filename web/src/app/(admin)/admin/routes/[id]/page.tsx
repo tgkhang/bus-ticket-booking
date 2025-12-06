@@ -28,6 +28,16 @@ import {
 import { getRouteDetailsAPI } from '@/lib/api'
 import { toast } from 'sonner'
 import { Route, Stop } from '@/types/routeAndStop'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface DisplayRoute extends Omit<Route, 'stops'> {
   basePrice?: number
@@ -86,6 +96,8 @@ export default function RouteDetailPage() {
   const [loading, setLoading] = useState(true)
   const [availableStops] = useState<Stop[]>([]) // TODO: Fetch when needed for editing
   const [operators] = useState<Array<{ id: string; name: string }>>([]) // TODO: Fetch when needed for editing
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [stopToDelete, setStopToDelete] = useState<string | null>(null)
 
   const [routeFormData, setRouteFormData] = useState({
     name: '',
@@ -237,14 +249,19 @@ export default function RouteDetailPage() {
   }
 
   const handleDeleteStop = (stopId: string) => {
-    if (window.confirm('Are you sure you want to delete this stop?')) {
-      if (route) {
-        const newStops = route.stops.filter((s) => s.id !== stopId)
-        // Resequence
-        const resequenced = newStops.map((stop, i) => ({ ...stop, sequence: i + 1 }))
-        setRoute({ ...route, stops: resequenced })
-        // TODO: Call API to delete stop
-      }
+    setStopToDelete(stopId)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDeleteStop = () => {
+    if (stopToDelete && route) {
+      const newStops = route.stops.filter((s) => s.id !== stopToDelete)
+      // Resequence
+      const resequenced = newStops.map((stop, i) => ({ ...stop, sequence: i + 1 }))
+      setRoute({ ...route, stops: resequenced })
+      setDeleteDialogOpen(false)
+      setStopToDelete(null)
+      // TODO: Call API to delete stop
     }
   }
 
@@ -1019,6 +1036,24 @@ export default function RouteDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Stop Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Stop?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this stop from the route? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteStop} className="bg-red-600 hover:bg-red-700">
+              Delete Stop
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

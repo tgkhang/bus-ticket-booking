@@ -3,7 +3,7 @@ import { GET_DB } from '~/config/prisma'
 const includeRelations = {
   operator: true,
   seats: {
-    orderBy: { seatNumber: 'asc' }
+    orderBy: { seatNumber: 'asc' },
   },
 }
 
@@ -83,13 +83,13 @@ const findAllBuses = async (filters = {}, pagination = {}) => {
     if (plateNumber) {
       where.plateNumber = {
         contains: plateNumber.toUpperCase(),
-        mode: 'insensitive'
+        mode: 'insensitive',
       }
     }
 
     if (minCapacity) {
       where.seatCapacity = {
-        gte: parseInt(minCapacity)
+        gte: parseInt(minCapacity),
       }
     }
 
@@ -113,7 +113,7 @@ const findAllBuses = async (filters = {}, pagination = {}) => {
     })
 
     // Parse amenities JSON for each bus
-    buses.forEach(bus => {
+    buses.forEach((bus) => {
       if (bus.amenities) {
         bus.amenities = JSON.parse(bus.amenities)
       }
@@ -126,7 +126,7 @@ const findAllBuses = async (filters = {}, pagination = {}) => {
         limit: take,
         total,
         totalPages: Math.ceil(total / take),
-      }
+      },
     }
   } catch (error) {
     throw new Error(error)
@@ -168,6 +168,35 @@ const deleteBus = async (id) => {
     return await prisma.bus.delete({
       where: { id },
     })
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+
+const validateBusAvailability = async (busId, departureTime, arrivalTime) => {
+  try {
+    const conflictingTrip = await GET_DB().trip.findFirst({
+      where: {
+        busId: busId,
+        status: { in: ['scheduled', 'active'] },
+        OR: [
+          {
+            AND: [
+              { departureTime: { lte: new Date(departureTime) } },
+              { arrivalTime: { gte: new Date(departureTime) } },
+            ],
+          },
+          {
+            AND: [{ departureTime: { lte: new Date(arrivalTime) } }, { arrivalTime: { gte: new Date(arrivalTime) } }],
+          },
+          {
+            AND: [{ departureTime: { gte: new Date(departureTime) } }, { arrivalTime: { lte: new Date(arrivalTime) } }],
+          },
+        ],
+      },
+    })
+
+    return conflictingTrip ? false : true
   } catch (error) {
     throw new Error(error)
   }
@@ -310,7 +339,7 @@ const searchBuses = async (filters = {}) => {
     })
 
     // Parse amenities and filter by amenities if requested
-    let filteredBuses = buses.map(bus => {
+    let filteredBuses = buses.map((bus) => {
       if (bus.amenities) {
         bus.amenities = JSON.parse(bus.amenities)
       }
@@ -319,10 +348,10 @@ const searchBuses = async (filters = {}) => {
 
     // Filter by amenities (e.g., wifi=true, ac=true)
     if (amenities) {
-      const requiredAmenities = amenities.split(',').map(a => a.trim())
-      filteredBuses = filteredBuses.filter(bus => {
+      const requiredAmenities = amenities.split(',').map((a) => a.trim())
+      filteredBuses = filteredBuses.filter((bus) => {
         if (!bus.amenities) return false
-        return requiredAmenities.every(amenity => bus.amenities[amenity] === true)
+        return requiredAmenities.every((amenity) => bus.amenities[amenity] === true)
       })
     }
 
@@ -342,4 +371,5 @@ export const busModel = {
   checkBusHasActiveTrips,
   getBusWithTrips,
   searchBuses,
+  validateBusAvailability,
 }

@@ -29,8 +29,7 @@ Router.use('/stops', stopRoute);
 
 Router.use('/routes', routeRoute)
 
-// Trip search route
-Router.use('/', tripRoute)
+Router.use('/trips', tripRoute)
 
 // Booking routes
 Router.use('/', bookingRoute)

@@ -50,16 +50,56 @@ const search = async (req, res, next) => {
   }
 }
 
-const getTripById = async (req, res, next) => {
-  const condition = Joi.object({
-    id: Joi.string().uuid().required(),
+
+const createTrip = async (req, res, next) => {
+  const schema = Joi.object({
+    routeId: Joi.string().uuid().required(),
+    busId: Joi.string().uuid().required(),
+    departureTime: Joi.date().iso().required(),
+    arrivalTime: Joi.date().iso().greater(Joi.ref('departureTime')).required(),
+    basePrice: Joi.number().min(0).required(),
+    status: Joi.string().valid('scheduled', 'active', 'completed', 'cancelled').default('scheduled'),
   })
+
   try {
-    await condition.validateAsync(req.params)
+    const value = await schema.validateAsync(req.body, { abortEarly: false })
+    req.body = value
     next()
   } catch (error) {
-    next(new ApiError(StatusCodes.BAD_REQUEST, new Error(error).message))
+    next(new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, new Error(error).message))
   }
 }
 
-export const tripValidation = { search, getTripById }
+const updateTrip = async (req, res, next) => {
+  const paramsSchema = Joi.object({
+    id: Joi.string().uuid().required(),
+  })
+
+  const bodySchema = Joi.object({
+    routeId: Joi.string().uuid(),
+    busId: Joi.string().uuid(),
+    departureTime: Joi.date().iso(),
+    arrivalTime: Joi.date().iso(),
+    basePrice: Joi.number().min(0),
+    status: Joi.string().valid('scheduled', 'active', 'completed', 'cancelled'),
+  }).custom((value, helpers) => {
+    // If both departure and arrival are provided, ensure arrival > departure
+    if (value.departureTime && value.arrivalTime) {
+      if (new Date(value.arrivalTime) <= new Date(value.departureTime)) {
+        return helpers.error('any.invalid', { message: 'arrivalTime must be after departureTime' })
+      }
+    }
+    return value
+  })
+
+  try {
+    await paramsSchema.validateAsync(req.params)
+    const value = await bodySchema.validateAsync(req.body, { abortEarly: false, stripUnknown: true })
+    req.body = value
+    next()
+  } catch (error) {
+    next(new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, new Error(error).message))
+  }
+}
+
+export const tripValidation = { search, createTrip, updateTrip }

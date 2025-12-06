@@ -10,4 +10,6 @@ export const amenityOptions = [
   { value: 'entertainment', label: 'Entertainment', icon: Tv },
   { value: 'reclining_seats', label: 'Reclining Seats', icon: User },
   { value: 'reading_light', label: 'Reading Light', icon: Lightbulb },
+  { value: 'blanket', label: 'Blanket', icon: Lightbulb },
+  { value: 'water', label: 'Water', icon: Droplet },
 ]

@@ -17,7 +17,6 @@ import type {
 } from '@/types/api'
 import type { Operator, ListOperatorsFilters } from '@/types/operator'
 import { CreateRouteData, Route, Stop } from '@/types/routeAndStop'
-import type { Trip, TripDetail, CreateTripData, UpdateTripData, ListTripsFilters } from '@/types/trip'
 import { toast } from 'sonner'
 
 //=================================
@@ -69,33 +68,6 @@ export const autocompleteStopsAPI = async (query: string, limit: number = 10) =>
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/stops/autocomplete`, {
     params: { q: query, limit },
   })
-  return response.data
-}
-
-// Trips API
-export const searchTripsAPI = async (params: {
-  originStopId?: string
-  destinationStopId?: string
-  date?: string
-  passengers?: number
-  startTime?: string
-  endTime?: string
-  minPrice?: number
-  maxPrice?: number
-  busModel?: string
-  amenities?: string
-  status?: string
-  sortBy?: string
-  sortOrder?: string
-  page?: number
-  limit?: number
-}) => {
-  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/search`, { params })
-  return response.data
-}
-
-export const getTripByIdAPI = async (id: string) => {
-  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${id}`)
   return response.data
 }
 
@@ -265,38 +237,27 @@ export const getRouteDetailsAPI = async (routeId: string): Promise<Route> => {
 // Trip API Calls
 //=================================
 
-export const listTripsAPI = async (
-  filters?: ListTripsFilters,
-  pagination?: PaginationParams
-): Promise<PaginatedResponse<Trip>> => {
-  const params = {
-    ...filters,
-    ...pagination,
-  }
-  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips`, { params })
-  return response.data
-}
+// Re-export trip APIs from tripApi.ts
+export { listTripsAPI, getTripDetailsAPI, createTripAPI, updateTripAPI, deleteTripAPI } from './tripApi'
 
-export const getTripDetailsAPI = async (tripId: string): Promise<TripDetail> => {
-  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${tripId}`)
-  return response.data
-}
-
-export const createTripAPI = async (tripData: CreateTripData) => {
-  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/trips`, tripData)
-  toast.success('Trip created successfully')
-  return response.data
-}
-
-export const updateTripAPI = async (tripId: string, tripData: UpdateTripData) => {
-  const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/trips/${tripId}`, tripData)
-  toast.success('Trip updated successfully')
-  return response.data
-}
-
-export const deleteTripAPI = async (tripId: string) => {
-  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/trips/${tripId}`)
-  toast.success('Trip deleted successfully')
+export const searchTripsAPI = async (params: {
+  originStopId?: string
+  destinationStopId?: string
+  date?: string
+  passengers?: number
+  startTime?: string
+  endTime?: string
+  minPrice?: number
+  maxPrice?: number
+  busModel?: string
+  amenities?: string
+  status?: string
+  sortBy?: string
+  sortOrder?: string
+  page?: number
+  limit?: number
+}) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/search`, { params })
   return response.data
 }
 
@@ -337,23 +298,19 @@ export const getBookingByIdAPI = async (bookingId: string) => {
   return response.data
 }
 
-export const getUserBookingsAPI = async (params?: {
-  status?: string
-  page?: number
-  limit?: number
-}) => {
+export const getUserBookingsAPI = async (params?: { status?: string; page?: number; limit?: number }) => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/bookings`, { params })
   return response.data
 }
 
-export const confirmBookingAPI = async (bookingId: string, paymentData: {
-  provider?: string
-  transactionRef?: string
-}) => {
-  const response = await authorizedAxiosInstance.post(
-    `${API_ROOT}/v1/bookings/${bookingId}/confirm`,
-    paymentData
-  )
+export const confirmBookingAPI = async (
+  bookingId: string,
+  paymentData: {
+    provider?: string
+    transactionRef?: string
+  }
+) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/bookings/${bookingId}/confirm`, paymentData)
   toast.success('Booking confirmed successfully!')
   return response.data
 }
