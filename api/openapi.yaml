@@ -197,6 +197,9 @@ components:
         basePrice: { type: number, format: float }
         status: { type: string, enum: [scheduled, cancelled, completed] }
         durationMinutes: { type: integer }
+        availableSeats: 
+          type: integer
+          description: Number of currently available seats on this trip
         originStop:
           type: object
           properties:
@@ -233,6 +236,7 @@ paths:
   /trips/search:
     get:
       summary: Search trips with filters
+      description: Search for available trips with optional filters. Supports multi-passenger booking by filtering trips with sufficient seat availability.
       tags: [Trips]
       security: [{ cookieAuth: [] }]
       parameters:
@@ -248,6 +252,10 @@ paths:
           name: date
           schema: { type: string, format: date }
           description: Departure date (YYYY-MM-DD). Combine with time window.
+        - in: query
+          name: passengers
+          schema: { type: integer, minimum: 1, maximum: 10, default: 1 }
+          description: Number of passengers. Filters trips with at least this many available seats.
         - in: query
           name: startTime
           schema: { type: string, pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$' }
