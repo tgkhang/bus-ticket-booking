@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { PublicLayout } from '@/components/layout'
 import Link from 'next/link'
 import Image from 'next/image'
 import TripSearchForm from '@/components/common/TripSearchForm'
@@ -26,27 +27,36 @@ export default function Home() {
   const { isAuthenticated, isInitialized, user } = useAuth()
   const router = useRouter()
 
-  // auto redirect to homepage if authenticated
   useEffect(() => {
-    if (isInitialized && isAuthenticated) {
-      if (user?.role === 'admin') {
-        router.push('/admin')
-      } else {
-        router.push('/homepage')
-      }
+    if (!isInitialized || !isAuthenticated) return;
+
+    if (user?.role === 'admin') {
+      router.push('/admin');
+    } else {
+      router.push('/homepage');
     }
-  }, [isAuthenticated, isInitialized, user, router])
+  }, [isAuthenticated, isInitialized, user?.role, router]);
+
+  const handleLogout = async () => {
+    try {
+      // await logout()
+      router.push('/')
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
+  }
 
   if (!isInitialized) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB]">
+    <PublicLayout>
+      <div className="bg-[#F9FAFB] dark:bg-gray-950">
       {/* Hero Section with Background */}
       <section className="relative bg-linear-to-br from-[#2563EB] to-[#1e40af] text-white py-20 lg:py-32 overflow-hidden">
         {/* Background Pattern */}
@@ -381,6 +391,7 @@ export default function Home() {
           </div>
         </div>
       </section>
-    </div>
+      </div>
+    </PublicLayout>
   )
 }

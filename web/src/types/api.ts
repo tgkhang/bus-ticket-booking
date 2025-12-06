@@ -57,6 +57,14 @@ export interface UpdateBusData {
   status?: 'active' | 'inactive' | 'maintenance'
 }
 
+export interface Seat {
+  id: string
+  busId: string
+  seatNumber: string
+  seatType: 'regular' | 'premium' | 'sleeper'
+  isActive: boolean
+}
+
 export interface Bus {
   id: string
   operatorId: string
@@ -65,6 +73,7 @@ export interface Bus {
   seatCapacity: number
   amenities: BusAmenities
   status: 'active' | 'inactive' | 'maintenance'
+  seats: Seat[]
   createdAt: string
   updatedAt: string
 }

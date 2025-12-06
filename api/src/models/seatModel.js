@@ -1,4 +1,5 @@
 import { GET_DB } from '~/config/prisma'
+import { generateSeatsByLayoutCode, getLayoutByCode } from '~/utils/baseBusType'
 
 // ============================================
 // SEAT CRUD OPERATIONS
@@ -30,40 +31,50 @@ const createSeats = async (busId, seats) => {
   }
 }
 
-const generateSeatsAuto = async (busId, layout, rows, seatType = 'regular', startRow = 1) => {
+const generateSeatsAuto = async (busId, layoutCode, rows, seatType = 'regular', startRow = 1) => {
   try {
-    const prisma = GET_DB()
+    // Check if layoutCode is a valid bus type code
+    const busLayout = getLayoutByCode(layoutCode)
 
-    // Parse layout (e.g., "2-2" means 2 seats on left, 2 on right)
-    const [leftSeats, rightSeats] = layout.split('-').map(Number)
-    const columns = ['A', 'B', 'C', 'D', 'E', 'F']
+    let seats = []
 
-    const seats = []
+    if (busLayout) {
+      // Use the new bus type layout generation
+      seats = generateSeatsByLayoutCode(layoutCode, rows, seatType, startRow)
+    } else {
+      // Fallback to old simple layout format (e.g., "2-2")
+      if (layoutCode.includes('-')) {
+        const [leftSeats, rightSeats] = layoutCode.split('-').map(Number)
+        const columns = ['A', 'B', 'C', 'D', 'E', 'F']
 
-    for (let row = startRow; row < startRow + rows; row++) {
-      let colIndex = 0
+        for (let row = startRow; row < startRow + rows; row++) {
+          let colIndex = 0
 
-      // Left side seats
-      for (let i = 0; i < leftSeats; i++) {
-        seats.push({
-          seatNumber: `${columns[colIndex]}${row}`,
-          seatType,
-          isActive: true,
-        })
-        colIndex++
-      }
+          // Left side seats
+          for (let i = 0; i < leftSeats; i++) {
+            seats.push({
+              seatNumber: `${columns[colIndex]}${row}`,
+              seatType,
+              isActive: true,
+            })
+            colIndex++
+          }
 
-      // Skip column for aisle
-      // colIndex++
+          // Skip column for aisle
+          // colIndex++
 
-      // Right side seats
-      for (let i = 0; i < rightSeats; i++) {
-        seats.push({
-          seatNumber: `${columns[colIndex]}${row}`,
-          seatType,
-          isActive: true,
-        })
-        colIndex++
+          // Right side seats
+          for (let i = 0; i < rightSeats; i++) {
+            seats.push({
+              seatNumber: `${columns[colIndex]}${row}`,
+              seatType,
+              isActive: true,
+            })
+            colIndex++
+          }
+        }
+      } else {
+        throw new Error(`Invalid layout code: ${layoutCode}`)
       }
     }
 

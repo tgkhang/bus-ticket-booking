@@ -1,29 +1,40 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Edit, Save, X, Plus, Grid, Wifi, Wind, Droplet, Usb, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Edit, Save, X, Plus, Grid, AlertCircle, Trash } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
+import {
+  getBusDetailsAPI,
+  updateBusAPI,
+  generateSeatsAPI,
+  deleteAllSeatsAPI,
+  deleteSeatAPI,
+  createSeatAPI,
+} from '@/lib/api'
+import { amenityOptions } from '@/utils/constants'
+import { Bus, BusAmenities, Seat } from '@/types/api'
+import { useForm, SubmitHandler } from 'react-hook-form'
+import { BUS_LAYOUTS_VIETNAM_BRIEF, calculateSeatCount, calculateSuggestedRows } from '@/utils/baseBusType'
 
-interface Seat {
-  id: string
-  busId: string
-  seatNumber: string
-  seatType: 'regular' | 'premium' | 'sleeper'
-  isActive: boolean
-}
-
-interface Bus {
-  id: string
-  operatorId: string
+type BusFormInputs = {
   plateNumber: string
   model: string
   seatCapacity: number
-  amenities: string[]
+  amenities: BusAmenities
   status: 'active' | 'inactive' | 'maintenance'
-  seats: Seat[]
 }
 
 export default function BusDetailPage() {
@@ -35,21 +46,56 @@ export default function BusDetailPage() {
   const [isEditingBus, setIsEditingBus] = useState(false)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [showAddSeatModal, setShowAddSeatModal] = useState(false)
+  const [loading, setLoading] = useState(false)
 
-  const [busFormData, setBusFormData] = useState({
-    plateNumber: '',
-    model: '',
-    seatCapacity: 0,
-    amenities: [] as string[],
-    status: 'active' as 'active' | 'inactive' | 'maintenance',
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<BusFormInputs>({
+    defaultValues: {
+      plateNumber: '',
+      model: '',
+      seatCapacity: 0,
+      amenities: {
+        wifi: false,
+        ac: false,
+        restroom: false,
+        entertainment: false,
+        usb_charging: false,
+        reclining_seats: false,
+        reading_light: false,
+        blanket: false,
+        water: false,
+      },
+      status: 'active',
+    },
   })
 
+  const amenities = watch('amenities')
+
   const [generateFormData, setGenerateFormData] = useState({
-    layout: '2-2' as '2-2' | '2-3' | '1-2' | '2-1',
-    rows: 10,
+    layout: '2-2',
+    rows: 0,
     seatType: 'regular' as 'regular' | 'premium' | 'sleeper',
     startRow: 1,
   })
+
+  // Auto-calculate rows when layout changes or modal opens
+  useEffect(() => {
+    if (bus && showGenerateModal) {
+      const suggestedRows = calculateSuggestedRows(generateFormData.layout, bus.seatCapacity)
+      setGenerateFormData((prev) => ({ ...prev, rows: suggestedRows }))
+    }
+  }, [showGenerateModal, generateFormData.layout, bus])
+
+  // Calculate expected seat count
+  const expectedSeatCount =
+    generateFormData.rows > 0 ? calculateSeatCount(generateFormData.layout, generateFormData.rows) : 0
+  const exceedsCapacity = bus ? expectedSeatCount > bus.seatCapacity : false
 
   const [seatFormData, setSeatFormData] = useState({
     seatNumber: '',
@@ -57,103 +103,190 @@ export default function BusDetailPage() {
     isActive: true,
   })
 
-  const amenityOptions = [
-    { value: 'wifi', label: 'WiFi', icon: Wifi },
-    { value: 'ac', label: 'AC', icon: Wind },
-    { value: 'toilet', label: 'Toilet', icon: Droplet },
-    { value: 'usb', label: 'USB', icon: Usb },
-  ]
+  const [selectedFloor, setSelectedFloor] = useState(1)
 
-  // Mock data - Replace with API call
-  useEffect(() => {
-    // Simulate API call
-    const mockBus: Bus = {
-      id: busId || '1',
-      operatorId: 'op1',
-      plateNumber: '59A-12345',
-      model: 'Mercedes Sprinter',
-      seatCapacity: 45,
-      amenities: ['wifi', 'ac', 'usb'],
-      status: 'active',
-      seats: [
-        { id: 's1', busId: busId || '1', seatNumber: 'A1', seatType: 'premium', isActive: true },
-        { id: 's2', busId: busId || '1', seatNumber: 'A2', seatType: 'premium', isActive: true },
-        { id: 's3', busId: busId || '1', seatNumber: 'A3', seatType: 'regular', isActive: true },
-        { id: 's4', busId: busId || '1', seatNumber: 'A4', seatType: 'regular', isActive: true },
-        { id: 's5', busId: busId || '1', seatNumber: 'B1', seatType: 'regular', isActive: true },
-        { id: 's6', busId: busId || '1', seatNumber: 'B2', seatType: 'regular', isActive: true },
-        { id: 's7', busId: busId || '1', seatNumber: 'B3', seatType: 'regular', isActive: true },
-        { id: 's8', busId: busId || '1', seatNumber: 'B4', seatType: 'regular', isActive: false },
-      ],
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setBus(mockBus)
-    setBusFormData({
-      plateNumber: mockBus.plateNumber,
-      model: mockBus.model,
-      seatCapacity: mockBus.seatCapacity,
-      amenities: mockBus.amenities,
-      status: mockBus.status,
+  // Helper function to organize seats by floor
+  const organizeSeatsByFloor = (seats: Seat[]) => {
+    const floors: { [key: number]: Seat[] } = {}
+
+    seats.forEach((seat) => {
+      // Check if seat number starts with a floor number (e.g., "1A1", "2B3")
+      const floorMatch = seat.seatNumber.match(/^(\d)/)
+      const floor = floorMatch ? parseInt(floorMatch[1]) : 1
+
+      if (!floors[floor]) {
+        floors[floor] = []
+      }
+      floors[floor].push(seat)
     })
-  }, [busId])
 
-  const handleSaveBusDetails = () => {
-    if (bus) {
-      setBus({ ...bus, ...busFormData })
+    return floors
+  }
+
+  // Helper function to organize seats by rows for better visualization
+  const organizeSeatsByRows = (seats: Seat[]) => {
+    const rows: { [key: string]: Seat[] } = {}
+
+    seats.forEach((seat) => {
+      // Extract row number from seat (e.g., "A1" -> "1", "1A1" -> "1")
+      const rowMatch = seat.seatNumber.match(/(\d+)$/)
+      const rowNum = rowMatch ? rowMatch[1] : '0'
+
+      if (!rows[rowNum]) {
+        rows[rowNum] = []
+      }
+      rows[rowNum].push(seat)
+    })
+
+    // Sort rows by number
+    const sortedRows: { [key: string]: Seat[] } = {}
+    Object.keys(rows)
+      .sort((a, b) => parseInt(a) - parseInt(b))
+      .forEach((key) => {
+        // Sort seats within each row by column letter
+        sortedRows[key] = rows[key].sort((a, b) => {
+          const colA = a.seatNumber.replace(/\d/g, '')
+          const colB = b.seatNumber.replace(/\d/g, '')
+          return colA.localeCompare(colB)
+        })
+      })
+
+    return sortedRows
+  }
+
+  useEffect(() => {
+    const fetchBusDetails = async () => {
+      try {
+        setLoading(true)
+        const response = await getBusDetailsAPI(busId)
+        setBus(response)
+        reset({
+          plateNumber: response.plateNumber,
+          model: response.model,
+          seatCapacity: response.seatCapacity,
+          amenities: response.amenities,
+          status: response.status,
+        })
+      } catch (error) {
+        console.error('Error fetching bus details:', error)
+        toast.error('Failed to fetch bus details')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchBusDetails()
+  }, [busId, reset])
+
+  const toggleAmenity = (amenity: keyof BusAmenities) => {
+    const currentAmenities = watch('amenities')
+    setValue('amenities', {
+      ...currentAmenities,
+      [amenity]: !currentAmenities[amenity],
+    })
+  }
+
+  const onSubmit: SubmitHandler<BusFormInputs> = async (data) => {
+    if (!bus) return
+
+    try {
+      await updateBusAPI(bus.id, data)
+      setBus({ ...bus, ...data })
       setIsEditingBus(false)
       toast.success('Bus details updated successfully')
-      // TODO: Call API to update bus
+    } catch (error) {
+      console.error('Error updating bus:', error)
+      toast.error('Failed to update bus details')
     }
   }
 
-  const toggleAmenity = (amenity: string) => {
-    if (busFormData.amenities.includes(amenity)) {
-      setBusFormData({
-        ...busFormData,
-        amenities: busFormData.amenities.filter((a) => a !== amenity),
-      })
-    } else {
-      setBusFormData({
-        ...busFormData,
-        amenities: [...busFormData.amenities, amenity],
-      })
+  const handleGenerateSeats = async () => {
+    if (!bus) return
+
+    try {
+      await generateSeatsAPI(bus.id, generateFormData)
+      setShowGenerateModal(false)
+
+      // Refresh bus data after generation
+      const refreshedBus = await getBusDetailsAPI(bus.id)
+      setBus(refreshedBus)
+    } catch (error) {
+      console.error('Error generating seats:', error)
+      // toast.error('Failed to generate seats')
     }
   }
 
-  const handleGenerateSeats = () => {
-    // TODO: Call API to generate seats
-    console.log('Generating seats:', generateFormData)
-    setShowGenerateModal(false)
-    toast.success('Seats generated successfully')
-    // Refresh bus data after generation
-  }
+  const handleAddSeat = async () => {
+    if (!bus || !seatFormData.seatNumber.trim()) {
+      toast.error('Please enter a seat number')
+      return
+    }
 
-  const handleAddSeat = () => {
-    if (bus) {
-      const newSeat: Seat = {
-        id: `s${Date.now()}`,
-        busId: bus.id,
-        ...seatFormData,
-      }
-      setBus({ ...bus, seats: [...bus.seats, newSeat] })
+    try {
+      await createSeatAPI(bus.id, seatFormData)
       setShowAddSeatModal(false)
       setSeatFormData({
         seatNumber: '',
         seatType: 'regular',
         isActive: true,
       })
-      toast.success('Seat added successfully')
-      // TODO: Call API to add seat
+
+      // Refresh bus data after adding seat
+      const refreshedBus = await getBusDetailsAPI(bus.id)
+      setBus(refreshedBus)
+    } catch (error) {
+      console.error('Error adding seat:', error)
+      // API already shows error toast
     }
   }
 
-  const handleDeleteSeat = (seatId: string) => {
-    if (window.confirm('Are you sure you want to delete this seat?')) {
-      if (bus) {
-        setBus({ ...bus, seats: bus.seats.filter((s) => s.id !== seatId) })
-        toast.success('Seat deleted successfully')
-        // TODO: Call API to delete seat
-      }
+  const handleOpenDeleteSeatModal = (seatId: string) => {
+    setSeatToDelete(seatId)
+    setShowDeleteSeatModal(true)
+  }
+
+  const handleConfirmDeleteSeat = async () => {
+    if (!bus || !seatToDelete) return
+
+    try {
+      await deleteSeatAPI(bus.id, seatToDelete)
+      setShowDeleteSeatModal(false)
+      setSeatToDelete(null)
+
+      // Refresh bus data after deletion
+      const refreshedBus = await getBusDetailsAPI(bus.id)
+      setBus(refreshedBus)
+    } catch (error) {
+      console.error('Error deleting seat:', error)
+      // API already shows error toast
+    }
+  }
+
+  const [showDeleteAllSeatsModal, setShowDeleteAllSeatsModal] = useState(false)
+  const [isDeletingSeats, setIsDeletingSeats] = useState(false)
+  const [showDeleteSeatModal, setShowDeleteSeatModal] = useState(false)
+  const [seatToDelete, setSeatToDelete] = useState<string | null>(null)
+
+  const handleOpenDeleteAllSeatsModal = () => {
+    setShowDeleteAllSeatsModal(true)
+  }
+
+  const handleDeleteAllSeats = async () => {
+    if (!bus) return
+
+    try {
+      setIsDeletingSeats(true)
+      await deleteAllSeatsAPI(bus.id)
+      setShowDeleteAllSeatsModal(false)
+
+      // Refresh bus data after deletion
+      const refreshedBus = await getBusDetailsAPI(bus.id)
+      setBus(refreshedBus)
+    } catch (error) {
+      console.error('Error deleting all seats:', error)
+      toast.error('Failed to delete all seats')
+    } finally {
+      setIsDeletingSeats(false)
     }
   }
 
@@ -243,15 +376,16 @@ export default function BusDetailPage() {
                 ) : (
                   <div className="flex gap-2">
                     <button
-                      onClick={handleSaveBusDetails}
-                      className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900 rounded-lg transition-colors"
+                      onClick={handleSubmit(onSubmit)}
+                      disabled={isSubmitting}
+                      className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900 rounded-lg transition-colors disabled:opacity-50"
                     >
                       <Save className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => {
                         setIsEditingBus(false)
-                        setBusFormData({
+                        reset({
                           plateNumber: bus.plateNumber,
                           model: bus.model,
                           seatCapacity: bus.seatCapacity,
@@ -273,8 +407,7 @@ export default function BusDetailPage() {
                   {isEditingBus ? (
                     <input
                       type="text"
-                      value={busFormData.plateNumber}
-                      onChange={(e) => setBusFormData({ ...busFormData, plateNumber: e.target.value })}
+                      {...register('plateNumber', { required: true })}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   ) : (
@@ -287,8 +420,7 @@ export default function BusDetailPage() {
                   {isEditingBus ? (
                     <input
                       type="text"
-                      value={busFormData.model}
-                      onChange={(e) => setBusFormData({ ...busFormData, model: e.target.value })}
+                      {...register('model', { required: true })}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   ) : (
@@ -301,8 +433,7 @@ export default function BusDetailPage() {
                   {isEditingBus ? (
                     <input
                       type="number"
-                      value={busFormData.seatCapacity}
-                      onChange={(e) => setBusFormData({ ...busFormData, seatCapacity: parseInt(e.target.value) || 0 })}
+                      {...register('seatCapacity', { required: true, valueAsNumber: true })}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
                   ) : (
@@ -314,13 +445,7 @@ export default function BusDetailPage() {
                   <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Status</label>
                   {isEditingBus ? (
                     <select
-                      value={busFormData.status}
-                      onChange={(e) =>
-                        setBusFormData({
-                          ...busFormData,
-                          status: e.target.value as 'active' | 'inactive' | 'maintenance',
-                        })
-                      }
+                      {...register('status')}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     >
                       <option value="active">Active</option>
@@ -338,13 +463,15 @@ export default function BusDetailPage() {
                     <div className="grid grid-cols-2 gap-2">
                       {amenityOptions.map((amenity) => {
                         const Icon = amenity.icon
+                        const amenityKey = amenity.value as keyof BusAmenities
+                        const currentAmenities = watch('amenities')
                         return (
                           <button
                             key={amenity.value}
                             type="button"
-                            onClick={() => toggleAmenity(amenity.value)}
+                            onClick={() => toggleAmenity(amenityKey)}
                             className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                              busFormData.amenities.includes(amenity.value)
+                              currentAmenities[amenityKey]
                                 ? 'border-blue-600 bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-300'
                                 : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
                             }`}
@@ -357,13 +484,14 @@ export default function BusDetailPage() {
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {bus.amenities.map((amenity) => {
-                        const option = amenityOptions.find((a) => a.value === amenity)
+                      {Object.entries(bus.amenities).map(([key, value]) => {
+                        if (!value) return null
+                        const option = amenityOptions.find((a) => a.value === key)
                         if (!option) return null
                         const Icon = option.icon
                         return (
                           <div
-                            key={amenity}
+                            key={key}
                             className="flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg"
                           >
                             <Icon className="w-4 h-4" />
@@ -399,6 +527,13 @@ export default function BusDetailPage() {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Seat Layout Management</h2>
                 <div className="flex gap-2">
+                  <Button
+                    onClick={() => handleOpenDeleteAllSeatsModal()}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700"
+                  >
+                    <Trash className="w-4 h-4" />
+                    Delete all seats
+                  </Button>
                   <Button
                     onClick={() => setShowGenerateModal(true)}
                     className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700"
@@ -436,28 +571,220 @@ export default function BusDetailPage() {
                 </div>
               </div>
 
-              {/* Seat Grid */}
-              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
-                {bus.seats.map((seat) => (
-                  <div key={seat.id} className="relative group">
-                    <button
-                      onClick={() => handleToggleSeatStatus(seat.id)}
-                      className={`w-full aspect-square rounded-lg text-white transition-all ${
-                        seat.isActive ? getSeatTypeColor(seat.seatType) : 'bg-gray-300'
-                      }`}
-                    >
-                      <div className="flex flex-col items-center justify-center h-full">
-                        <span className="text-sm">{seat.seatNumber}</span>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSeat(seat.id)}
-                      className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+              {/* Seat Grid - Bus Layout View */}
+              <div className="space-y-4">
+                {(() => {
+                  const floorSeats = organizeSeatsByFloor(bus.seats)
+                  const floorNumbers = Object.keys(floorSeats).map(Number).sort()
+                  const hasMultipleFloors = floorNumbers.length > 1
+
+                  return (
+                    <>
+                      {/* Floor Tabs for multi-floor buses */}
+                      {hasMultipleFloors && (
+                        <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+                          {floorNumbers.map((floorNum) => (
+                            <button
+                              key={floorNum}
+                              onClick={() => setSelectedFloor(floorNum)}
+                              className={`px-4 py-2 font-medium transition-colors ${
+                                selectedFloor === floorNum
+                                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                              }`}
+                            >
+                              Floor {floorNum}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Display seats for selected floor */}
+                      {floorNumbers.map((floorNum) => {
+                        if (hasMultipleFloors && floorNum !== selectedFloor) return null
+
+                        const seatsOnFloor = floorSeats[floorNum] || []
+                        const rowSeats = organizeSeatsByRows(seatsOnFloor)
+                        const rowNumbers = Object.keys(rowSeats)
+
+                        return (
+                          <div key={floorNum} className="space-y-4">
+                            {/* Driver section indicator */}
+                            <div className="flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                🚗 Driver {hasMultipleFloors && `- Floor ${floorNum}`}
+                              </span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">Front of Bus</span>
+                            </div>
+
+                            {/* Seat Layout by Rows */}
+                            <div className="space-y-3 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+                              {rowNumbers.map((rowNum) => {
+                                const seatsInRow = rowSeats[rowNum]
+
+                                // Sort seats by column letter to ensure proper order
+                                const sortedSeats = [...seatsInRow].sort((a, b) => {
+                                  const colA = a.seatNumber.replace(/\d/g, '')
+                                  const colB = b.seatNumber.replace(/\d/g, '')
+                                  return colA.localeCompare(colB)
+                                })
+
+                                // Organize seats based on their column positions
+                                // For 2-2: A, B (left) | Aisle | C, D (right)
+                                // For 1-1-1: A (left) | B (middle) | C (right)
+                                // For 1-1: A (left) | Aisle | B (right)
+                                const leftSeats: Seat[] = []
+                                const middleSeats: Seat[] = []
+                                const rightSeats: Seat[] = []
+
+                                // Determine the layout type based on columns present
+                                const columns = [...new Set(sortedSeats.map((s) => s.seatNumber.replace(/\d/g, '')))]
+                                const totalColumns = columns.length
+
+                                sortedSeats.forEach((seat) => {
+                                  const col = seat.seatNumber.replace(/\d/g, '')
+
+                                  // Logic based on total number of columns:
+                                  // 2 columns (A, B) = 1-1 layout: A | B
+                                  // 3 columns (A, B, C) = could be 1-1-1 or 2-1
+                                  // 4 columns (A, B, C, D) = 2-2 layout: AB | CD
+
+                                  if (totalColumns === 2) {
+                                    // 1-1 layout: A (left) | B (right)
+                                    if (col === 'A') {
+                                      leftSeats.push(seat)
+                                    } else {
+                                      rightSeats.push(seat)
+                                    }
+                                  } else if (totalColumns === 3) {
+                                    // 1-1-1 layout: A (left) | B (middle) | C (right)
+                                    // OR 2-1 layout: AB (left) | C (right)
+                                    // We need to check if it's 1-1-1 (middle exists) or 2-1
+                                    // For now, assume 1-1-1 for 3 columns with A, B, C
+                                    if (col === 'A') {
+                                      leftSeats.push(seat)
+                                    } else if (col === 'B') {
+                                      middleSeats.push(seat)
+                                    } else {
+                                      rightSeats.push(seat)
+                                    }
+                                  } else if (totalColumns >= 4) {
+                                    // 2-2 layout: AB (left) | CD (right)
+                                    if (col === 'A' || col === 'B') {
+                                      leftSeats.push(seat)
+                                    } else {
+                                      rightSeats.push(seat)
+                                    }
+                                  } else {
+                                    // Single column, put on left
+                                    leftSeats.push(seat)
+                                  }
+                                })
+
+                                return (
+                                  <div key={rowNum} className="flex items-center gap-3 justify-center">
+                                    {/* Left seats */}
+                                    <div className="flex gap-2">
+                                      {leftSeats.map((seat) => (
+                                        <div key={seat.id} className="relative group">
+                                          <button
+                                            onClick={() => handleToggleSeatStatus(seat.id)}
+                                            className={`w-12 h-12 rounded-lg text-white text-xs font-semibold transition-all ${
+                                              seat.isActive
+                                                ? getSeatTypeColor(seat.seatType)
+                                                : 'bg-gray-300 dark:bg-gray-600'
+                                            }`}
+                                            title={`${seat.seatNumber} - ${seat.seatType} ${
+                                              seat.isActive ? '(Active)' : '(Inactive)'
+                                            }`}
+                                          >
+                                            {seat.seatNumber}
+                                          </button>
+                                          <button
+                                            onClick={() => handleOpenDeleteSeatModal(seat.id)}
+                                            className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Delete seat"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* Aisle */}
+                                    <div className="w-8 border-l-2 border-r-2 border-dashed border-gray-300 dark:border-gray-600 h-12"></div>
+
+                                    {/* Middle seats (for 1-1-1 layouts) */}
+                                    {middleSeats.length > 0 && (
+                                      <>
+                                        <div className="flex gap-2">
+                                          {middleSeats.map((seat) => (
+                                            <div key={seat.id} className="relative group">
+                                              <button
+                                                onClick={() => handleToggleSeatStatus(seat.id)}
+                                                className={`w-12 h-12 rounded-lg text-white text-xs font-semibold transition-all ${
+                                                  seat.isActive
+                                                    ? getSeatTypeColor(seat.seatType)
+                                                    : 'bg-gray-300 dark:bg-gray-600'
+                                                }`}
+                                                title={`${seat.seatNumber} - ${seat.seatType} ${
+                                                  seat.isActive ? '(Active)' : '(Inactive)'
+                                                }`}
+                                              >
+                                                {seat.seatNumber}
+                                              </button>
+                                              <button
+                                                onClick={() => handleOpenDeleteSeatModal(seat.id)}
+                                                className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                title="Delete seat"
+                                              >
+                                                <X className="w-3 h-3" />
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                        {/* Another aisle */}
+                                        <div className="w-8 border-l-2 border-r-2 border-dashed border-gray-300 dark:border-gray-600 h-12"></div>
+                                      </>
+                                    )}
+
+                                    {/* Right seats */}
+                                    <div className="flex gap-2">
+                                      {rightSeats.map((seat) => (
+                                        <div key={seat.id} className="relative group">
+                                          <button
+                                            onClick={() => handleToggleSeatStatus(seat.id)}
+                                            className={`w-12 h-12 rounded-lg text-white text-xs font-semibold transition-all ${
+                                              seat.isActive
+                                                ? getSeatTypeColor(seat.seatType)
+                                                : 'bg-gray-300 dark:bg-gray-600'
+                                            }`}
+                                            title={`${seat.seatNumber} - ${seat.seatType} ${
+                                              seat.isActive ? '(Active)' : '(Inactive)'
+                                            }`}
+                                          >
+                                            {seat.seatNumber}
+                                          </button>
+                                          <button
+                                            onClick={() => handleOpenDeleteSeatModal(seat.id)}
+                                            className="absolute -top-1 -right-1 p-0.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Delete seat"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </>
+                  )
+                })()}
               </div>
 
               {bus.seats.length === 0 && (
@@ -490,35 +817,60 @@ export default function BusDetailPage() {
 
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-gray-700 dark:text-gray-300 mb-2">Layout Pattern</label>
+                <label className="block text-gray-700 dark:text-gray-300 mb-2">Bus Layout Type</label>
                 <select
                   value={generateFormData.layout}
                   onChange={(e) =>
                     setGenerateFormData({
                       ...generateFormData,
-                      layout: e.target.value as '2-2' | '2-3' | '1-2' | '2-1',
+                      layout: e.target.value,
                     })
                   }
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 >
-                  <option value="2-2">2-2 (Standard)</option>
-                  <option value="2-3">2-3 (Wide)</option>
-                  <option value="1-2">1-2 (VIP)</option>
-                  <option value="2-1">2-1 (Luxury)</option>
+                  {BUS_LAYOUTS_VIETNAM_BRIEF.map((layout) => (
+                    <option key={layout.code} value={layout.code}>
+                      {layout.name} ({layout.type})
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              <div>
-                <label className="block text-gray-700 dark:text-gray-300 mb-2">Number of Rows</label>
-                <input
-                  type="number"
-                  value={generateFormData.rows}
-                  onChange={(e) => setGenerateFormData({ ...generateFormData, rows: parseInt(e.target.value) || 1 })}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  min="1"
-                  max="20"
-                />
+              {/* Capacity Information */}
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-700 dark:text-gray-300">Bus Capacity:</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{bus?.seatCapacity} seats</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-700 dark:text-gray-300">Auto-calculated Rows:</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{generateFormData.rows} rows</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-700 dark:text-gray-300">Total Seats to Generate:</span>
+                  <span
+                    className={`font-semibold ${
+                      exceedsCapacity ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                    }`}
+                  >
+                    {expectedSeatCount} seats
+                  </span>
+                </div>
               </div>
+
+              {/* Warning if exceeds capacity */}
+              {exceedsCapacity && (
+                <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                  <div className="text-sm text-red-800 dark:text-red-300">
+                    <p className="font-semibold mb-1">Bus capacity is not suitable with this layout!</p>
+                    <p>
+                      The generated layout ({expectedSeatCount} seats) exceeds your bus capacity ({bus?.seatCapacity}{' '}
+                      seats). Please adjust your bus capacity or choose a different layout.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-gray-700 dark:text-gray-300 mb-2">Seat Type</label>
@@ -538,19 +890,6 @@ export default function BusDetailPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-gray-700 dark:text-gray-300 mb-2">Start Row Number</label>
-                <input
-                  type="number"
-                  value={generateFormData.startRow}
-                  onChange={(e) =>
-                    setGenerateFormData({ ...generateFormData, startRow: parseInt(e.target.value) || 1 })
-                  }
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  min="1"
-                />
-              </div>
-
               <div className="flex items-center gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                 <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 shrink-0" />
                 <p className="text-sm text-yellow-800 dark:text-yellow-300">
@@ -563,7 +902,11 @@ export default function BusDetailPage() {
               <Button onClick={() => setShowGenerateModal(false)} variant="outline" className="px-6 py-3">
                 Cancel
               </Button>
-              <Button onClick={handleGenerateSeats} className="px-6 py-3 bg-blue-600 hover:bg-blue-700">
+              <Button
+                onClick={handleGenerateSeats}
+                disabled={exceedsCapacity}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Generate Layout
               </Button>
             </div>
@@ -634,13 +977,58 @@ export default function BusDetailPage() {
               <Button onClick={() => setShowAddSeatModal(false)} variant="outline" className="px-6 py-3">
                 Cancel
               </Button>
-              <Button onClick={handleAddSeat} className="px-6 py-3 bg-blue-600 hover:bg-blue-700">
+              <Button
+                onClick={handleAddSeat}
+                disabled={!seatFormData.seatNumber.trim()}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Add Seat
               </Button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Delete All Seats Alert Dialog */}
+      <AlertDialog open={showDeleteAllSeatsModal} onOpenChange={setShowDeleteAllSeatsModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All Seats?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action will permanently delete all {bus?.seats.length || 0} seat(s) and their associated seat
+              statuses for this bus. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingSeats}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAllSeats}
+              disabled={isDeletingSeats}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeletingSeats ? 'Deleting...' : 'Delete All Seats'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Single Seat Alert Dialog */}
+      <AlertDialog open={showDeleteSeatModal} onOpenChange={setShowDeleteSeatModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Seat?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this seat? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteSeat} className="bg-red-600 hover:bg-red-700">
+              Delete Seat
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
