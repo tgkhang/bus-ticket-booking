@@ -298,10 +298,10 @@ function SearchContent() {
 
   if (loading && trips.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Searching for available trips...</p>
+          <p className="text-gray-600 dark:text-gray-300">Searching for available trips...</p>
         </div>
       </div>
     )
@@ -309,11 +309,11 @@ function SearchContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Oops!</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Oops!</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">{error}</p>
           <Link href="/">
             <Button className="bg-blue-600 hover:bg-blue-700">Back to Home</Button>
           </Link>
@@ -323,9 +323,9 @@ function SearchContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between mb-4">
             <Link href="/homepage">
@@ -337,47 +337,47 @@ function SearchContent() {
           
           {/* Search Summary/Editor */}
           {!showSearchEditor ? (
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-gray-50 rounded-lg">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-blue-600" />
-                <span className="font-semibold text-gray-900">
+                <span className="font-semibold text-gray-900 dark:text-white">
                   {fromText || 'All Stops'}
                 </span>
               </div>
               <ArrowRight className="w-5 h-5 text-gray-400" />
               <div className="flex items-center gap-2">
                 <MapPin className="w-5 h-5 text-green-600" />
-                <span className="font-semibold text-gray-900">
+                <span className="font-semibold text-gray-900 dark:text-white">
                   {toText || 'All Stops'}
                 </span>
                 </div>
                 <div className="text-gray-400">|</div>
-                <div className="flex items-center gap-2 text-gray-600">
+                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                   <Calendar className="w-5 h-5 text-gray-400" />
                   <span>{date && formatDate(date)}</span>
                 </div>
                 <div className="text-gray-400">|</div>
-                <div className="flex items-center gap-2 text-gray-600">
+                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                   <Users className="w-5 h-5 text-gray-400" />
                   <span>{passengers} passenger{passengers > 1 ? 's' : ''}</span>
                 </div>
               </div>
               <button
                 onClick={() => setShowSearchEditor(true)}
-                className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-gray-600 rounded-lg transition-colors"
               >
                 <ChevronDown className="w-4 h-4" />
                 Edit Search
               </button>
             </div>
           ) : (
-            <div className="p-6 bg-linear-to-br from-blue-50 to-white rounded-lg border border-blue-100">
+            <div className="p-6 bg-linear-to-br from-blue-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-lg border border-blue-100 dark:border-gray-600">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Update Your Search</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Update Your Search</h3>
                 <button
                   onClick={() => setShowSearchEditor(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 >
                   <ChevronUp className="w-5 h-5" />
                 </button>
@@ -386,7 +386,7 @@ function SearchContent() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {/* From */}
                 <div className="relative">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">From</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From</label>
                   <div className="relative">
                     <input
                       type="text"
@@ -399,12 +399,12 @@ function SearchContent() {
                       onFocus={() => setShowFromDropdown(true)}
                       onBlur={() => setTimeout(() => setShowFromDropdown(false), 200)}
                       placeholder="Select departure stop"
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                     />
-                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
                     
                     {showFromDropdown && fromSuggestions.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                         {fromSuggestions.map((stop) => (
                           <button
                             key={stop.id}
@@ -414,11 +414,11 @@ function SearchContent() {
                               setSelectedOriginStop(stop)
                               setShowFromDropdown(false)
                             }}
-                            className="w-full px-4 py-2 text-left hover:bg-blue-50 flex items-start gap-2"
+                            className="w-full px-4 py-2 text-left hover:bg-blue-50 dark:hover:bg-gray-700 flex items-start gap-2"
                           >
-                            <MapPin className="w-4 h-4 text-blue-600 mt-1 shrink-0" />
+                            <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-1 shrink-0" />
                             <div>
-                              <p className="text-gray-900 font-medium">{stop.name}</p>
+                              <p className="text-gray-900 dark:text-white font-medium">{stop.name}</p>
                             </div>
                           </button>
                         ))}
@@ -429,7 +429,7 @@ function SearchContent() {
 
                 {/* To */}
                 <div className="relative">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">To</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">To</label>
                   <div className="relative">
                     <input
                       type="text"
@@ -442,12 +442,12 @@ function SearchContent() {
                       onFocus={() => setShowToDropdown(true)}
                       onBlur={() => setTimeout(() => setShowToDropdown(false), 200)}
                       placeholder="Select destination stop"
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                     />
-                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
                     
                     {showToDropdown && toSuggestions.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                         {toSuggestions.map((stop) => (
                           <button
                             key={stop.id}
@@ -457,11 +457,11 @@ function SearchContent() {
                               setSelectedDestinationStop(stop)
                               setShowToDropdown(false)
                             }}
-                            className="w-full px-4 py-2 text-left hover:bg-blue-50 flex items-start gap-2"
+                            className="w-full px-4 py-2 text-left hover:bg-blue-50 dark:hover:bg-gray-700 flex items-start gap-2"
                           >
-                            <MapPin className="w-4 h-4 text-blue-600 mt-1 shrink-0" />
+                            <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-1 shrink-0" />
                             <div>
-                              <p className="text-gray-900 font-medium">{stop.name}</p>
+                              <p className="text-gray-900 dark:text-white font-medium">{stop.name}</p>
                             </div>
                           </button>
                         ))}
@@ -472,21 +472,21 @@ function SearchContent() {
 
                 {/* Date */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date</label>
                   <input
                     type="date"
                     value={editDate}
                     onChange={(e) => setEditDate(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                   />
                 </div>
 
                 {/* Passengers */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Passengers</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Passengers</label>
                   <div className="relative">
-                    <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <Users className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
                     <input
                       type="number"
                       value={editPassengers}
@@ -496,7 +496,7 @@ function SearchContent() {
                       }}
                       min="1"
                       max="10"
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                     />
                   </div>
                 </div>
@@ -506,7 +506,7 @@ function SearchContent() {
               <div className="flex items-center justify-end gap-3 mt-4">
                 <button
                   onClick={() => setShowSearchEditor(false)}
-                  className="px-6 py-2 text-gray-700 hover:text-gray-900 transition-colors"
+                  className="px-6 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
                 >
                   Cancel
                 </button>
@@ -547,12 +547,12 @@ function SearchContent() {
                 <>
                   {/* Sort and Results Count */}
                   <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <h2 className="text-2xl font-bold text-gray-900">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                       {loading ? 'Loading...' : `${meta?.total || trips.length} ${trips.length === 1 ? 'Trip' : 'Trips'} Available`}
                     </h2>
                     
                     <div className="flex items-center gap-2">
-                      <label htmlFor="sortBy" className="text-sm text-gray-600 whitespace-nowrap">
+                      <label htmlFor="sortBy" className="text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
                         Sort by:
                       </label>
                       <div className="relative">
@@ -561,7 +561,7 @@ function SearchContent() {
                           value={sortBy}
                           onChange={(e) => setSortBy(e.target.value)}
                           disabled={loading}
-                          className="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="appearance-none bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 pr-10 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {SORT_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -576,18 +576,18 @@ function SearchContent() {
 
                   {/* Loading Overlay */}
                   {loading && trips.length > 0 && (
-                    <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                      <span className="text-sm text-blue-900">Updating results...</span>
+                    <div className="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-spin" />
+                      <span className="text-sm text-blue-900 dark:text-blue-300">Updating results...</span>
                     </div>
                   )}
 
                   {/* No Results Message */}
                   {!loading && trips.length === 0 && (
-                    <div className="bg-white rounded-lg shadow-md p-12 text-center">
-                      <Bus className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">No Trips Found</h3>
-                      <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
+                      <Bus className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Trips Found</h3>
+                      <p className="text-gray-600 dark:text-gray-300 mb-6 max-w-md mx-auto">
                         {originStopId || destinationStopId 
                           ? 'No trips available for this route and filters. Try clearing your location filters or adjusting your search criteria.'
                           : 'No trips available on this date. Try selecting a different date.'}
@@ -607,7 +607,12 @@ function SearchContent() {
                   {trips.length > 0 && (
                     <div className="space-y-4">
                       {trips.map((trip) => (
-                        <TripCard key={trip.id} trip={trip} passengers={passengers} />
+                        <TripCard 
+                          key={trip.id} 
+                          trip={trip} 
+                          passengers={passengers}
+                          currentPath={typeof window !== 'undefined' ? window.location.pathname + window.location.search : undefined}
+                        />
                       ))}
                     </div>
                   )}
@@ -628,8 +633,8 @@ function SearchContent() {
                           disabled={page === 1}
                           className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                             page === 1
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                              ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
                           }`}
                         >
                           <ArrowRight className="w-4 h-4 rotate-180" />
@@ -651,7 +656,7 @@ function SearchContent() {
 
                             if (showEllipsisBefore || showEllipsisAfter) {
                               return (
-                                <span key={pageNum} className="px-2 py-2 text-gray-500">
+                                <span key={pageNum} className="px-2 py-2 text-gray-500 dark:text-gray-400">
                                   ...
                                 </span>
                               )
@@ -670,7 +675,7 @@ function SearchContent() {
                                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                                   pageNum === page
                                     ? 'bg-blue-600 text-white'
-                                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
                                 }`}
                               >
                                 {pageNum}
@@ -691,8 +696,8 @@ function SearchContent() {
                           disabled={page === meta.totalPages}
                           className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                             page === meta.totalPages
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                              ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
                           }`}
                         >
                           Next
@@ -701,7 +706,7 @@ function SearchContent() {
                       </div>
 
                       {/* Page Info */}
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
                         Page {page} of {meta.totalPages} ({meta.total} total trips)
                       </p>
                     </div>
@@ -719,8 +724,8 @@ export default function TripSearchPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+          <Loader2 className="w-12 h-12 text-blue-600 dark:text-blue-400 animate-spin" />
         </div>
       }
     >

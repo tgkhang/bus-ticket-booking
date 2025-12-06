@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { getUserBookingsAPI } from '@/lib/api'
 import { Ticket, Calendar, MapPin, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Header } from '@/components/layout/Header'
 import { Badge } from '@/components/ui/badge'
 
 export default function MyBookingsPage() {
@@ -47,8 +46,7 @@ export default function MyBookingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
+      <div className="bg-gray-50 dark:bg-gray-900">
         <div className="flex items-center justify-center h-96">
           <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
         </div>
@@ -57,14 +55,12 @@ export default function MyBookingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-
+    <div className="bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Bookings</h1>
-            <p className="text-gray-600 mt-2">View and manage your bus ticket bookings</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Bookings</h1>
+            <p className="text-gray-600 dark:text-gray-300 mt-2">View and manage your bus ticket bookings</p>
           </div>
           <Button onClick={() => router.push('/homepage')} variant="outline">
             Book New Trip
@@ -78,10 +74,10 @@ export default function MyBookingsPage() {
         )}
 
         {bookings.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
             <Ticket className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">No Bookings Yet</h2>
-            <p className="text-gray-600 mb-6">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">No Bookings Yet</h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
               You haven't made any bookings yet. Start exploring bus trips now!
             </p>
             <Button onClick={() => router.push('/homepage')} className="bg-blue-600 hover:bg-blue-700">
@@ -93,15 +89,15 @@ export default function MyBookingsPage() {
             {bookings.map((booking) => (
               <div
                 key={booking.id}
-                className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+                className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
               >
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-4">
                       <Ticket className="w-6 h-6 text-blue-600" />
                       <div>
-                        <p className="text-sm text-gray-600">Booking Reference</p>
-                        <p className="text-lg font-bold text-gray-900">{booking.bookingReference}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Booking Reference</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-white">{booking.bookingReference}</p>
                       </div>
                       <Badge className={getStatusColor(booking.status)}>
                         {booking.status}
@@ -110,28 +106,28 @@ export default function MyBookingsPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">Route</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Route</p>
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4 text-gray-400" />
-                          <p className="text-gray-900 font-medium">
+                          <p className="text-gray-900 dark:text-white font-medium">
                             {booking.trip?.originStop?.name} → {booking.trip?.destinationStop?.name}
                           </p>
                         </div>
                       </div>
 
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">Departure</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Departure</p>
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-gray-400" />
-                          <p className="text-gray-900 font-medium">
+                          <p className="text-gray-900 dark:text-white font-medium">
                             {new Date(booking.trip?.departureTime).toLocaleString()}
                           </p>
                         </div>
                       </div>
 
                       <div>
-                        <p className="text-sm text-gray-600 mb-1">Amount Paid</p>
-                        <p className="text-gray-900 font-bold text-lg">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Amount Paid</p>
+                        <p className="text-gray-900 dark:text-white font-bold text-lg">
                           {new Intl.NumberFormat('vi-VN', {
                             style: 'currency',
                             currency: 'VND',

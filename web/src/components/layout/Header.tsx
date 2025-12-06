@@ -44,14 +44,14 @@ export function Header() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo and Navigation */}
           <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <Link href={(isAuthenticated && user?.role === 'client') ? "/homepage" : "/"} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <Bus className="w-8 h-8 text-blue-600" />
               <span className="font-bold text-xl text-gray-900 dark:text-white">BusBooking</span>
             </Link>
 
             <nav className="hidden md:flex items-center gap-6">
               <Link
-                href="/"
+                href={(isAuthenticated && user?.role === 'client') ? "/homepage" : "/"}
                 className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
               >
                 Home
@@ -59,7 +59,7 @@ export function Header() {
               {isAuthenticated && (
                 <>
                   <Link
-                    href="/bookings"
+                    href="/booking"
                     className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors"
                   >
                     My Bookings
@@ -180,7 +180,7 @@ export function Header() {
           <div className="md:hidden border-t border-gray-200 dark:border-gray-800 py-4">
             <nav className="flex flex-col gap-3">
               <Link
-                href="/"
+                href={isAuthenticated ? "/homepage" : "/"}
                 className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                 onClick={() => setShowMenu(false)}
               >
@@ -190,7 +190,7 @@ export function Header() {
               {isAuthenticated ? (
                 <>
                   <Link
-                    href="/bookings"
+                    href="/booking"
                     className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                     onClick={() => setShowMenu(false)}
                   >

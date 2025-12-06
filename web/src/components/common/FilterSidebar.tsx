@@ -4,17 +4,10 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { 
   Clock, 
   DollarSign, 
-  Wifi, 
-  Wind,
-  Droplet,
-  Usb,
   X, 
-  SlidersHorizontal,
-  Users,
-  Tv,
-  Lamp,
-  Armchair
+  SlidersHorizontal
 } from 'lucide-react'
+import { amenityOptions } from '@/utils/constants'
 
 interface FilterState {
   timeSlots: string[]
@@ -35,18 +28,6 @@ const TIME_SLOTS = [
   { id: 'morning', label: 'Morning', time: '6:01 AM - 12:00 PM', icon: '🌅' },
   { id: 'afternoon', label: 'Afternoon', time: '12:01 PM - 6:00 PM', icon: '☀️' },
   { id: 'evening', label: 'Evening', time: '6:01 PM - 11:59 PM', icon: '🌆' },
-]
-
-const AMENITIES = [
-  { id: 'wifi', label: 'WiFi', icon: Wifi },
-  { id: 'ac', label: 'Air Conditioning', icon: Wind },
-  { id: 'water', label: 'Water', icon: Droplet },
-  { id: 'usb_charging', label: 'USB Charging', icon: Usb },
-  { id: 'restroom', label: 'Restroom', icon: Users },
-  { id: 'entertainment', label: 'Entertainment', icon: Tv },
-  { id: 'reading_light', label: 'Reading Light', icon: Lamp },
-  { id: 'reclining_seats', label: 'Reclining Seats', icon: Armchair },
-  { id: 'blanket', label: 'Blanket', icon: Wind },
 ]
 
 function FilterSidebar({
@@ -132,15 +113,15 @@ function FilterSidebar({
   const FilterContent = () => (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+      <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
-          <SlidersHorizontal className="w-5 h-5 text-blue-600" />
-          <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+          <SlidersHorizontal className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filters</h3>
         </div>
         {hasActiveFilters && (
           <button
             onClick={onClearFilters}
-            className="text-sm text-red-600 hover:text-red-700 font-medium"
+            className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
             disabled={isLoading}
           >
             Clear All
@@ -149,20 +130,20 @@ function FilterSidebar({
       </div>
 
       {/* Results Count */}
-      <div className="bg-blue-50 rounded-lg p-3">
-        <p className="text-sm text-blue-900">
+      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+        <p className="text-sm text-blue-900 dark:text-blue-300">
           <span className="font-semibold">{totalResults}</span> {totalResults === 1 ? 'trip' : 'trips'} found
         </p>
       </div>
       {/* Departure Time */}
-      <div className="space-y-3 pb-6 border-b border-gray-200">
+      <div className="space-y-3 pb-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
-          <Clock className="w-5 h-5 text-gray-600" />
-          <h4 className="font-medium text-gray-900">Departure Time</h4>
+          <Clock className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          <h4 className="font-medium text-gray-900 dark:text-white">Departure Time</h4>
         </div>
         <div className="space-y-2">
           {TIME_SLOTS.map((slot) => (
-            <label key={slot.id} className="flex items-center gap-3 cursor-pointer group hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label key={slot.id} className="flex items-center gap-3 cursor-pointer group hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded-lg transition-colors">
               <input
                 type="checkbox"
                 checked={filters.timeSlots.includes(slot.id)}
@@ -172,8 +153,8 @@ function FilterSidebar({
               />
               <span className="text-xl">{slot.icon}</span>
               <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">{slot.label}</div>
-                <div className="text-xs text-gray-500">{slot.time}</div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">{slot.label}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">{slot.time}</div>
               </div>
             </label>
           ))}
@@ -181,15 +162,15 @@ function FilterSidebar({
       </div>
 
       {/* Price Range */}
-      <div className="space-y-3 pb-6 border-b border-gray-200">
+      <div className="space-y-3 pb-6 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-gray-600" />
-          <h4 className="font-medium text-gray-900">Price Range</h4>
+          <DollarSign className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          <h4 className="font-medium text-gray-900 dark:text-white">Price Range</h4>
         </div>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-600 mb-1 block">Min Price (VND)</label>
+              <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">Min Price (VND)</label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -200,12 +181,12 @@ function FilterSidebar({
                 // onBlur={() => { typingRef.current.minFocused = false; commitPriceChange() }}
                 onKeyDown={handlePriceKeyDown}
                 disabled={isLoading}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 placeholder="0"
               />
             </div>
             <div>
-              <label className="text-xs text-gray-600 mb-1 block">Max Price (VND)</label>
+              <label className="text-xs text-gray-600 dark:text-gray-400 mb-1 block">Max Price (VND)</label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -216,12 +197,12 @@ function FilterSidebar({
                 // onBlur={() => { typingRef.current.maxFocused = false; commitPriceChange() }}
                 onKeyDown={handlePriceKeyDown}
                 disabled={isLoading}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 placeholder="10000000"
               />
             </div>
           </div>
-          <div className="flex items-center justify-between text-xs text-gray-600">
+          <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
             <span>{(priceMinStr.trim() === '' ? 0 : Number(priceMinStr)).toLocaleString('vi-VN')} đ</span>
             <span>{(priceMaxStr.trim() === '' ? 0 : Number(priceMaxStr)).toLocaleString('vi-VN')} đ</span>
           </div>
@@ -230,21 +211,21 @@ function FilterSidebar({
 
       {/* Amenities */}
       <div className="space-y-3">
-        <h4 className="font-medium text-gray-900">Amenities</h4>
+        <h4 className="font-medium text-gray-900 dark:text-white">Amenities</h4>
         <div className="space-y-2">
-          {AMENITIES.map((amenity) => {
+          {amenityOptions.map((amenity) => {
             const Icon = amenity.icon
             return (
-              <label key={amenity.id} className="flex items-center gap-3 cursor-pointer group hover:bg-gray-50 p-2 rounded-lg transition-colors">
+              <label key={amenity.value} className="flex items-center gap-3 cursor-pointer group hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded-lg transition-colors">
                 <input
                   type="checkbox"
-                  checked={filters.amenities.includes(amenity.id)}
-                  onChange={() => handleAmenityToggle(amenity.id)}
+                  checked={filters.amenities.includes(amenity.value)}
+                  onChange={() => handleAmenityToggle(amenity.value)}
                   disabled={isLoading}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
                 />
-                <Icon className="w-4 h-4 text-gray-600" />
-                <span className="text-sm text-gray-900">{amenity.label}</span>
+                <Icon className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                <span className="text-sm text-gray-900 dark:text-white">{amenity.label}</span>
               </label>
             )
           })}
@@ -257,7 +238,7 @@ function FilterSidebar({
     <>
       {/* Desktop Sidebar */}
       <div className="hidden lg:block">
-        <div className="bg-white rounded-lg shadow-md p-6 sticky top-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 sticky top-6">
           {FilterContent()}
         </div>
       </div>
@@ -281,24 +262,24 @@ function FilterSidebar({
       {/* Mobile Filter Modal */}
       {showMobileFilters && (
         <div className="lg:hidden fixed inset-0 z-50 bg-black bg-opacity-50">
-          <div className="absolute inset-y-0 right-0 w-full sm:w-96 bg-white shadow-xl">
+          <div className="absolute inset-y-0 right-0 w-full sm:w-96 bg-white dark:bg-gray-800 shadow-xl">
             <div className="flex flex-col h-full">
-              <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filters</h3>
                 <button
                   onClick={() => setShowMobileFilters(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                 >
-                  <X className="w-5 h-5 text-gray-600" />
+                  <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-6">
                 {FilterContent()}
               </div>
-              <div className="p-4 border-t border-gray-200">
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => setShowMobileFilters(false)}
-                  className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  className="w-full bg-blue-600 dark:bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors font-medium"
                 >
                   Show {totalResults} Results
                 </button>

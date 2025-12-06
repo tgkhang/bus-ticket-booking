@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { getBookingByIdAPI } from '@/lib/api'
 import { CheckCircle, Ticket, ArrowRight, Printer, Download, QrCode, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Header } from '@/components/layout/Header'
 import Link from 'next/link'
 import { toast } from 'sonner'
 
@@ -52,8 +51,7 @@ function ConfirmationContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header />
+      <div className="bg-gray-50">
         <div className="flex items-center justify-center h-96">
           <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
         </div>
@@ -64,7 +62,6 @@ function ConfirmationContent() {
   if (!bookingRef || !booking) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Header />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
@@ -79,9 +76,7 @@ function ConfirmationContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-
+    <div className="bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Success Message */}
         <div className="text-center mb-8">
@@ -271,12 +266,11 @@ function ConfirmationContent() {
   )
 }
 
-export default function BookingConfirmationPage() {
+export default function ConfirmationPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gray-50">
-          <Header />
+        <div className="bg-gray-50">
           <div className="flex items-center justify-center h-96">
             <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
           </div>

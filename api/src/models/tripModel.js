@@ -9,20 +9,29 @@ const buildWhere = (filters) => {
     if (filters.destinationStopId) where.route.destinationStopId = filters.destinationStopId
   }
   if (filters.date) {
-    // date boundary; timeFrom/timeTo refine
-    const dayStart = new Date(`${filters.date}T00:00:00.000Z`)
-    const dayEnd = new Date(`${filters.date}T23:59:59.999Z`)
+    // Parse date as local time (Vietnam timezone UTC+7)
+    const localDate = new Date(filters.date)
+    
+    // Create day boundaries in local time
+    const dayStart = new Date(localDate)
+    dayStart.setHours(0, 0, 0, 0)
+    
+    const dayEnd = new Date(localDate)
+    dayEnd.setHours(23, 59, 59, 999)
+    
     where.departureTime = { gte: dayStart, lte: dayEnd }
+    
+    // Apply time range filters if provided
     if (filters.timeFrom) {
       const [h, m] = filters.timeFrom.split(':')
-      const from = new Date(dayStart)
-      from.setUTCHours(Number(h), Number(m), 0, 0)
+      const from = new Date(localDate)
+      from.setHours(Number(h), Number(m), 0, 0)
       if (from > where.departureTime.gte) where.departureTime.gte = from
     }
     if (filters.timeTo) {
       const [h, m] = filters.timeTo.split(':')
-      const to = new Date(dayStart)
-      to.setUTCHours(Number(h), Number(m), 59, 999)
+      const to = new Date(localDate)
+      to.setHours(Number(h), Number(m), 59, 999)
       if (to < where.departureTime.lte) where.departureTime.lte = to
     }
   }
