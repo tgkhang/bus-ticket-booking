@@ -65,19 +65,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         // No localStorage, but maybe we have valid cookies?
-        // Only check cookies if we're not on auth pages (login/register)
-        const isAuthPage =
+        // Define public pages that don't require authentication check
+        const isPublicPage =
           typeof window !== 'undefined' &&
-          (window.location.pathname.includes('/login') ||
+          (window.location.pathname === '/' ||
+            window.location.pathname.includes('/login') ||
             window.location.pathname.includes('/register') ||
             window.location.pathname.includes('/forgot-password'))
 
-        if (!isAuthPage) {
-          // Try to get current user info from API
+        if (!isPublicPage) {
+          // Only call /me for protected pages
           try {
             console.log('No stored user, calling /me to check auth status')
             const response = await getMeAPI()
             setUser(response)
+            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(response))
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } catch (error: any) {
             // No valid cookies, user is not authenticated

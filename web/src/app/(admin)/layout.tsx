@@ -86,7 +86,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const handleLogout = async () => {
     await logout()
-    router.push('/login')
+    router.push('/')
   }
 
   const getUserInitials = () => {
@@ -125,10 +125,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside
         className={`fixed top-0 left-0 z-30 h-full ${sidebarWidth} bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transform transition-all duration-300 lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } flex flex-col`}
       >
         {/* Logo Section */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800 shrink-0">
           <div className={`flex items-center gap-2 ${sidebarCollapsed ? 'justify-center w-full' : ''}`}>
             <Bus className="w-8 h-8 text-blue-600 shrink-0" />
             {!sidebarCollapsed && <span className="text-xl font-bold text-gray-900 dark:text-white">BusBooking</span>}
@@ -167,27 +167,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </nav>
 
-        {/* Collapse Button - Desktop Only */}
-        <div className="hidden lg:block border-t border-gray-200 dark:border-gray-800 p-4">
-          <button
-            onClick={toggleSidebarCollapse}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight className="w-5 h-5" />
-            ) : (
-              <>
-                <ChevronLeft className="w-5 h-5" />
-                <span className="text-sm font-medium">Collapse</span>
-              </>
-            )}
-          </button>
-        </div>
-
         {/* User Profile Section - Bottom of Sidebar */}
-        {!sidebarCollapsed && (
-          <div className="border-t border-gray-200 dark:border-gray-800 p-4">
+        <div className="border-t border-gray-200 dark:border-gray-800 p-4 shrink-0">
+          {sidebarCollapsed ? (
+            <div className="flex justify-center">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={user?.avatar} alt={user?.username || user?.email} />
+                <AvatarFallback className="bg-blue-600 text-white">{getUserInitials()}</AvatarFallback>
+              </Avatar>
+            </div>
+          ) : (
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10">
                 <AvatarImage src={user?.avatar} alt={user?.username || user?.email} />
@@ -200,8 +189,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{user?.email}</p>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Collapse Button - Desktop Only - Sticks out from sidebar */}
+        <button
+          onClick={toggleSidebarCollapse}
+          className={`hidden lg:flex absolute ${sidebarCollapsed ? 'left-[72px]' : 'left-[248px]'} top-1/2 -translate-y-1/2 items-center justify-center w-6 h-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-r-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300 shadow-md`}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
       </aside>
 
       {/* Main Content */}

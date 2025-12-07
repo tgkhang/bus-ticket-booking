@@ -65,7 +65,7 @@ async function main() {
     })
   }
 
-  // Import 4 real HCMC stops from stops.txt (name,latitude,longitude,address)
+  // Import real HCMC stops from stops.txt (name,latitude,longitude,address)
   const ensureStop = async (name, latitude, longitude, address) => {
     const existing = await prisma.stop.findFirst({ where: { name, latitude, longitude } })
     if (existing) return existing
@@ -183,51 +183,116 @@ async function main() {
     createdRoutes.push(r)
   }
 
-  // Create sample bus
-  const bus = await prisma.bus.upsert({
-    where: { plateNumber: 'GBL-001' },
-    update: {},
-    create: {
-      operatorId: operator.id,
+  // Create buses for every layout type
+  const busConfigs = [
+    {
       plateNumber: 'GBL-001',
-      model: 'Mercedes Sprinter',
-      seatCapacity: 16,
-      amenities: JSON.stringify({
-        wifi: true,
-        ac: true,
-        restroom: true,
-        entertainment: true,
-        usb_charging: true,
-        reclining_seats: true,
-        reading_light: true,
-        blanket: true,
-        water: true,
-      }),
+      model: 'Mercedes Sprinter Standard',
+      seatCapacity: 32,
+      layoutCode: '2-2',
+      seatNumbers: Array.from({ length: 8 }, (_, row) => 
+        ['A', 'B', 'C', 'D'].map(col => `${col}${row + 1}`)
+      ).flat(),
+      seatType: 'regular',
     },
-  })
+    {
+      plateNumber: 'GBL-002',
+      model: 'Hyundai Universe Sleeper 32',
+      seatCapacity: 32,
+      layoutCode: 'Sleeper-32',
+      seatNumbers: Array.from({ length: 11 }, (_, row) => 
+        ['L', 'M', 'R'].map(col => `${col}${row + 1}`)
+      ).flat().slice(0, 32),
+      seatType: 'sleeper',
+    },
+    {
+      plateNumber: 'GBL-003',
+      model: 'Thaco Universe Sleeper 40',
+      seatCapacity: 40,
+      layoutCode: 'Sleeper-40',
+      seatNumbers: Array.from({ length: 14 }, (_, row) => 
+        ['L', 'M', 'R'].map(col => `${col}${row + 1}`)
+      ).flat().slice(0, 40),
+      seatType: 'sleeper',
+    },
+    {
+      plateNumber: 'GBL-004',
+      model: 'Mercedes Cabin VIP',
+      seatCapacity: 22,
+      layoutCode: 'Cabin-VIP',
+      seatNumbers: Array.from({ length: 11 }, (_, row) => 
+        ['L', 'R'].map(col => `${col}${row + 1}`)
+      ).flat(),
+      seatType: 'premium',
+    },
+    {
+      plateNumber: 'GBL-005',
+      model: 'Ford Transit Limousine 9',
+      seatCapacity: 9,
+      layoutCode: 'Limo-9',
+      seatNumbers: Array.from({ length: 3 }, (_, row) => 
+        ['A', 'B', 'C'].map(col => `${col}${row + 1}`)
+      ).flat(),
+      seatType: 'premium',
+    },
+    {
+      plateNumber: 'GBL-006',
+      model: 'Hyundai Solati Limousine 16',
+      seatCapacity: 16,
+      layoutCode: 'Limo-16',
+      seatNumbers: Array.from({ length: 4 }, (_, row) => 
+        ['A', 'B', 'C', 'D'].map(col => `${col}${row + 1}`)
+      ).flat(),
+      seatType: 'premium',
+    },
+  ]
 
-  // Create seats for the bus
-  const seatNumbers = ['A1', 'A2', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C2', 'C3', 'C4', 'D1', 'D2', 'D3', 'D4']
-
-  for (const seatNumber of seatNumbers) {
-    await prisma.seat.upsert({
-      where: {
-        busId_seatNumber: {
-          busId: bus.id,
-          seatNumber: seatNumber,
-        },
-      },
+  const buses = []
+  for (const config of busConfigs) {
+    const bus = await prisma.bus.upsert({
+      where: { plateNumber: config.plateNumber },
       update: {},
       create: {
-        busId: bus.id,
-        seatNumber: seatNumber,
-        seatType: seatNumber.startsWith('A') ? 'premium' : 'regular',
-        isActive: true,
+        operatorId: operator.id,
+        plateNumber: config.plateNumber,
+        model: config.model,
+        seatCapacity: config.seatCapacity,
+        amenities: JSON.stringify({
+          wifi: true,
+          ac: true,
+          restroom: config.seatCapacity > 16,
+          entertainment: config.seatCapacity > 20,
+          usb_charging: true,
+          reclining_seats: true,
+          reading_light: true,
+        }),
       },
     })
+
+    // Create seats for the bus
+    for (const seatNumber of config.seatNumbers) {
+      await prisma.seat.upsert({
+        where: {
+          busId_seatNumber: {
+            busId: bus.id,
+            seatNumber: seatNumber,
+          },
+        },
+        update: {},
+        create: {
+          busId: bus.id,
+          seatNumber: seatNumber,
+          seatType: config.seatType,
+          isActive: true,
+        },
+      })
+    }
+
+    buses.push(bus)
+    console.log(`🚌 Created bus ${config.plateNumber} (${config.model}) with ${config.seatNumbers.length} seats`)
   }
 
-  // Create multiple trips for each created route
+  // Create multiple trips for each created route for the next 7 days
   const makeTime = (daysFromNow, hour, minute) => {
     const d = new Date()
     d.setDate(d.getDate() + daysFromNow)
@@ -235,54 +300,81 @@ async function main() {
     return d
   }
 
-  const tripWindows = [
-    { days: 1, dep: [7, 30], price: 35000 },
-    { days: 1, dep: [9, 0], price: 45000 },
-    { days: 2, dep: [17, 0], price: 50000 },
+  // Multiple departure times throughout the day
+  const departureSlots = [
+    { time: [6, 0], priceMultiplier: 1.0 },   // Early morning
+    { time: [7, 30], priceMultiplier: 1.1 },  // Morning peak
+    { time: [9, 0], priceMultiplier: 1.0 },   // Mid morning
+    { time: [11, 30], priceMultiplier: 0.9 }, // Late morning
+    { time: [14, 0], priceMultiplier: 0.95 }, // Afternoon
+    { time: [17, 0], priceMultiplier: 1.2 },  // Evening peak
+    { time: [19, 30], priceMultiplier: 1.1 }, // Evening
+    { time: [22, 0], priceMultiplier: 1.0 },  // Night
   ]
 
-  for (const r of createdRoutes) {
-    for (const w of tripWindows) {
-      const dep = makeTime(w.days, w.dep[0], w.dep[1])
-      const arr = new Date(dep)
-      // Arrival based on estimatedMinutes
-      arr.setMinutes(arr.getMinutes() + (r.estimatedMinutes || 60))
-      const exists = await prisma.trip.findFirst({
-        where: { routeId: r.id, busId: bus.id, departureTime: dep },
-      })
-      if (!exists) {
-        await prisma.trip.create({
-          data: {
-            routeId: r.id,
-            busId: bus.id,
-            departureTime: dep,
-            arrivalTime: arr,
-            basePrice: w.price,
-            status: 'scheduled',
-          },
+  let tripCount = 0
+  // Create trips for next 7 days
+  for (let day = 0; day < 7; day++) {
+    for (const route of createdRoutes) {
+      // Rotate through buses for variety
+      const busesForDay = day % 2 === 0 ? buses.slice(0, 3) : buses.slice(3, 6)
+      
+      for (const slot of departureSlots) {
+        // Use different buses for different time slots
+        const bus = busesForDay[slot.time[0] % busesForDay.length]
+        
+        const dep = makeTime(day, slot.time[0], slot.time[1])
+        const arr = new Date(dep)
+        arr.setMinutes(arr.getMinutes() + (route.estimatedMinutes || 60))
+        
+        // Base price varies by route distance
+        const basePrice = Math.floor((route.distanceKm * 1500) * slot.priceMultiplier)
+        
+        const exists = await prisma.trip.findFirst({
+          where: { routeId: route.id, busId: bus.id, departureTime: dep },
         })
+        
+        if (!exists) {
+          await prisma.trip.create({
+            data: {
+              routeId: route.id,
+              busId: bus.id,
+              departureTime: dep,
+              arrivalTime: arr,
+              basePrice: basePrice,
+              status: 'scheduled',
+            },
+          })
+          tripCount++
+        }
       }
     }
   }
+  console.log(`🎫 Created ${tripCount} trips across 7 days`)
 
-  // Create seat statuses for all upcoming trips on the bus
-  const seats = await prisma.seat.findMany({ where: { busId: bus.id } })
-  const tripsForBus = await prisma.trip.findMany({ where: { busId: bus.id } })
-  for (const t of tripsForBus) {
-    for (const seat of seats) {
+  // Create seat statuses for all upcoming trips
+  const allSeats = await prisma.seat.findMany()
+  const allTrips = await prisma.trip.findMany()
+  
+  let seatStatusCount = 0
+  for (const trip of allTrips) {
+    const tripSeats = allSeats.filter(s => s.busId === trip.busId)
+    for (const seat of tripSeats) {
       await prisma.seatStatus.upsert({
         where: {
-          tripId_seatId: { tripId: t.id, seatId: seat.id },
+          tripId_seatId: { tripId: trip.id, seatId: seat.id },
         },
         update: {},
         create: {
-          tripId: t.id,
+          tripId: trip.id,
           seatId: seat.id,
           status: 'available',
         },
       })
+      seatStatusCount++
     }
   }
+  console.log(`💺 Created ${seatStatusCount} seat statuses for all trips`)
 
   console.log('✅ Database seeding completed!')
 }

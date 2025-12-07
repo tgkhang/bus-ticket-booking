@@ -15,9 +15,8 @@ import type {
   ListStopsFilters,
   ListRoutesFilters,
 } from '@/types/api'
-import type { Operator,ListOperatorsFilters } from '@/types/operator'
+import type { Operator, ListOperatorsFilters } from '@/types/operator'
 import { CreateRouteData, Route, Stop } from '@/types/routeAndStop'
-import type { Trip, TripDetail, CreateTripData, UpdateTripData, ListTripsFilters, SearchTripsFilters } from '@/types/trip'
 import { toast } from 'sonner'
 
 //=================================
@@ -72,33 +71,6 @@ export const autocompleteStopsAPI = async (query: string, limit: number = 10) =>
   return response.data
 }
 
-// Trips API
-export const searchTripsAPI = async (params: {
-  originStopId?: string
-  destinationStopId?: string
-  date?: string
-  startTime?: string
-  endTime?: string
-  minPrice?: number
-  maxPrice?: number
-  busModel?: string
-  amenities?: string
-  status?: string
-  sortBy?: string
-  sortOrder?: string
-  page?: number
-  limit?: number
-}) => {
-  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/search`, { params })
-  return response.data
-}
-
-export const getTripByIdAPI = async (id: string) => {
-  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${id}`)
-  return response.data
-}
-
-
 //=================================
 // Bus API Calls
 //=================================
@@ -144,14 +116,46 @@ export const updateBusAPI = async (busId: string, busData: UpdateBusData) => {
   return response.data
 }
 
-// // Update bus
-// Router.put(
-//   '/:id',
-//   authMiddleware.isAuthorized,
-//   rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_BUSES]),
-//   busValidation.updateBus,
-//   busController.updateBus
-// )
+export const deleteAllSeatsAPI = async (busId: string) => {
+  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/buses/${busId}/allSeats`)
+  toast.success('All seats deleted successfully')
+  return response.data
+}
+
+export const deleteSeatAPI = async (busId: string, seatId: string) => {
+  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/buses/${busId}/seats/${seatId}`)
+  toast.success('Seat deleted successfully')
+  return response.data
+}
+
+export const createSeatAPI = async (
+  busId: string,
+  seatData: {
+    seatNumber: string
+    seatType: 'regular' | 'premium' | 'sleeper'
+    isActive: boolean
+  }
+) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/buses/${busId}/seats`, {
+    seats: [seatData],
+  })
+  toast.success('Seat created successfully')
+  return response.data
+}
+
+export const generateSeatsAPI = async (
+  busId: string,
+  layoutData: {
+    layout: string
+    rows: number
+    seatType: 'regular' | 'premium' | 'sleeper'
+    startRow: number
+  }
+) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/buses/${busId}/seats/generate`, layoutData)
+  toast.success('Seats generated successfully')
+  return response.data
+}
 
 //=================================
 // Stops API Calls
@@ -233,37 +237,86 @@ export const getRouteDetailsAPI = async (routeId: string): Promise<Route> => {
 // Trip API Calls
 //=================================
 
-export const listTripsAPI = async (
-  filters?: ListTripsFilters,
-  pagination?: PaginationParams
-): Promise<PaginatedResponse<Trip>> => {
-  const params = {
-    ...filters,
-    ...pagination,
+// Re-export trip APIs from tripApi.ts
+export { listTripsAPI, getTripDetailsAPI, createTripAPI, updateTripAPI, deleteTripAPI } from './tripApi'
+
+export const searchTripsAPI = async (params: {
+  originStopId?: string
+  destinationStopId?: string
+  date?: string
+  passengers?: number
+  startTime?: string
+  endTime?: string
+  minPrice?: number
+  maxPrice?: number
+  busModel?: string
+  amenities?: string
+  status?: string
+  sortBy?: string
+  sortOrder?: string
+  page?: number
+  limit?: number
+}) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/search`, { params })
+  return response.data
+}
+
+//=================================
+// Booking API Calls
+//=================================
+
+export const getSeatStatusesAPI = async (tripId: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${tripId}/seats`)
+  return response.data
+}
+
+export const lockSeatsAPI = async (tripId: string, seatIds: string[], lockDuration: number = 10) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/bookings/lock-seats`, {
+    tripId,
+    seatIds,
+    lockDuration,
+  })
+  return response.data
+}
+
+export const createBookingAPI = async (bookingData: {
+  tripId: string
+  seatIds: string[]
+  passengers: Array<{
+    fullName: string
+    documentId: string
+    seatCode: string
+  }>
+  totalAmount: number
+}) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/bookings`, bookingData)
+  return response.data
+}
+
+export const getBookingByIdAPI = async (bookingId: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/bookings/${bookingId}`)
+  return response.data
+}
+
+export const getUserBookingsAPI = async (params?: { status?: string; page?: number; limit?: number }) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/bookings`, { params })
+  return response.data
+}
+
+export const confirmBookingAPI = async (
+  bookingId: string,
+  paymentData: {
+    provider?: string
+    transactionRef?: string
   }
-  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips`, { params })
+) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/bookings/${bookingId}/confirm`, paymentData)
+  toast.success('Booking confirmed successfully!')
   return response.data
 }
 
-export const getTripDetailsAPI = async (tripId: string): Promise<TripDetail> => {
-  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${tripId}`)
-  return response.data
-}
-
-export const createTripAPI = async (tripData: CreateTripData) => {
-  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/trips`, tripData)
-  toast.success('Trip created successfully')
-  return response.data
-}
-
-export const updateTripAPI = async (tripId: string, tripData: UpdateTripData) => {
-  const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/trips/${tripId}`, tripData)
-  toast.success('Trip updated successfully')
-  return response.data
-}
-
-export const deleteTripAPI = async (tripId: string) => {
-  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/trips/${tripId}`)
-  toast.success('Trip deleted successfully')
+export const cancelBookingAPI = async (bookingId: string) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/bookings/${bookingId}/cancel`)
+  toast.success('Booking cancelled successfully')
   return response.data
 }

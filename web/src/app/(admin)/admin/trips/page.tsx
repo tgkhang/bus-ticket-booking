@@ -1,636 +1,561 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
 import {
   Plus,
   Edit,
   Trash2,
   X,
-  Calendar,
-  Clock,
-  DollarSign,
-  Bus,
-  Users,
-  CheckCircle,
-  XCircle,
-  PlayCircle,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
-import { Trip, TripStatus } from '@/types/trip'
+import { Trip, TripStatus, CreateTripData } from '@/types/trip'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { listTripsAPI, deleteTripAPI, createTripAPI, listRoutesAPI, listBusesAPI } from '@/lib/api'
+import { toast } from 'sonner'
+import { ITEMS_PER_PAGE } from '@/utils/constants'
+import type { Route } from '@/types/routeAndStop'
+import type { Bus } from '@/types/api'
+
+interface TripFormData {
+  routeId: string
+  busId: string
+  departureTime: string
+  arrivalTime: string
+  basePrice: number
+  status: TripStatus
+}
 
 export default function TripManagementPage() {
   const router = useRouter()
-  const [trips, setTrips] = useState<Trip[]>([
-    {
-      id: '1',
-      routeId: 'r1',
-      routeName: 'HCMC - Da Lat Express',
-      originStop: 'Ho Chi Minh City Terminal',
-      destinationStop: 'Da Lat Bus Station',
-      distanceKm: 308,
-      busId: 'b1',
-      busPlateNumber: '59A-12345',
-      busModel: 'Mercedes Sprinter',
-      busCapacity: 45,
-      busAmenities: ['wifi', 'ac', 'usb'],
-      operatorId: 'op1',
-      operatorName: 'National Express Vietnam',
-      operatorPhone: '+84 123 456 789',
-      operatorEmail: 'contact@nationalexpress.vn',
-      departureTime: '2024-12-01T08:00:00',
-      arrivalTime: '2024-12-01T14:30:00',
-      basePrice: 350000,
-      seatsBooked: 33,
-      totalSeats: 45,
-      status: 'completed',
-    },
-    {
-      id: '2',
-      routeId: 'r2',
-      routeName: 'Hanoi - Ha Long Bay Route',
-      originStop: 'Hanoi Central Station',
-      destinationStop: 'Ha Long Bay Terminal',
-      distanceKm: 165,
-      busId: 'b2',
-      busPlateNumber: '51B-67890',
-      busModel: 'Hyundai Universe',
-      busCapacity: 40,
-      busAmenities: ['wifi', 'ac'],
-      operatorId: 'op2',
-      operatorName: 'Vietnam Tours',
-      operatorPhone: '+84 987 654 321',
-      operatorEmail: 'info@vietnamtours.vn',
-      departureTime: '2024-12-15T09:00:00',
-      arrivalTime: '2024-12-15T12:45:00',
-      basePrice: 180000,
-      seatsBooked: 28,
-      totalSeats: 40,
-      status: 'active',
-    },
-    {
-      id: '3',
-      routeId: 'r1',
-      routeName: 'HCMC - Da Lat Express',
-      originStop: 'Ho Chi Minh City Terminal',
-      destinationStop: 'Da Lat Bus Station',
-      distanceKm: 308,
-      busId: 'b1',
-      busPlateNumber: '59A-12345',
-      busModel: 'Mercedes Sprinter',
-      busCapacity: 45,
-      busAmenities: ['wifi', 'ac', 'usb'],
-      operatorId: 'op1',
-      operatorName: 'National Express Vietnam',
-      operatorPhone: '+84 123 456 789',
-      operatorEmail: 'contact@nationalexpress.vn',
-      departureTime: '2024-12-20T14:00:00',
-      arrivalTime: '2024-12-20T20:30:00',
-      basePrice: 350000,
-      seatsBooked: 12,
-      totalSeats: 45,
+  const [trips, setTrips] = useState<Trip[]>([])
+  const [routes, setRoutes] = useState<Route[]>([])
+  const [buses, setBuses] = useState<Bus[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadingRoutes, setLoadingRoutes] = useState(false)
+  const [loadingBuses, setLoadingBuses] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deletingTrip, setDeletingTrip] = useState<Trip | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<TripFormData>({
+    defaultValues: {
+      routeId: '',
+      busId: '',
+      departureTime: '',
+      arrivalTime: '',
+      basePrice: 0,
       status: 'scheduled',
     },
-    {
-      id: '4',
-      routeId: 'r3',
-      routeName: 'Da Nang - Hue Coastal',
-      originStop: 'Da Nang Station',
-      destinationStop: 'Hue Bus Terminal',
-      distanceKm: 105,
-      busId: 'b3',
-      busPlateNumber: '29C-11111',
-      busModel: 'Thaco TB120S',
-      busCapacity: 35,
-      busAmenities: ['ac'],
-      operatorId: 'op3',
-      operatorName: 'Coastal Express',
-      operatorPhone: '+84 555 123 456',
-      operatorEmail: 'contact@coastalexpress.vn',
-      departureTime: '2024-12-18T07:30:00',
-      arrivalTime: '2024-12-18T10:00:00',
-      basePrice: 120000,
-      seatsBooked: 0,
-      totalSeats: 35,
-      status: 'cancelled',
-    },
-  ])
-
-  const [routes] = useState([
-    { id: 'r1', name: 'HCMC - Da Lat Express' },
-    { id: 'r2', name: 'Hanoi - Ha Long Bay Route' },
-    { id: 'r3', name: 'Da Nang - Hue Coastal' },
-  ])
-
-  const [buses] = useState([
-    { id: 'b1', info: '59A-12345 - Mercedes Sprinter (45 seats)', capacity: 45 },
-    { id: 'b2', info: '51B-67890 - Hyundai Universe (40 seats)', capacity: 40 },
-    { id: 'b3', info: '29C-11111 - Thaco TB120S (35 seats)', capacity: 35 },
-  ])
-
-  const [showModal, setShowModal] = useState(false)
-  const [editingTrip, setEditingTrip] = useState<Trip | null>(null)
-  const [filterStatus, setFilterStatus] = useState<string>('all')
-
-  const [formData, setFormData] = useState({
-    routeId: '',
-    busId: '',
-    departureTime: '',
-    arrivalTime: '',
-    basePrice: 0,
-    status: 'scheduled' as TripStatus,
   })
 
-  const handleOpenModal = (trip?: Trip) => {
-    if (trip) {
-      setEditingTrip(trip)
-      setFormData({
-        routeId: trip.routeId,
-        busId: trip.busId,
-        departureTime: trip.departureTime,
-        arrivalTime: trip.arrivalTime,
-        basePrice: trip.basePrice,
-        status: trip.status,
-      })
-    } else {
-      setEditingTrip(null)
-      setFormData({
-        routeId: '',
-        busId: '',
-        departureTime: '',
-        arrivalTime: '',
-        basePrice: 0,
-        status: 'scheduled',
-      })
+  // Fetch trips and reference data on component mount
+  useEffect(() => {
+    fetchTrips()
+    fetchRoutes()
+    fetchBuses()
+  }, [])
+
+  const fetchTrips = async () => {
+    try {
+      setLoading(true)
+      const response = await listTripsAPI({}, { page: 1, limit: 100 })
+      setTrips(response.data)
+    } catch (error) {
+      toast.error('Failed to fetch trips')
+      console.error('Error fetching trips:', error)
+    } finally {
+      setLoading(false)
     }
+  }
+
+  const fetchRoutes = async () => {
+    try {
+      setLoadingRoutes(true)
+      const response = await listRoutesAPI({}, { page: 1, limit: 100 })
+      setRoutes(response.data)
+    } catch (error) {
+      toast.error('Failed to fetch routes')
+      console.error('Error fetching routes:', error)
+    } finally {
+      setLoadingRoutes(false)
+    }
+  }
+
+  const fetchBuses = async () => {
+    try {
+      setLoadingBuses(true)
+      const response = await listBusesAPI({}, { page: 1, limit: 100 })
+      setBuses(response.data)
+    } catch (error) {
+      toast.error('Failed to fetch buses')
+      console.error('Error fetching buses:', error)
+    } finally {
+      setLoadingBuses(false)
+    }
+  }
+
+  const handleOpenModal = () => {
+    reset({
+      routeId: '',
+      busId: '',
+      departureTime: '',
+      arrivalTime: '',
+      basePrice: 0,
+      status: 'scheduled',
+    })
     setShowModal(true)
   }
 
   const handleCloseModal = () => {
     setShowModal(false)
-    setEditingTrip(null)
+    reset()
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    const route = routes.find((r) => r.id === formData.routeId)
-    const bus = buses.find((b) => b.id === formData.busId)
-
-    if (editingTrip) {
-      setTrips(
-        trips.map((trip) =>
-          trip.id === editingTrip.id
-            ? {
-                ...trip,
-                ...formData,
-                routeName: route?.name || '',
-                busPlateNumber: bus?.info.split(' - ')[0] || '',
-                busModel: bus?.info.split(' - ')[1]?.split(' (')[0] || '',
-                totalSeats: bus?.capacity || 0,
-                busCapacity: bus?.capacity || 0,
-              }
-            : trip
-        )
-      )
-    } else {
-      const newTrip: Trip = {
-        id: Date.now().toString(),
-        ...formData,
-        routeName: route?.name || '',
-        originStop: 'Origin Stop',
-        destinationStop: 'Destination Stop',
-        distanceKm: 0,
-        busPlateNumber: bus?.info.split(' - ')[0] || '',
-        busModel: bus?.info.split(' - ')[1]?.split(' (')[0] || '',
-        busAmenities: [],
-        operatorId: 'op1',
-        operatorName: 'Default Operator',
-        operatorPhone: '+84 000 000 000',
-        operatorEmail: 'operator@example.com',
-        seatsBooked: 0,
-        totalSeats: bus?.capacity || 0,
-        busCapacity: bus?.capacity || 0,
+  const onSubmit = async (data: TripFormData) => {
+    try {
+      const createData: CreateTripData = {
+        routeId: data.routeId,
+        busId: data.busId,
+        departureTime: data.departureTime,
+        arrivalTime: data.arrivalTime,
+        basePrice: data.basePrice,
+        status: data.status,
       }
-      setTrips([...trips, newTrip])
-    }
+      await createTripAPI(createData)
 
-    handleCloseModal()
-  }
-
-  const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this trip?')) {
-      setTrips(trips.filter((trip) => trip.id !== id))
+      // Refresh the trip list
+      await fetchTrips()
+      handleCloseModal()
+    } catch (error) {
+      console.error('Error creating trip:', error)
     }
   }
 
-  const filteredTrips = trips.filter((trip) => filterStatus === 'all' || trip.status === filterStatus)
+  const handleOpenDeleteModal = (trip: Trip) => {
+    setDeletingTrip(trip)
+    setShowDeleteModal(true)
+  }
 
-  const getStatusBadge = (status: string) => {
+  const handleCloseDeleteModal = () => {
+    setShowDeleteModal(false)
+    setDeletingTrip(null)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deletingTrip) return
+
+    try {
+      setIsDeleting(true)
+      await deleteTripAPI(deletingTrip.id)
+      await fetchTrips()
+      handleCloseDeleteModal()
+    } catch (error) {
+      toast.error('Failed to delete trip')
+      console.error('Error deleting trip:', error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const getStatusColor = (status: TripStatus) => {
     switch (status) {
       case 'scheduled':
-        return (
-          <Badge
-            variant="default"
-            className="gap-1 bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-300"
-          >
-            <Calendar className="w-4 h-4" />
-            Scheduled
-          </Badge>
-        )
+        return 'bg-blue-500 text-white'
       case 'active':
-        return (
-          <Badge
-            variant="default"
-            className="gap-1 bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900 dark:text-green-300"
-          >
-            <PlayCircle className="w-4 h-4" />
-            Active
-          </Badge>
-        )
+        return 'bg-green-500 text-white'
       case 'completed':
-        return (
-          <Badge
-            variant="default"
-            className="gap-1 bg-gray-100 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300"
-          >
-            <CheckCircle className="w-4 h-4" />
-            Completed
-          </Badge>
-        )
+        return 'bg-gray-500 text-white'
       case 'cancelled':
-        return (
-          <Badge
-            variant="default"
-            className="gap-1 bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900 dark:text-red-300"
-          >
-            <XCircle className="w-4 h-4" />
-            Cancelled
-          </Badge>
-        )
+        return 'bg-red-500 text-white'
       default:
-        return null
+        return 'bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
     }
   }
 
-  const getOccupancyColor = (percentage: number) => {
-    if (percentage >= 80) return 'text-red-600 dark:text-red-400'
-    if (percentage >= 50) return 'text-yellow-600 dark:text-yellow-400'
-    return 'text-green-600 dark:text-green-400'
+  const formatDateTime = (dateStr: string) => {
+    const date = new Date(dateStr)
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+    }).format(amount)
+  }
+
+  // Helper to get route name from routeId
+  const getRouteName = (routeId: string) => {
+    const route = routes.find((r) => r.id === routeId)
+    return route?.name || routeId
+  }
+
+  // Helper to get bus info from busId
+  const getBusInfo = (busId: string) => {
+    const bus = buses.find((b) => b.id === busId)
+    return bus ? { model: bus.model, plateNumber: bus.plateNumber } : { model: 'Unknown', plateNumber: busId }
+  }
+
+  // Pagination calculations
+  const totalPages = Math.ceil(trips.length / ITEMS_PER_PAGE)
+  const indexOfLastItem = currentPage * ITEMS_PER_PAGE
+  const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE
+  const currentTrips = trips.slice(indexOfFirstItem, indexOfLastItem)
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (
-    <div className="p-8">
-      {/* Header */}
+    <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Trip Management</h1>
-          <p className="text-gray-600 dark:text-gray-400">Schedule and manage bus trips</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Trip Management</h1>
+          <p className="text-gray-600">Manage your bus trips</p>
         </div>
-        <Button onClick={() => handleOpenModal()} className="flex items-center gap-2">
-          <Plus className="w-5 h-5" />
-          Schedule Trip
+
+        <Button
+          onClick={() => handleOpenModal()}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-6 text-base"
+        >
+          <Plus className="w-6 h-6" />
+          Add New Trip
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">Total Trips</p>
-                <p className="text-gray-900 dark:text-white text-2xl font-bold">{trips.length}</p>
-              </div>
-              <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
-                <Bus className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              </div>
+      {/* Trips Table */}
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-gray-500 dark:text-gray-400">Loading trips...</div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">Scheduled</p>
-                <p className="text-gray-900 dark:text-white text-2xl font-bold">
-                  {trips.filter((t) => t.status === 'scheduled').length}
-                </p>
-              </div>
-              <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
-                <Calendar className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              </div>
+          ) : trips.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-gray-500 dark:text-gray-400">No trips found. Add one to get started!</div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">Active</p>
-                <p className="text-gray-900 dark:text-white text-2xl font-bold">
-                  {trips.filter((t) => t.status === 'active').length}
-                </p>
-              </div>
-              <div className="bg-green-100 dark:bg-green-900 p-3 rounded-lg">
-                <PlayCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">Total Revenue</p>
-                <p className="text-gray-900 dark:text-white text-2xl font-bold">
-                  ₫{(trips.reduce((acc, t) => acc + t.basePrice * t.seatsBooked, 0) / 1000000).toFixed(1)}M
-                </p>
-              </div>
-              <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-lg">
-                <DollarSign className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filter Tabs */}
-      <Card className="mb-6">
-        <div className="flex gap-2 p-4 border-b border-gray-200 dark:border-gray-700">
-          {[
-            { value: 'all', label: 'All Trips' },
-            { value: 'scheduled', label: 'Scheduled' },
-            { value: 'active', label: 'Active' },
-            { value: 'completed', label: 'Completed' },
-            { value: 'cancelled', label: 'Cancelled' },
-          ].map((filter) => (
-            <Button
-              key={filter.value}
-              onClick={() => setFilterStatus(filter.value)}
-              variant={filterStatus === filter.value ? 'default' : 'outline'}
-            >
-              {filter.label}
-            </Button>
-          ))}
-        </div>
-
-        {/* Trips Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th className="px-6 py-3 text-left text-gray-700 dark:text-gray-300 font-semibold">Route</th>
-                <th className="px-6 py-3 text-left text-gray-700 dark:text-gray-300 font-semibold">Bus</th>
-                <th className="px-6 py-3 text-left text-gray-700 dark:text-gray-300 font-semibold">Departure</th>
-                <th className="px-6 py-3 text-left text-gray-700 dark:text-gray-300 font-semibold">Arrival</th>
-                <th className="px-6 py-3 text-left text-gray-700 dark:text-gray-300 font-semibold">Price</th>
-                <th className="px-6 py-3 text-left text-gray-700 dark:text-gray-300 font-semibold">Occupancy</th>
-                <th className="px-6 py-3 text-left text-gray-700 dark:text-gray-300 font-semibold">Status</th>
-                <th className="px-6 py-3 text-left text-gray-700 dark:text-gray-300 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredTrips.map((trip) => {
-                const occupancyPercentage = (trip.seatsBooked / trip.totalSeats) * 100
-                return (
-                  <tr
-                    key={trip.id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800"
-                    onClick={() => router.push(`/admin/trips/${trip.id}`)}
-                  >
-                    <td className="px-6 py-4">
-                      <Link
-                        href={`/admin/trips/${trip.id}`}
-                        className="text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
-                      >
-                        {trip.routeName}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-gray-600 dark:text-gray-400 text-sm">
-                        {trip.busPlateNumber} - {trip.busModel}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-gray-900 dark:text-white">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          {new Date(trip.departureTime).toLocaleDateString()}
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
-                          <Clock className="w-4 h-4 text-gray-400" />
-                          {new Date(trip.departureTime).toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-gray-900 dark:text-white">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          {new Date(trip.arrivalTime).toLocaleDateString()}
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 text-sm">
-                          <Clock className="w-4 h-4 text-gray-400" />
-                          {new Date(trip.arrivalTime).toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-gray-900 dark:text-white">₫{trip.basePrice.toLocaleString()}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-gray-400" />
-                          <span className="text-gray-900 dark:text-white">
-                            {trip.seatsBooked}/{trip.totalSeats}
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${
-                              occupancyPercentage >= 80
-                                ? 'bg-red-500'
-                                : occupancyPercentage >= 50
-                                ? 'bg-yellow-500'
-                                : 'bg-green-500'
-                            }`}
-                            style={{ width: `${occupancyPercentage}%` }}
-                          ></div>
-                        </div>
-                        <span className={`text-sm ${getOccupancyColor(occupancyPercentage)}`}>
-                          {occupancyPercentage.toFixed(0)}% full
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">{getStatusBadge(trip.status)}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleOpenModal(trip)
-                          }}
-                          variant="ghost"
-                          size="sm"
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900"
-                        >
-                          <Edit className="w-5 h-5" />
-                        </Button>
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDelete(trip.id)
-                          }}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </Button>
-                      </div>
-                    </td>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-800">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
+                      Trip ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
+                      Route
+                    </th>
+                    <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
+                      Bus
+                    </th>
+                    <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
+                      Departure
+                    </th>
+                    <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
+                      Arrival
+                    </th>
+                    <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
+                      Price
+                    </th>
+                    <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
+                      Actions
+                    </th>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {currentTrips.map((trip) => {
+                    const busInfo = getBusInfo(trip.busId)
+                    return (
+                      <tr
+                        key={trip.id}
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        onClick={() => router.push(`/admin/trips/${trip.id}`)}
+                      >
+                        <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">
+                          <span className="font-mono text-sm">{trip.id.substring(0, 8)}...</span>
+                        </td>
+                        <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">{getRouteName(trip.routeId)}</td>
+                        <td className="px-6 py-4">
+                          <div className="text-base text-gray-900 dark:text-gray-100">{busInfo.model}</div>
+                          <div className="text-sm text-gray-500">{busInfo.plateNumber}</div>
+                        </td>
+                        <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">
+                          {formatDateTime(trip.departureTime)}
+                        </td>
+                        <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">
+                          {formatDateTime(trip.arrivalTime)}
+                        </td>
+                        <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">
+                          {formatCurrency(trip.basePrice)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(trip.status)}`}>
+                            {trip.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(`/admin/trips/${trip.id}`)
+                              }}
+                              className="text-blue-600 hover:text-blue-700 transition-colors"
+                              title="Edit trip"
+                            >
+                              <Edit className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleOpenDeleteModal(trip)
+                              }}
+                              className="text-red-600 hover:text-red-700 transition-colors"
+                              title="Delete trip"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {!loading && trips.length > 0 && totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, trips.length)} of {trips.length} trips
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => handlePageChange(page)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      currentPage === page
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </CardContent>
       </Card>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deletingTrip && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Confirm Delete</h2>
+              <button
+                onClick={handleCloseDeleteModal}
+                disabled={isDeleting}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <p className="text-gray-700 dark:text-gray-300 mb-4">Are you sure you want to delete this trip?</p>
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2">
+                <p className="text-sm">
+                  <span className="font-medium text-gray-900 dark:text-white">Trip ID: </span>
+                  <span className="text-gray-700 dark:text-gray-300">{deletingTrip.id.substring(0, 8)}...</span>
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium text-gray-900 dark:text-white">Route: </span>
+                  <span className="text-gray-700 dark:text-gray-300">{getRouteName(deletingTrip.routeId)}</span>
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium text-gray-900 dark:text-white">Departure: </span>
+                  <span className="text-gray-700 dark:text-gray-300">{formatDateTime(deletingTrip.departureTime)}</span>
+                </p>
+              </div>
+              <p className="text-sm text-red-600 dark:text-red-400 mt-4">This action cannot be undone.</p>
+            </div>
+
+            <div className="flex gap-3 p-6 border-t border-gray-200 dark:border-gray-800">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCloseDeleteModal}
+                disabled={isDeleting}
+                className="flex-1 bg-white dark:bg-gray-800 py-6 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="flex-1 bg-red-600 hover:bg-red-700 py-6 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Trip'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {editingTrip ? 'Edit Trip' : 'Schedule New Trip'}
-              </h2>
-              <Button
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add New Trip</h2>
+              <button
                 onClick={handleCloseModal}
-                variant="ghost"
-                size="sm"
-                className="text-gray-400 hover:text-gray-600"
+                disabled={isSubmitting}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50"
               >
                 <X className="w-6 h-6" />
-              </Button>
+              </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6">
-              <div className="space-y-6">
-                {/* Route & Bus */}
-                <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleFormSubmit(onSubmit)} className="p-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-gray-700 dark:text-gray-300 mb-2 font-medium">
-                      Route <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Route</label>
                     <select
-                      value={formData.routeId}
-                      onChange={(e) => setFormData({ ...formData, routeId: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-800"
-                      required
+                      {...register('routeId', { required: 'Route is required' })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      disabled={loadingRoutes}
                     >
-                      <option value="">Select Route</option>
+                      <option value="">{loadingRoutes ? 'Loading routes...' : 'Select a route'}</option>
                       {routes.map((route) => (
                         <option key={route.id} value={route.id}>
                           {route.name}
                         </option>
                       ))}
                     </select>
+                    {errors.routeId && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.routeId.message}</p>
+                    )}
                   </div>
 
                   <div>
-                    <label className="block text-gray-700 dark:text-gray-300 mb-2 font-medium">
-                      Bus <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bus</label>
                     <select
-                      value={formData.busId}
-                      onChange={(e) => setFormData({ ...formData, busId: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-800"
-                      required
+                      {...register('busId', { required: 'Bus is required' })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      disabled={loadingBuses}
                     >
-                      <option value="">Select Bus</option>
+                      <option value="">{loadingBuses ? 'Loading buses...' : 'Select a bus'}</option>
                       {buses.map((bus) => (
                         <option key={bus.id} value={bus.id}>
-                          {bus.info}
+                          {bus.model} - {bus.plateNumber}
                         </option>
                       ))}
                     </select>
+                    {errors.busId && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.busId.message}</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Departure & Arrival Times */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-gray-700 dark:text-gray-300 mb-2 font-medium">
-                      Departure Time <span className="text-red-500">*</span>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Departure Time
                     </label>
                     <input
                       type="datetime-local"
-                      value={formData.departureTime.slice(0, 16)}
-                      onChange={(e) => setFormData({ ...formData, departureTime: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-800"
-                      required
+                      {...register('departureTime', { required: 'Departure time is required' })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
+                    {errors.departureTime && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.departureTime.message}</p>
+                    )}
                   </div>
 
                   <div>
-                    <label className="block text-gray-700 dark:text-gray-300 mb-2 font-medium">
-                      Arrival Time <span className="text-red-500">*</span>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Arrival Time
                     </label>
                     <input
                       type="datetime-local"
-                      value={formData.arrivalTime.slice(0, 16)}
-                      onChange={(e) => setFormData({ ...formData, arrivalTime: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-800"
-                      required
+                      {...register('arrivalTime', { required: 'Arrival time is required' })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
+                    {errors.arrivalTime && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.arrivalTime.message}</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Price & Status */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-gray-700 dark:text-gray-300 mb-2 font-medium">
-                      Base Price (VND) <span className="text-red-500">*</span>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Base Price (VND)
                     </label>
                     <input
                       type="number"
-                      value={formData.basePrice}
-                      onChange={(e) => setFormData({ ...formData, basePrice: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-800"
-                      min="0"
-                      step="1000"
-                      required
+                      {...register('basePrice', {
+                        required: 'Base price is required',
+                        min: { value: 0, message: 'Base price must be at least 0' },
+                        valueAsNumber: true,
+                      })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
+                    {errors.basePrice && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.basePrice.message}</p>
+                    )}
                   </div>
 
                   <div>
-                    <label className="block text-gray-700 dark:text-gray-300 mb-2 font-medium">
-                      Status <span className="text-red-500">*</span>
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
                     <select
-                      value={formData.status}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          status: e.target.value as TripStatus,
-                        })
-                      }
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white bg-white dark:bg-gray-800"
+                      {...register('status')}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     >
                       <option value="scheduled">Scheduled</option>
                       <option value="active">Active</option>
@@ -641,15 +566,26 @@ export default function TripManagementPage() {
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="flex items-center justify-end gap-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <Button type="button" onClick={handleCloseModal} variant="outline">
+              <div className="flex gap-3 mt-6">
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 py-6 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? 'Saving...' : 'Add Trip'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCloseModal}
+                  disabled={isSubmitting}
+                  className="flex-1 bg-white dark:bg-gray-800 py-6 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Cancel
                 </Button>
-                <Button type="submit">{editingTrip ? 'Update Trip' : 'Schedule Trip'}</Button>
               </div>
             </form>
-          </Card>
+          </div>
         </div>
       )}
     </div>

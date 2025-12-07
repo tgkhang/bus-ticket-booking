@@ -9,10 +9,14 @@ import ApiError from '~/utils/ApiError'
 const createNewBus = async (req, _res, next) => {
   const schema = Joi.object({
     operatorId: Joi.string().uuid().required(),
-    plateNumber: Joi.string().min(5).max(20).required().trim()
+    plateNumber: Joi.string()
+      .min(5)
+      .max(20)
+      .required()
+      .trim()
       .pattern(/^[A-Z0-9-]+$/)
       .messages({
-        'string.pattern.base': 'Plate number must contain only uppercase letters, numbers, and hyphens'
+        'string.pattern.base': 'Plate number must contain only uppercase letters, numbers, and hyphens',
       }),
     model: Joi.string().min(2).max(100).required().trim(),
     seatCapacity: Joi.number().integer().min(1).max(100).required(),
@@ -26,7 +30,7 @@ const createNewBus = async (req, _res, next) => {
       reading_light: Joi.boolean().default(false),
       blanket: Joi.boolean().default(false),
       water: Joi.boolean().default(false),
-    }).default({})
+    }).default({}),
   })
 
   try {
@@ -39,10 +43,13 @@ const createNewBus = async (req, _res, next) => {
 
 const updateBus = async (req, _res, next) => {
   const schema = Joi.object({
-    plateNumber: Joi.string().min(5).max(20).trim()
+    plateNumber: Joi.string()
+      .min(5)
+      .max(20)
+      .trim()
       .pattern(/^[A-Z0-9-]+$/)
       .messages({
-        'string.pattern.base': 'Plate number must contain only uppercase letters, numbers, and hyphens'
+        'string.pattern.base': 'Plate number must contain only uppercase letters, numbers, and hyphens',
       }),
     model: Joi.string().min(2).max(100).trim(),
     seatCapacity: Joi.number().integer().min(1).max(100),
@@ -57,7 +64,7 @@ const updateBus = async (req, _res, next) => {
       reading_light: Joi.boolean(),
       blanket: Joi.boolean(),
       water: Joi.boolean(),
-    })
+    }),
   }).min(1) // At least one field must be provided for update
 
   try {
@@ -73,10 +80,14 @@ const updateBus = async (req, _res, next) => {
 // ============================================
 
 const seatItemSchema = Joi.object({
-  seatNumber: Joi.string().min(1).max(10).required().trim()
+  seatNumber: Joi.string()
+    .min(1)
+    .max(10)
+    .required()
+    .trim()
     .pattern(/^[A-Z0-9]+$/)
     .messages({
-      'string.pattern.base': 'Seat number must contain only uppercase letters and numbers (e.g., A1, VIP1)'
+      'string.pattern.base': 'Seat number must contain only uppercase letters and numbers (e.g., A1, VIP1)',
     }),
   seatType: Joi.string().valid('regular', 'premium', 'sleeper').default('regular'),
   isActive: Joi.boolean().default(true),
@@ -85,10 +96,10 @@ const seatItemSchema = Joi.object({
 const createSeats = async (req, _res, next) => {
   // console.log('Validating createSeats with body:', req.body)
   const schema = Joi.object({
-    seats: Joi.array().items(seatItemSchema).min(1).required()
+    seats: Joi.array().items(seatItemSchema).min(1).required(),
   }).custom((value, helpers) => {
     // Check for duplicate seat numbers
-    const seatNumbers = value.seats.map(s => s.seatNumber.toUpperCase())
+    const seatNumbers = value.seats.map((s) => s.seatNumber.toUpperCase())
     if (new Set(seatNumbers).size !== seatNumbers.length) {
       return helpers.error('any.invalid', { message: 'Duplicate seat numbers found' })
     }
@@ -105,11 +116,26 @@ const createSeats = async (req, _res, next) => {
 
 const generateSeats = async (req, _res, next) => {
   const schema = Joi.object({
-    layout: Joi.string().valid('2-2', '2-3', '1-2', '2-1').required()
+    layout: Joi.string()
+      .valid(
+        '2-2',
+        '2-1',
+        '1-1',
+        '2-3',
+        '1-2',
+        'Sleeper-32',
+        'Sleeper-40',
+        'Cabin-VIP',
+        'Limo-9',
+        'Limo-16',
+        // 'City-Transit',
+        // 'Mini-Bus'
+      )
+      .required()
       .messages({
-        'any.only': 'Layout must be one of: 2-2, 2-3, 1-2, 2-1'
+        'any.only': 'Layout must be a valid bus type code (e.g., 2-2, Sleeper-32, Limo-9, etc.)',
       }),
-    rows: Joi.number().integer().min(1).max(20).required(),
+    rows: Joi.number().integer().min(1).max(30).required(),
     seatType: Joi.string().valid('regular', 'premium', 'sleeper').default('regular'),
     startRow: Joi.number().integer().min(1).default(1),
   })
@@ -124,10 +150,13 @@ const generateSeats = async (req, _res, next) => {
 
 const updateSeat = async (req, _res, next) => {
   const schema = Joi.object({
-    seatNumber: Joi.string().min(1).max(10).trim()
+    seatNumber: Joi.string()
+      .min(1)
+      .max(10)
+      .trim()
       .pattern(/^[A-Z0-9]+$/)
       .messages({
-        'string.pattern.base': 'Seat number must contain only uppercase letters and numbers'
+        'string.pattern.base': 'Seat number must contain only uppercase letters and numbers',
       }),
     seatType: Joi.string().valid('regular', 'premium', 'sleeper'),
     isActive: Joi.boolean(),

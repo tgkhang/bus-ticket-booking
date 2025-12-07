@@ -5,6 +5,7 @@ import { busRoute } from './busRoute'
 import { operatorRoute } from './operatorRoute'
 import { tripRoute } from './tripRoute'
 import { stopRoute } from './stopRoute'
+import { bookingRoute } from './bookingRoute'
 
 const Router = express.Router()
 
@@ -28,7 +29,9 @@ Router.use('/stops', stopRoute);
 
 Router.use('/routes', routeRoute)
 
-// Trip search route
-Router.use('/', tripRoute)
+Router.use('/trips', tripRoute)
+
+// Booking routes
+Router.use('/', bookingRoute)
 
 export const APIs_V1 = Router
