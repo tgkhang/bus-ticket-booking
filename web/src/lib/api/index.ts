@@ -64,9 +64,9 @@ export const oauthGoogleLoginAPI = async (userData: OAuthGoogleData) => {
 }
 
 // Stops API
-export const autocompleteStopsAPI = async (query: string, limit: number = 10) => {
+export const autocompleteStopsAPI = async (query: string, limit: number = 10, page: number = 1) => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/stops/autocomplete`, {
-    params: { q: query, limit },
+    params: { q: query, limit, page },
   })
   return response.data
 }
@@ -264,6 +264,11 @@ export const searchTripsAPI = async (params: {
 //=================================
 // Booking API Calls
 //=================================
+
+export const getTripByIdAPI = async (tripId: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${tripId}`)
+  return response.data
+}
 
 export const getSeatStatusesAPI = async (tripId: string) => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${tripId}/seats`)
