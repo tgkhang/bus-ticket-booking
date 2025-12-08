@@ -265,6 +265,11 @@ export const searchTripsAPI = async (params: {
 // Booking API Calls
 //=================================
 
+export const getTripByIdAPI = async (tripId: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${tripId}`)
+  return response.data
+}
+
 export const getSeatStatusesAPI = async (tripId: string) => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${tripId}/seats`)
   return response.data
