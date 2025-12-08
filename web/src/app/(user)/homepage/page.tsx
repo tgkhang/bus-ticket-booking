@@ -238,7 +238,7 @@ export default function UserHomePage() {
                         <button
                           key={stop.id}
                           type="button"
-                          onClick={() => {
+                          onMouseDown={() => {
                             setSearchData({ ...searchData, from: stop.name })
                             setSelectedOriginStop(stop)
                             setShowFromDropdown(false)
@@ -290,7 +290,7 @@ export default function UserHomePage() {
                         <button
                           key={stop.id}
                           type="button"
-                          onClick={() => {
+                          onMouseDown={() => {
                             setSearchData({ ...searchData, to: stop.name })
                             setSelectedDestinationStop(stop)
                             setShowToDropdown(false)
