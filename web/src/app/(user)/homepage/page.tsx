@@ -50,6 +50,14 @@ export default function UserHomePage() {
   const [selectedOriginStop, setSelectedOriginStop] = useState<Stop | null>(null)
   const [selectedDestinationStop, setSelectedDestinationStop] = useState<Stop | null>(null)
 
+  // Pagination state
+  const [fromPage, setFromPage] = useState(1)
+  const [toPage, setToPage] = useState(1)
+  const [hasMoreFrom, setHasMoreFrom] = useState(true)
+  const [hasMoreTo, setHasMoreTo] = useState(true)
+  const [loadingFrom, setLoadingFrom] = useState(false)
+  const [loadingTo, setLoadingTo] = useState(false)
+
   // Mock data - in production, fetch from API
   const recentSearches: RecentSearch[] = []
 
@@ -88,38 +96,62 @@ export default function UserHomePage() {
     },
   ]
 
+  const fetchStops = async (query: string, page: number, type: 'from' | 'to') => {
+    try {
+      if (type === 'from') setLoadingFrom(true)
+      else setLoadingTo(true)
+
+      const limit = 5
+      const results = await autocompleteStopsAPI(query, limit, page)
+      
+      if (type === 'from') {
+        if (page === 1) setFromSuggestions(results)
+        else setFromSuggestions(prev => [...prev, ...results])
+        setHasMoreFrom(results.length === limit)
+      } else {
+        if (page === 1) setToSuggestions(results)
+        else setToSuggestions(prev => [...prev, ...results])
+        setHasMoreTo(results.length === limit)
+      }
+    } catch (error) {
+      console.error(error)
+    } finally {
+      if (type === 'from') setLoadingFrom(false)
+      else setLoadingTo(false)
+    }
+  }
+
   // Debounced search for suggestions
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (searchData.from && searchData.from.length >= 2) {
-        try {
-          const results = await autocompleteStopsAPI(searchData.from, 5)
-          setFromSuggestions(results)
-        } catch (error) {
-          setFromSuggestions([])
-        }
-      } else {
-        setFromSuggestions([])
-      }
+    const timer = setTimeout(() => {
+      setFromPage(1)
+      fetchStops(searchData.from, 1, 'from')
     }, 300)
     return () => clearTimeout(timer)
   }, [searchData.from])
 
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (searchData.to && searchData.to.length >= 2) {
-        try {
-          const results = await autocompleteStopsAPI(searchData.to, 5)
-          setToSuggestions(results)
-        } catch (error) {
-          setToSuggestions([])
-        }
-      } else {
-        setToSuggestions([])
-      }
+    const timer = setTimeout(() => {
+      setToPage(1)
+      fetchStops(searchData.to, 1, 'to')
     }, 300)
     return () => clearTimeout(timer)
   }, [searchData.to])
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>, type: 'from' | 'to') => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    if (scrollHeight - scrollTop <= clientHeight + 1) { // +1 for tolerance
+      if (type === 'from' && hasMoreFrom && !loadingFrom) {
+        const nextPage = fromPage + 1
+        setFromPage(nextPage)
+        fetchStops(searchData.from, nextPage, 'from')
+      } else if (type === 'to' && hasMoreTo && !loadingTo) {
+        const nextPage = toPage + 1
+        setToPage(nextPage)
+        fetchStops(searchData.to, nextPage, 'to')
+      }
+    }
+  }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -198,7 +230,10 @@ export default function UserHomePage() {
                   <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   
                   {showFromDropdown && fromSuggestions.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    <div 
+                      className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                      onScroll={(e) => handleScroll(e, 'from')}
+                    >
                       {fromSuggestions.map((stop) => (
                         <button
                           key={stop.id}
@@ -219,6 +254,9 @@ export default function UserHomePage() {
                           </div>
                         </button>
                       ))}
+                      {loadingFrom && (
+                        <div className="p-2 text-center text-gray-500 text-sm">Loading...</div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -244,7 +282,10 @@ export default function UserHomePage() {
                   <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                   
                   {showToDropdown && toSuggestions.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    <div 
+                      className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                      onScroll={(e) => handleScroll(e, 'to')}
+                    >
                       {toSuggestions.map((stop) => (
                         <button
                           key={stop.id}
@@ -265,6 +306,9 @@ export default function UserHomePage() {
                           </div>
                         </button>
                       ))}
+                      {loadingTo && (
+                        <div className="p-2 text-center text-gray-500 text-sm">Loading...</div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -62,12 +62,20 @@ const listStops = async (filters, pagination) => {
   return await stopModel.getStops(filters, pagination)
 }
 
-const autocompleteStops = async (query, limit = 10) => {
+const autocompleteStops = async (query, limit = 10, page = 1) => {
   try {
     if (!query || query.trim().length === 0) {
-      return []
+      // If no query, return all stops (paginated)
+      const stops = await stopModel.searchStops('', limit, page)
+      return stops.map((stop) => ({
+        id: stop.id,
+        name: stop.name,
+        address: stop.address,
+        latitude: stop.latitude,
+        longitude: stop.longitude,
+      }))
     }
-    const stops = await stopModel.searchStops(query.trim(), limit)
+    const stops = await stopModel.searchStops(query.trim(), limit, page)
     return stops.map((stop) => ({
       id: stop.id,
       name: stop.name,

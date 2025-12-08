@@ -132,8 +132,8 @@ const deleteStop = async (req, res, next) => {
 
 const autocompleteStops = async (req, res, next) => {
   try {
-    const { q, limit } = req.query
-    const result = await routeService.autocompleteStops(q, limit ? parseInt(limit) : 10)
+    const { q, limit, page } = req.query
+    const result = await routeService.autocompleteStops(q, limit ? parseInt(limit) : 10, page ? parseInt(page) : 1)
     res.status(StatusCodes.OK).json(result)
   } catch (error) {
     next(error)

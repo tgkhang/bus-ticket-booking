@@ -62,9 +62,10 @@ const findMany = async (filter = {}) => {
   }
 }
 
-const searchStops = async (query, limit = 10) => {
+const searchStops = async (query, limit = 10, page = 1) => {
   try {
     const prisma = GET_DB()
+    const skip = (page - 1) * limit
     return await prisma.stop.findMany({
       where: {
         AND: [
@@ -79,6 +80,7 @@ const searchStops = async (query, limit = 10) => {
       },
       orderBy: { name: 'asc' },
       take: limit,
+      skip: skip,
     })
   } catch (error) {
     throw new Error(error)
