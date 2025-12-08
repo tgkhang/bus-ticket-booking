@@ -84,12 +84,6 @@ export interface Bus {
     status: string
     approvedAt?: string
   }
-  seats?: Array<{
-    id: string
-    seatNumber: string
-    seatType: string
-    isActive: boolean
-  }>
 }
 
 // =================================
