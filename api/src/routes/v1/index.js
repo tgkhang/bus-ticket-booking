@@ -5,6 +5,8 @@ import { busRoute } from './busRoute'
 import { operatorRoute } from './operatorRoute'
 import { tripRoute } from './tripRoute'
 import { stopRoute } from './stopRoute'
+
+import { eTicketRoute } from './eTicketRoute'
 import { bookingRoute } from './bookingRoute'
 
 const Router = express.Router()
@@ -31,6 +33,9 @@ Router.use('/routes', routeRoute)
 
 Router.use('/trips', tripRoute)
 
+
+// E-ticket routes
+Router.use('/', eTicketRoute)
 // Booking routes
 Router.use('/', bookingRoute)
 

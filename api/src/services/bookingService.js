@@ -52,6 +52,9 @@ const createBooking = async (userId, bookingData) => {
           tripId,
           seatId: { in: seatIds },
         },
+        include: {
+          seat: true,
+        },
       })
 
       if (seatStatuses.length !== seatIds.length) {
@@ -73,12 +76,15 @@ const createBooking = async (userId, bookingData) => {
         },
       })
 
+      // Map seatId to seatNumber
+      const seatIdToNumber = Object.fromEntries(seatStatuses.map(s => [s.seatId, s.seat.seatNumber]))
+
       // Create passenger details
       const passengerData = passengers.map((p, index) => ({
         bookingId: newBooking.id,
         fullName: p.fullName.trim(),
         documentId: p.documentId.trim(),
-        seatCode: p.seatCode || seatIds[index], // Use provided seatCode or fallback to seatId
+        seatCode: seatIdToNumber[seatIds[index]],
       }))
 
       await tx.passengerDetail.createMany({
