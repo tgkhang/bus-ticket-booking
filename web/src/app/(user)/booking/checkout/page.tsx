@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBookingAPI, getTripByIdAPI } from '@/lib/api'
+import { sendETicketEmailAPI } from '@/lib/api/eTicket'
 import {
   ArrowLeft,
   Check,
@@ -127,7 +128,8 @@ function CheckoutContent() {
 
       // Create booking
       const response = await createBookingAPI(bookingPayload)
-      
+      // Send e-ticket email
+      await sendETicketEmailAPI(response.id)
       // Simulate payment processing
       await new Promise((resolve) => setTimeout(resolve, 2000))
 

@@ -3,6 +3,8 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getBookingByIdAPI } from '@/lib/api'
+import { downloadETicketAPI, sendETicketEmailAPI } from '@/lib/api/eTicket'
+import QRCode from 'react-qr-code'
 import { CheckCircle, Ticket, ArrowRight, Printer, Download, QrCode, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -45,8 +47,21 @@ function ConfirmationContent() {
     window.print()
   }
 
-  const handleDownload = () => {
-    toast.info('PDF download functionality will be implemented')
+  const handleDownload = async () => {
+    if (!bookingId) return
+    try {
+      const blob = await downloadETicketAPI(bookingId)
+      const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `e-ticket-${bookingId}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.parentNode?.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      toast.error('Failed to download PDF')
+    }
   }
 
   if (loading) {
@@ -184,12 +199,17 @@ function ConfirmationContent() {
               </div>
             </div>
 
-            {/* QR Code Placeholder */}
+            {/* QR Code */}
             <div className="flex items-center justify-center mb-6 pb-6 border-b border-gray-200">
               <div className="bg-gray-100 w-48 h-48 rounded-lg flex items-center justify-center">
                 <div className="text-center">
-                  <QrCode className="w-24 h-24 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500 text-sm">Scan at boarding</p>
+                  {booking && (
+                    <QRCode
+                      value={`https://domain.com/admin/verify-ticket?bookingId=${booking.id}`}
+                      size={160}
+                    />
+                  )}
+                  <p className="text-gray-500 text-sm mt-2">Scan at boarding</p>
                 </div>
               </div>
             </div>
