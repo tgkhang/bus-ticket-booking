@@ -61,7 +61,7 @@ const confirmBooking = async (req, res, next) => {
   })
 
   const bodySchema = Joi.object({
-    provider: Joi.string().valid('card', 'paypal', 'vnpay', 'momo').optional().default('card'),
+    provider: Joi.string().valid('card', 'paypal', 'vnpay', 'momo', 'payos').optional().default('card'),
     transactionRef: Joi.string().optional(),
   })
 

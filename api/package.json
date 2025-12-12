@@ -24,6 +24,7 @@
   "dependencies": {
     "@babel/runtime": "^7.28.4",
     "@getbrevo/brevo": "^3.0.1",
+    "@payos/node": "^2.0.3",
     "@prisma/client": "^6.19.0",
     "async-exit-hook": "^2.0.1",
     "bcryptjs": "^3.0.3",
@@ -44,6 +45,7 @@
     "pdfkit": "^0.17.2",
     "qrcode": "^1.5.4",
     "streamifier": "^0.1.1",
+    "stripe": "^20.0.0",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^13.0.0",
     "yamljs": "^0.3.0"

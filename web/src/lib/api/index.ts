@@ -325,3 +325,9 @@ export const cancelBookingAPI = async (bookingId: string) => {
   toast.success('Booking cancelled successfully')
   return response.data
 }
+
+//=================================
+// Payment API Calls
+//=================================
+
+export { createPaymentLinkAPI, getPaymentLinkInfoAPI } from './payment'

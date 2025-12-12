@@ -91,7 +91,9 @@ const createBooking = async (userId, bookingData) => {
         data: passengerData,
       })
 
-      // Update seat statuses to booked
+      // Keep seats locked until payment confirmation (extend lock to 30 minutes)
+      const lockUntil = new Date(Date.now() + 30 * 60 * 1000) // 30 minutes for payment
+
       const updateResult = await tx.seatStatus.updateMany({
         where: {
           tripId,
@@ -99,13 +101,13 @@ const createBooking = async (userId, bookingData) => {
           status: { in: ['available', 'locked'] }, // Can book if available or locked
         },
         data: {
-          status: 'booked',
-          lockedUntil: null,
+          status: 'locked', // Keep locked until payment confirmed
+          lockedUntil: lockUntil,
         },
       })
 
       if (updateResult.count !== seatIds.length) {
-        throw new ApiError(StatusCodes.CONFLICT, 'Failed to book all seats. Some seats may have been taken by another user.')
+        throw new ApiError(StatusCodes.CONFLICT, 'Failed to reserve all seats. Some seats may have been taken by another user.')
       }
 
       console.log('Booking created successfully:', newBooking.id)
@@ -316,6 +318,33 @@ const confirmBooking = async (bookingId, userId, paymentData) => {
       },
     })
 
+    // Get seat IDs from passenger details to mark as booked
+    const seatCodes = booking.passengerDetails.map((p) => p.seatCode)
+
+    // Find seat IDs from seat codes
+    const seats = await tx.seat.findMany({
+      where: {
+        seatNumber: { in: seatCodes },
+        busId: booking.trip.busId,
+      },
+    })
+
+    const seatIds = seats.map((s) => s.id)
+
+    // Mark seats as booked and remove lock
+    if (seatIds.length > 0) {
+      await tx.seatStatus.updateMany({
+        where: {
+          tripId: booking.tripId,
+          seatId: { in: seatIds },
+        },
+        data: {
+          status: 'booked',
+          lockedUntil: null,
+        },
+      })
+    }
+
     return updatedBooking
   })
 
@@ -352,11 +381,11 @@ const cancelBooking = async (bookingId, userId) => {
 
     // Get seat IDs from passenger details
     const seatCodes = booking.passengerDetails.map((p) => p.seatCode)
-    
+
     // Find seat IDs from seat codes
     const seats = await tx.seat.findMany({
       where: {
-        seatCode: { in: seatCodes },
+        seatNumber: { in: seatCodes },
         busId: booking.trip.busId,
       },
     })
