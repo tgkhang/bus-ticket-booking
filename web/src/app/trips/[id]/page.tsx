@@ -370,7 +370,10 @@ export default function TripDetailsPage() {
                     </div>
 
                     <div className="pt-4">
-                      <Button className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg" onClick={() => toast.info('Booking flow coming soon!')}>
+                      <Button 
+                        className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg" 
+                        onClick={() => router.push(`/booking/seats/${trip.id}?passengers=1`)}
+                      >
                         Book Now
                       </Button>
                       <p className="text-xs text-center text-gray-500 mt-2">

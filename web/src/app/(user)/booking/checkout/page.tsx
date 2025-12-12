@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBookingAPI, getTripByIdAPI } from '@/lib/api'
 import { sendETicketEmailAPI } from '@/lib/api/eTicket'
+import { createPaymentLinkAPI } from '@/lib/api/payment'
 import {
   ArrowLeft,
   Check,
@@ -14,6 +16,7 @@ import {
   QrCode,
   Loader2,
   AlertCircle,
+  XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -28,13 +31,6 @@ function CheckoutContent() {
   const [loading, setLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState(false)
 
-  const [paymentMethod, setPaymentMethod] = useState('card')
-  const [cardDetails, setCardDetails] = useState({
-    cardNumber: '',
-    expiry: '',
-    cvv: '',
-    cardName: '',
-  })
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [timeLeft, setTimeLeft] = useState(600) // 10 minutes in seconds
 
@@ -96,16 +92,67 @@ function CheckoutContent() {
       return
     }
 
-    if (paymentMethod === 'card') {
-      if (
-        !cardDetails.cardNumber ||
-        !cardDetails.expiry ||
-        !cardDetails.cvv ||
-        !cardDetails.cardName
-      ) {
-        toast.error('Please fill in all card details')
-        return
+    setIsProcessing(true)
+
+    try {
+      const seatIds = bookingData.seats.split(',')
+      const bookingPayload = {
+        tripId: bookingData.tripId,
+        seatIds: seatIds,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        passengers: bookingData.passengers.map((p: any, index: number) => ({
+          fullName: p.fullName,
+          documentId: p.documentId,
+          seatCode: seatIds[index],
+        })),
+        totalAmount: Number(bookingData.totalPrice),
       }
+
+      // console.log('Creating booking with payload:', bookingPayload)
+
+      // Create booking first
+      const booking = await createBookingAPI(bookingPayload)
+
+      // Prepare payment items
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const paymentItems = bookingData.passengers.map((p: any, index: number) => ({
+        name: `${trip.route?.originStop?.name} → ${trip.route?.destinationStop?.name} - ${p.fullName}`,
+        quantity: 1,
+        price: Math.floor(Number(bookingData.totalPrice) / bookingData.passengers.length),
+      }))
+
+      // Create PayOS payment link (description max 25 chars)
+      const paymentData = {
+        amount: Number(bookingData.totalPrice),
+        description: 'Bus ticket booking',
+        items: paymentItems,
+        bookingId: booking.id, // UUID string
+      }
+
+      // console.log('Creating payment link with data:', paymentData)
+
+      const paymentResponse = await createPaymentLinkAPI(paymentData)
+
+      // Redirect to PayOS checkout page
+      if (paymentResponse.success && paymentResponse.checkoutUrl) {
+        window.location.href = paymentResponse.checkoutUrl
+      } else {
+        throw new Error('Failed to create payment link')
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      console.error('Payment failed:', err)
+      const errorMessage = err.response?.data?.message || err.message || 'Payment failed. Please try again.'
+      toast.error(errorMessage)
+      setIsProcessing(false)
+    }
+  }
+
+  // Development only: Simulate successful payment without PayOS
+  const handleDevPayment = async () => {
+    if (!agreedToTerms) {
+      toast.error('Please agree to the terms and conditions')
+      return
     }
 
     setIsProcessing(true)
@@ -119,28 +166,74 @@ function CheckoutContent() {
         passengers: bookingData.passengers.map((p: any, index: number) => ({
           fullName: p.fullName,
           documentId: p.documentId,
-          seatCode: seatIds[index], // Using seatId as code for now
+          seatCode: seatIds[index],
         })),
-        totalAmount: Number(bookingData.totalPrice), // Ensure it's a number
+        totalAmount: Number(bookingData.totalPrice),
       }
 
       console.log('Creating booking with payload:', bookingPayload)
 
       // Create booking
-      const response = await createBookingAPI(bookingPayload)
-      // Send e-ticket email
-      await sendETicketEmailAPI(response.id)
-      // Simulate payment processing
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const booking = await createBookingAPI(bookingPayload)
 
-      // Navigate to confirmation
-      // Backend returns booking directly (not wrapped in { data: ... })
-      router.push(
-        `/booking/confirmation?bookingId=${response.id}&bookingRef=${response.id}`
-      )
+      // Send e-ticket email
+      await sendETicketEmailAPI(booking.id)
+
+      // Simulate payment processing
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      toast.success('Payment simulated successfully!')
+
+      // Redirect to success page
+      router.push(`/payment/success?bookingId=${booking.id}`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
-      console.error('Payment failed:', err)
-      const errorMessage = err.response?.data?.message || err.message || 'Payment failed. Please try again.'
+      console.error('Dev payment failed:', err)
+      const errorMessage = err.response?.data?.message || err.message || 'Payment simulation failed.'
+      toast.error(errorMessage)
+      setIsProcessing(false)
+    }
+  }
+
+  // Development only: Simulate payment cancellation
+  const handleDevCancelPayment = async () => {
+    if (!agreedToTerms) {
+      toast.error('Please agree to the terms and conditions')
+      return
+    }
+
+    setIsProcessing(true)
+
+    try {
+      // Prepare booking payload
+      const seatIds = bookingData.seats.split(',')
+      const bookingPayload = {
+        tripId: bookingData.tripId,
+        seatIds: seatIds,
+        passengers: bookingData.passengers.map((p: any, index: number) => ({
+          fullName: p.fullName,
+          documentId: p.documentId,
+          seatCode: seatIds[index],
+        })),
+        totalAmount: Number(bookingData.totalPrice),
+      }
+
+      console.log('Creating booking with payload:', bookingPayload)
+
+      // Create booking
+      const booking = await createBookingAPI(bookingPayload)
+
+      // Simulate payment processing delay
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      toast.info('Payment cancellation simulated')
+
+      // Redirect to cancel page (seats will be released automatically)
+      router.push(`/payment/cancel?bookingId=${booking.id}&orderCode=DEV_CANCEL`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (err: any) {
+      console.error('Dev cancel payment failed:', err)
+      const errorMessage = err.response?.data?.message || err.message || 'Cancellation simulation failed.'
       toast.error(errorMessage)
       setIsProcessing(false)
     }
@@ -242,9 +335,7 @@ function CheckoutContent() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Passengers:</span>
-                    <span className="text-gray-900 dark:text-white font-medium">
-                      {bookingData.passengers.length}
-                    </span>
+                    <span className="text-gray-900 dark:text-white font-medium">{bookingData.passengers.length}</span>
                   </div>
                   {bookingData.passengers.map((p: any, idx: number) => (
                     <div key={idx} className="flex justify-between pl-4 text-sm">
@@ -255,141 +346,52 @@ function CheckoutContent() {
                 </div>
               </div>
 
-              {/* Payment Method Selection (Mock UI) */}
+              {/* Payment Method - PayOS */}
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Payment Method</h2>
 
-                <div className="space-y-3 mb-6">
-                  <label className="flex items-center gap-3 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-blue-600 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-900/20">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="card"
-                      checked={paymentMethod === 'card'}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <CreditCard className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Credit/Debit Card</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Visa, Mastercard, AMEX</p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-blue-600 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-900/20">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="ewallet"
-                      checked={paymentMethod === 'ewallet'}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <Smartphone className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">E-Wallet</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Momo, ZaloPay, VNPay</p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-blue-600 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-900/20">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="bank"
-                      checked={paymentMethod === 'bank'}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <Building2 className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Bank Transfer</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Direct bank transfer</p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-blue-600 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-900/20">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="qr"
-                      checked={paymentMethod === 'qr'}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <QrCode className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">QR Code Payment</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Scan to pay</p>
-                    </div>
-                  </label>
-                </div>
-
-                {/* Mock Card Details Form */}
-                {paymentMethod === 'card' && (
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Card Number
-                      </label>
-                      <input
-                        type="text"
-                        value={cardDetails.cardNumber}
-                        onChange={(e) =>
-                          setCardDetails({ ...cardDetails, cardNumber: e.target.value })
-                        }
-                        placeholder="1234 5678 9012 3456"
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white dark:bg-gray-700"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Expiry Date
-                        </label>
-                        <input
-                          type="text"
-                          value={cardDetails.expiry}
-                          onChange={(e) =>
-                            setCardDetails({ ...cardDetails, expiry: e.target.value })
-                          }
-                          placeholder="MM/YY"
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white dark:bg-gray-700"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          CVV
-                        </label>
-                        <input
-                          type="text"
-                          value={cardDetails.cvv}
-                          onChange={(e) =>
-                            setCardDetails({ ...cardDetails, cvv: e.target.value })
-                          }
-                          placeholder="123"
-                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white dark:bg-gray-700"
-                        />
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-6">
+                  <div className="flex items-start gap-4">
+                    <div className="shrink-0">
+                      <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <CreditCard className="w-8 h-8 text-white" />
                       </div>
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Cardholder Name
-                      </label>
-                      <input
-                        type="text"
-                        value={cardDetails.cardName}
-                        onChange={(e) =>
-                          setCardDetails({ ...cardDetails, cardName: e.target.value })
-                        }
-                        placeholder="John Doe"
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white dark:bg-gray-700"
-                      />
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                        PayOS Payment Gateway
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                        Secure payment with multiple options
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-white dark:bg-gray-700 rounded-full text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                          <CreditCard className="w-3 h-3" />
+                          Credit/Debit Card
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-white dark:bg-gray-700 rounded-full text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                          <Smartphone className="w-3 h-3" />
+                          E-Wallet
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-white dark:bg-gray-700 rounded-full text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                          <Building2 className="w-3 h-3" />
+                          Bank Transfer
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-3 py-1 bg-white dark:bg-gray-700 rounded-full text-xs font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
+                          <QrCode className="w-3 h-3" />
+                          QR Code
+                        </span>
+                      </div>
                     </div>
                   </div>
-                )}
+                </div>
+
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 mb-6">
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    After clicking &quot;Continue to Payment&quot;, you will be redirected to PayOS secure payment page
+                    where you can choose your preferred payment method.
+                  </p>
+                </div>
 
                 {/* Terms and Conditions */}
                 <div className="mt-6">
@@ -461,18 +463,60 @@ function CheckoutContent() {
                   {isProcessing ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      Processing...
+                      Redirecting to PayOS...
                     </>
                   ) : (
                     <>
                       <CreditCard className="w-5 h-5" />
-                      Complete Payment
+                      Continue to Payment
                     </>
                   )}
                 </Button>
 
+                {/* Development Mode: Skip Payment Button */}
+                {process.env.NODE_ENV === 'development' && (
+                  <>
+                    <Button
+                      type="button"
+                      onClick={handleDevPayment}
+                      disabled={isProcessing}
+                      className="w-full mt-3 bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-md transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-5 h-5" />
+                          Skip Payment (Dev Only)
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleDevCancelPayment}
+                      disabled={isProcessing}
+                      className="w-full mt-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-md transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="w-5 h-5" />
+                          Cancel Payment (Dev Only)
+                        </>
+                      )}
+                    </Button>
+                  </>
+                )}
+
                 <p className="text-gray-600 dark:text-gray-400 text-center text-xs mt-4">
-                  🔒 Secure payment powered by Stripe
+                  🔒 Secure payment powered by PayOS
                 </p>
               </div>
             </div>
