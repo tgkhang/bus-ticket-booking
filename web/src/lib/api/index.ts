@@ -275,15 +275,6 @@ export const getSeatStatusesAPI = async (tripId: string) => {
   return response.data
 }
 
-export const lockSeatsAPI = async (tripId: string, seatIds: string[], lockDuration: number = 10) => {
-  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/bookings/lock-seats`, {
-    tripId,
-    seatIds,
-    lockDuration,
-  })
-  return response.data
-}
-
 export const createBookingAPI = async (bookingData: {
   tripId: string
   seatIds: string[]
@@ -331,3 +322,22 @@ export const cancelBookingAPI = async (bookingId: string) => {
 //=================================
 
 export { createPaymentLinkAPI, getPaymentLinkInfoAPI } from './payment'
+
+//=================================
+// Seat API Calls
+//=================================
+
+export const lockSeatsAPI = async (tripId: string, seatIds: string[]) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/seats/lock`, { tripId, seatIds })
+  return response.data
+}
+
+export const unlockSeatsAPI = async (tripId: string, seatIds: string[]) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/seats/unlock`, { tripId, seatIds })
+  return response.data
+}
+
+export const getLockedSeatsAPI = async (tripId: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/seats/locked/${tripId}`)
+  return response.data
+}

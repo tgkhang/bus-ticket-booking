@@ -6,6 +6,10 @@ const createBooking = async (req, res, next) => {
     const userId = req.jwtDecoded.id
     const bookingData = req.body
     const booking = await bookingService.createBooking(userId, bookingData)
+    // Notify clients that seats are now booked
+    if (bookingData?.tripId && Array.isArray(bookingData?.seatIds) && bookingData.seatIds.length > 0) {
+      req.io.emit('seats:booked', { tripId: bookingData.tripId, seatIds: bookingData.seatIds })
+    }
     res.status(StatusCodes.CREATED).json(booking)
   } catch (error) {
     next(error)
@@ -38,16 +42,6 @@ const getUserBookings = async (req, res, next) => {
   }
 }
 
-const lockSeats = async (req, res, next) => {
-  try {
-    const { tripId, seatIds, lockDuration } = req.body
-    const result = await bookingService.lockSeats(tripId, seatIds, lockDuration)
-    res.status(StatusCodes.OK).json(result)
-  } catch (error) {
-    next(error)
-  }
-}
-
 const getSeatStatuses = async (req, res, next) => {
   try {
     const { tripId } = req.params
@@ -64,6 +58,12 @@ const confirmBooking = async (req, res, next) => {
     const userId = req.jwtDecoded.id
     const paymentData = req.body
     const booking = await bookingService.confirmBooking(id, userId, paymentData)
+    // If service returns seatIdsBooked, broadcast booked event
+    if (booking?.__meta?.seatIdsBooked && booking?.tripId) {
+      req.io.emit('seats:booked', { tripId: booking.tripId, seatIds: booking.__meta.seatIdsBooked })
+      // Clean meta before responding
+      delete booking.__meta
+    }
     res.status(StatusCodes.OK).json(booking)
   } catch (error) {
     next(error)
@@ -85,7 +85,6 @@ export const bookingController = {
   createBooking,
   getBookingById,
   getUserBookings,
-  lockSeats,
   getSeatStatuses,
   confirmBooking,
   cancelBooking,

@@ -67,8 +67,24 @@ const refreshToken = async (req, res, next) => {
   }
 }
 
+import { seatLockService } from '~/services/seatLockService'
+
 const logout = async (req, res, next) => {
   try {
+    // Release any locks held by the user
+    if (req.user?.id || req.jwtDecoded?.id) {
+      const userId = req.user?.id || req.jwtDecoded?.id
+      const unlocked = await seatLockService.unlockAllUserLocks(userId)
+      if (unlocked) {
+        Object.keys(unlocked).forEach(tripId => {
+          req.io.emit('seats:unlocked', { 
+            tripId, 
+            seatIds: unlocked[tripId] 
+          })
+        })
+      }
+    }
+
     await userService.logout(req.cookies?.refreshToken, req)
 
     // Clear cookies with same options used when setting

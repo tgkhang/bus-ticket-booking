@@ -66,9 +66,10 @@ const releaseExpiredLocks = async () => {
   const prisma = GET_DB()
   await prisma.seatStatus.updateMany({
     where: {
-      status: 'locked',
+      status: { in: ['locked', 'booked'] },
       lockedUntil: {
         lt: new Date(),
+        not: null
       },
     },
     data: {

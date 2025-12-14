@@ -51,7 +51,7 @@ Router.route('/login').post(authLimiter, userValidation.login, userController.lo
 
 Router.route('/refresh_token').get(generalLimiter, userController.refreshToken)
 
-Router.route('/logout').delete(userController.logout)
+Router.route('/logout').delete(authMiddleware.isAuthorized, userController.logout)
 
 // OAuth routes
 Router.route('/oauth/google').post(generalLimiter, userController.oauthGoogleLogin)
