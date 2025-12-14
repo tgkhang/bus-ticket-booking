@@ -4,6 +4,9 @@ import { StatusCodes } from 'http-status-codes'
 
 const LOCK_PREFIX = 'lock:trip'
 const DEFAULT_LOCK_DURATION = 60 * 10 // 10 minutes in seconds
+const USER_SOCKET_TTL_SECONDS = 60 * 60 * 24 // 24 hours
+
+const getUserSocketsKey = (userId) => `user:${userId}:sockets`
 
 const getLockKey = (tripId, seatId) => `${LOCK_PREFIX}:${tripId}:seat:${seatId}`
 
@@ -125,5 +128,19 @@ export const seatLockService = {
   getLockedSeats,
   validateLock,
   unlockAllUserLocks,
-  DEFAULT_LOCK_DURATION
+  DEFAULT_LOCK_DURATION,
+  registerUserSocket: async (userId, socketId) => {
+    const key = getUserSocketsKey(userId)
+    await redisClient.sAdd(key, socketId)
+    await redisClient.expire(key, USER_SOCKET_TTL_SECONDS)
+  },
+  unregisterUserSocket: async (userId, socketId) => {
+    const key = getUserSocketsKey(userId)
+    await redisClient.sRem(key, socketId)
+    const remaining = await redisClient.sCard(key)
+    if (remaining === 0) {
+      await redisClient.del(key)
+    }
+    return remaining
+  }
 }

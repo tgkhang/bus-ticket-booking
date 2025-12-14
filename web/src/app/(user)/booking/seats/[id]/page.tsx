@@ -1,14 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { getSeatStatusesAPI, getTripByIdAPI, lockSeatsAPI, unlockSeatsAPI } from '@/lib/api'
 import { ArrowLeft, Radio, AlertCircle, Loader2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { detectLayoutAndGroupSeats, detectLayoutPattern } from '@/utils/seatLayout'
-import { io, Socket } from 'socket.io-client'
-import { env } from '@/config/env'
+import { useBookingSocket } from '@/contexts/BookingSocketContext'
 
 type SeatStatus = 'available' | 'booked' | 'locked' | 'selected'
 
@@ -33,72 +32,74 @@ export default function SeatSelectionPage() {
   const searchParams = useSearchParams()
   const tripId = params?.id as string
 
+  const socket = useBookingSocket()
+
   const [trip, setTrip] = useState<any>(null)
   const [seats, setSeats] = useState<Seat[]>([])
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [socket, setSocket] = useState<Socket | null>(null)
   const [lockExpiry, setLockExpiry] = useState<Date | null>(null)
+
+  const selectedSeatsRef = useRef<string[]>([])
+
+  useEffect(() => {
+    selectedSeatsRef.current = selectedSeats
+  }, [selectedSeats])
   
   // Get passengers from URL params (from search page)
   const passengers = parseInt(searchParams.get('passengers') || '1')
 
-  // Socket connection
+  // Socket listeners (socket is provided by booking layout and stays connected across booking pages)
   useEffect(() => {
-    const newSocket = io(env.API_URL, {
-      withCredentials: true
-    })
-    setSocket(newSocket)
+    if (!socket) return
 
-    newSocket.on('connect', () => {
-      console.log('Connected to socket')
-    })
+    const onLocked = ({ tripId: eventTripId, seatIds }: { tripId: string; seatIds: string[] }) => {
+      if (eventTripId !== tripId) return
 
-    newSocket.on('seats:locked', ({ tripId: eventTripId, seatIds }: { tripId: string, seatIds: string[] }) => {
-      if (eventTripId === tripId) {
-        setSeats(prev => prev.map(s => {
+      setSeats((prev) =>
+        prev.map((s) => {
           if (!seatIds.includes(s.id)) return s
-          // Do not override if seat already booked or currently selected locally
-          if (s.status === 'booked' || selectedSeats.includes(s.id)) return s
+          if (s.status === 'booked' || selectedSeatsRef.current.includes(s.id)) return s
           return { ...s, status: 'locked' }
-        }))
-      }
-    })
+        })
+      )
+    }
 
-    newSocket.on('seats:unlocked', ({ tripId: eventTripId, seatIds }: { tripId: string, seatIds: string[] }) => {
-      if (eventTripId === tripId) {
-        setSeats(prev => prev.map(s => {
+    const onUnlocked = ({ tripId: eventTripId, seatIds }: { tripId: string; seatIds: string[] }) => {
+      if (eventTripId !== tripId) return
+
+      setSeats((prev) =>
+        prev.map((s) => {
           if (!seatIds.includes(s.id)) return s
-          // Do not override if seat already booked or currently selected locally
-          if (s.status === 'booked' || selectedSeats.includes(s.id)) return s
-          // Only revert locked seats back to available
+          if (s.status === 'booked' || selectedSeatsRef.current.includes(s.id)) return s
           return { ...s, status: 'available' }
-        }))
-      }
-    })
+        })
+      )
+    }
 
-    // When seats are booked, mark them as booked (red) for everyone
-    newSocket.on('seats:booked', ({ tripId: eventTripId, seatIds }: { tripId: string, seatIds: string[] }) => {
-      if (eventTripId === tripId) {
-        setSeats(prev => prev.map(s =>
-          seatIds.includes(s.id)
-            ? { ...s, status: 'booked' }
-            : s
-        ))
-        // If any of the user's selected seats got booked by someone else, clear selection and notify
-        const conflict = selectedSeats.some(id => seatIds.includes(id))
-        if (conflict) {
-          setSelectedSeats(prev => prev.filter(id => !seatIds.includes(id)))
-          toast.error('Some of your selected seats were booked by another user.')
-        }
-      }
-    })
+    const onBooked = ({ tripId: eventTripId, seatIds }: { tripId: string; seatIds: string[] }) => {
+      if (eventTripId !== tripId) return
+
+      setSeats((prev) => prev.map((s) => (seatIds.includes(s.id) ? { ...s, status: 'booked' } : s)))
+
+      setSelectedSeats((prevSelected) => {
+        const conflict = prevSelected.some((id) => seatIds.includes(id))
+        if (conflict) toast.error('Some of your selected seats were booked by another user.')
+        return prevSelected.filter((id) => !seatIds.includes(id))
+      })
+    }
+
+    socket.on('seats:locked', onLocked)
+    socket.on('seats:unlocked', onUnlocked)
+    socket.on('seats:booked', onBooked)
 
     return () => {
-      newSocket.disconnect()
+      socket.off('seats:locked', onLocked)
+      socket.off('seats:unlocked', onUnlocked)
+      socket.off('seats:booked', onBooked)
     }
-  }, [tripId, selectedSeats]) // Re-bind listeners if selectedSeats changes to ensure correct check
+  }, [socket, tripId])
 
   // Store returnUrl in session storage when arriving from search page
   useEffect(() => {

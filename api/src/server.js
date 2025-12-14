@@ -16,6 +16,21 @@ import cookieParser from 'cookie-parser'
 import { seatLockService } from '~/services/seatLockService'
 import jwt from 'jsonwebtoken'
 
+const getCookieValue = (cookieHeader, name) => {
+  if (!cookieHeader) return null
+  const parts = cookieHeader.split(';')
+  for (const part of parts) {
+    const trimmed = part.trim()
+    if (!trimmed) continue
+    const eqIndex = trimmed.indexOf('=')
+    if (eqIndex === -1) continue
+    const key = trimmed.slice(0, eqIndex)
+    if (key !== name) continue
+    return trimmed.slice(eqIndex + 1)
+  }
+  return null
+}
+
 const START_SERVER = async () => {
   await connectRedis()
   const app = express()
@@ -29,19 +44,8 @@ const START_SERVER = async () => {
     
     // Try to identify user from token if present in handshake auth or cookies
     let token = socket.handshake.auth?.token
-
-    // If no token in auth, try to get from cookies
-    if (!token && socket.request.headers.cookie) {
-      try {
-        const cookies = socket.request.headers.cookie.split(';').reduce((acc, cookie) => {
-          const [key, value] = cookie.trim().split('=')
-          acc[key] = value
-          return acc
-        }, {})
-        token = cookies['accessToken']
-      } catch (e) {
-        // console.log('Error parsing cookies:', e)
-      }
+    if (!token) {
+      token = getCookieValue(socket.request.headers.cookie, 'accessToken')
     }
 
     if (token) {
@@ -54,19 +58,29 @@ const START_SERVER = async () => {
       }
     }
 
+    if (socket.userId) {
+      seatLockService.registerUserSocket(socket.userId, socket.id).catch((err) => {
+        console.error('Error registering user socket:', err)
+      })
+    }
+
     socket.on('disconnect', async () => {
       // console.log('Client disconnected:', socket.id)
       if (socket.userId) {
         try {
-          const unlocked = await seatLockService.unlockAllUserLocks(socket.userId)
-          if (unlocked) {
-            // Notify others about unlocked seats
-            Object.keys(unlocked).forEach(tripId => {
-              socket.broadcast.emit('seats:unlocked', { 
-                tripId, 
-                seatIds: unlocked[tripId] 
+          const remainingSockets = await seatLockService.unregisterUserSocket(socket.userId, socket.id)
+
+          // Only unlock when the user has no other active sockets (multi-tab safe)
+          if (remainingSockets === 0) {
+            const unlocked = await seatLockService.unlockAllUserLocks(socket.userId)
+            if (unlocked) {
+              Object.keys(unlocked).forEach(tripId => {
+                socket.broadcast.emit('seats:unlocked', {
+                  tripId,
+                  seatIds: unlocked[tripId]
+                })
               })
-            })
+            }
           }
         } catch (err) {
           console.error('Error unlocking seats on disconnect:', err)
