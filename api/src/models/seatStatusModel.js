@@ -64,11 +64,13 @@ const bookSeats = async (tripId, seatIds) => {
 
 const releaseExpiredLocks = async () => {
   const prisma = GET_DB()
+  // Only release seats that are locked and have expired locks. Do NOT touch booked seats.
   await prisma.seatStatus.updateMany({
     where: {
       status: 'locked',
       lockedUntil: {
         lt: new Date(),
+        not: null
       },
     },
     data: {

@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { getSeatStatusesAPI, getTripByIdAPI, lockSeatsAPI } from '@/lib/api'
-import { ArrowLeft, Radio, AlertCircle, Loader2 } from 'lucide-react'
+import { getSeatStatusesAPI, getTripByIdAPI, lockSeatsAPI, unlockSeatsAPI } from '@/lib/api'
+import { ArrowLeft, Radio, AlertCircle, Loader2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { detectLayoutAndGroupSeats, detectLayoutPattern } from '@/utils/seatLayout'
+import { useBookingSocket } from '@/contexts/BookingSocketContext'
 
 type SeatStatus = 'available' | 'booked' | 'locked' | 'selected'
 
@@ -31,14 +32,74 @@ export default function SeatSelectionPage() {
   const searchParams = useSearchParams()
   const tripId = params?.id as string
 
+  const socket = useBookingSocket()
+
   const [trip, setTrip] = useState<any>(null)
   const [seats, setSeats] = useState<Seat[]>([])
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [lockExpiry, setLockExpiry] = useState<Date | null>(null)
+
+  const selectedSeatsRef = useRef<string[]>([])
+
+  useEffect(() => {
+    selectedSeatsRef.current = selectedSeats
+  }, [selectedSeats])
   
   // Get passengers from URL params (from search page)
   const passengers = parseInt(searchParams.get('passengers') || '1')
+
+  // Socket listeners (socket is provided by booking layout and stays connected across booking pages)
+  useEffect(() => {
+    if (!socket) return
+
+    const onLocked = ({ tripId: eventTripId, seatIds }: { tripId: string; seatIds: string[] }) => {
+      if (eventTripId !== tripId) return
+
+      setSeats((prev) =>
+        prev.map((s) => {
+          if (!seatIds.includes(s.id)) return s
+          if (s.status === 'booked' || selectedSeatsRef.current.includes(s.id)) return s
+          return { ...s, status: 'locked' }
+        })
+      )
+    }
+
+    const onUnlocked = ({ tripId: eventTripId, seatIds }: { tripId: string; seatIds: string[] }) => {
+      if (eventTripId !== tripId) return
+
+      setSeats((prev) =>
+        prev.map((s) => {
+          if (!seatIds.includes(s.id)) return s
+          if (s.status === 'booked' || selectedSeatsRef.current.includes(s.id)) return s
+          return { ...s, status: 'available' }
+        })
+      )
+    }
+
+    const onBooked = ({ tripId: eventTripId, seatIds }: { tripId: string; seatIds: string[] }) => {
+      if (eventTripId !== tripId) return
+
+      setSeats((prev) => prev.map((s) => (seatIds.includes(s.id) ? { ...s, status: 'booked' } : s)))
+
+      setSelectedSeats((prevSelected) => {
+        const conflict = prevSelected.some((id) => seatIds.includes(id))
+        if (conflict) toast.error('Some of your selected seats were booked by another user.')
+        return prevSelected.filter((id) => !seatIds.includes(id))
+      })
+    }
+
+    socket.on('seats:locked', onLocked)
+    socket.on('seats:unlocked', onUnlocked)
+    socket.on('seats:booked', onBooked)
+
+    return () => {
+      socket.off('seats:locked', onLocked)
+      socket.off('seats:unlocked', onUnlocked)
+      socket.off('seats:booked', onBooked)
+    }
+  }, [socket, tripId])
 
   // Store returnUrl in session storage when arriving from search page
   useEffect(() => {
@@ -78,23 +139,24 @@ export default function SeatSelectionPage() {
 
         setSeats(transformedSeats)
         
-        // Check if user is returning from passenger details with locked seats
-        const returnedSeats = searchParams.get('lockedSeats')
-        if (returnedSeats) {
-          const lockedSeatIds = returnedSeats.split(',')
-          // Select seats that are locked (user's previous selection)
-          const seatsToSelect = lockedSeatIds.filter(seatId => {
-            const seat = transformedSeats.find(s => s.id === seatId)
-            return seat && seat.status === 'locked'
-          })
+        // Check if user is returning from passenger details (via session storage)
+        const pendingSeats = sessionStorage.getItem(`pending_seats_${tripId}`)
+        if (pendingSeats) {
+          const lockedSeatIds = JSON.parse(pendingSeats) as string[]
           
-          if (seatsToSelect.length > 0) {
-            setSelectedSeats(seatsToSelect)
-            // Mark them as selected in the UI
-            setSeats(transformedSeats.map(s => 
-              seatsToSelect.includes(s.id) ? { ...s, status: 'selected' as SeatStatus } : s
+          // Unlock them so user can re-select or change
+          try {
+            await unlockSeatsAPI(tripId, lockedSeatIds)
+            sessionStorage.removeItem(`pending_seats_${tripId}`)
+            
+            // Restore selection in UI
+            setSelectedSeats(lockedSeatIds)
+            setSeats(prev => prev.map(s => 
+              lockedSeatIds.includes(s.id) ? { ...s, status: 'selected' as SeatStatus } : s
             ))
-            toast.info(`Restored ${seatsToSelect.length} previously selected seat(s)`)
+            toast.info('Previous selection restored')
+          } catch (e) {
+            console.error('Failed to unlock pending seats', e)
           }
         }
       } catch (err) {
@@ -157,12 +219,32 @@ export default function SeatSelectionPage() {
 
     try {
       // Lock seats before proceeding
-      await lockSeatsAPI(tripId, selectedSeats, 10) // Lock for 10 minutes
+      await lockSeatsAPI(tripId, selectedSeats)
       
+      // Save to session storage in case user comes back
+      sessionStorage.setItem(`pending_seats_${tripId}`, JSON.stringify(selectedSeats))
+
       router.push(`/booking/passenger-details?tripId=${tripId}&seats=${selectedSeats.join(',')}&totalPrice=${totalPrice}&passengers=${selectedSeats.length}`)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to lock seats:', err)
-      toast.error('Failed to lock seats. Please try again.')
+      
+      if (err.response?.status === 409) {
+        toast.error('Some seats are already taken. Refreshing...')
+      } else {
+        toast.error('Failed to lock seats. Please try again.')
+      }
+      
+      // Refresh seats
+      const seatStatusData = await getSeatStatusesAPI(tripId)
+      const transformedSeats: Seat[] = (seatStatusData as SeatStatusResponse[]).map((ss: SeatStatusResponse) => ({
+        id: ss.seatId,
+        code: ss.seatCode,
+        status: ss.status as SeatStatus,
+        price: trip?.basePrice || 0,
+      }))
+      setSeats(transformedSeats)
+      // Clear invalid selection
+      setSelectedSeats([])
     }
   }
 

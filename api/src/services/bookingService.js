@@ -1,6 +1,7 @@
 import { bookingModel } from '~/models/bookingModel'
 import { seatStatusModel } from '~/models/seatStatusModel'
 import { tripModel } from '~/models/tripModel'
+import { seatLockService } from '~/services/seatLockService'
 import ApiError from '~/utils/ApiError'
 import { StatusCodes } from 'http-status-codes'
 import { GET_DB } from '~/config/prisma'
@@ -14,6 +15,12 @@ const createBooking = async (userId, bookingData) => {
     // Validate input
     if (!tripId || !seatIds || !Array.isArray(seatIds) || seatIds.length === 0) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid booking data: tripId and seatIds are required')
+    }
+
+    // Validate Redis locks
+    const hasLock = await seatLockService.validateLock(tripId, seatIds, userId)
+    if (!hasLock) {
+      throw new ApiError(StatusCodes.CONFLICT, 'One or more seats are locked by another user')
     }
 
     if (!passengers || !Array.isArray(passengers) || passengers.length === 0) {
@@ -101,7 +108,7 @@ const createBooking = async (userId, bookingData) => {
           status: { in: ['available', 'locked'] }, // Can book if available or locked
         },
         data: {
-          status: 'locked', // Keep locked until payment confirmed
+          status: 'booked', // Mark as booked (pending payment)
           lockedUntil: lockUntil,
         },
       })
@@ -117,6 +124,9 @@ const createBooking = async (userId, bookingData) => {
     // Fetch complete booking with all relations
     const completeBooking = await bookingModel.getBookingById(booking.id)
     
+    // Release Redis locks as seats are now reserved in DB
+    await seatLockService.unlockSeats(tripId, seatIds, userId)
+
     if (!completeBooking) {
       throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Booking was created but could not be retrieved')
     }
@@ -174,96 +184,32 @@ const getUserBookings = async (userId, filters) => {
   return bookingModel.getUserBookings(userId, filters)
 }
 
-const lockSeats = async (tripId, seatIds, lockDuration = 10) => {
-  try {
-    // Validate input
-    if (!tripId || !seatIds || !Array.isArray(seatIds) || seatIds.length === 0) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid input: tripId and seatIds are required')
-    }
-
-    if (lockDuration < 1 || lockDuration > 15) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, 'Lock duration must be between 1 and 15 minutes')
-    }
-
-    console.log('Locking seats:', { tripId, seatIds, lockDuration })
-
-    // Release expired locks first
-    await seatStatusModel.releaseExpiredLocks()
-
-    const prisma = GET_DB()
-    
-    // Lock seats in transaction to ensure atomicity
-    const result = await prisma.$transaction(async (tx) => {
-      // Check seat availability
-      const seatStatuses = await tx.seatStatus.findMany({
-        where: {
-          tripId,
-          seatId: { in: seatIds },
-        },
-      })
-
-      if (seatStatuses.length !== seatIds.length) {
-        throw new ApiError(StatusCodes.BAD_REQUEST, 'One or more seats do not exist')
-      }
-
-      const unavailableSeats = seatStatuses.filter(s => s.status !== 'available')
-      if (unavailableSeats.length > 0) {
-        throw new ApiError(StatusCodes.CONFLICT, `Seats are not available: ${unavailableSeats.map(s => s.seatId).join(', ')}`)
-      }
-
-      // Lock the seats
-      const lockedUntil = new Date(Date.now() + lockDuration * 60 * 1000)
-      
-      const updateResult = await tx.seatStatus.updateMany({
-        where: {
-          tripId,
-          seatId: { in: seatIds },
-          status: 'available',
-        },
-        data: {
-          status: 'locked',
-          lockedUntil,
-        },
-      })
-
-      if (updateResult.count !== seatIds.length) {
-        throw new ApiError(StatusCodes.CONFLICT, 'Failed to lock all seats. Some may have been taken.')
-      }
-
-      return lockedUntil
-    })
-
-    console.log('Seats locked successfully until:', result)
-    
-    return {
-      success: true,
-      lockedUntil: result,
-      message: `Seats locked until ${result.toISOString()}`,
-    }
-  } catch (error) {
-    console.error('Error locking seats:', error.message)
-    
-    if (error instanceof ApiError) {
-      throw error
-    }
-    
-    throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, `Failed to lock seats: ${error.message}`)
-  }
-}
-
 const getSeatStatusesByTripId = async (tripId) => {
   // Release expired locks first
   await seatStatusModel.releaseExpiredLocks()
 
   const seatStatuses = await seatStatusModel.getSeatStatusesByTripId(tripId)
   
-  return seatStatuses.map((ss) => ({
-    id: ss.id,
-    seatId: ss.seatId,
-    seatCode: ss.seat.seatNumber, // Changed from seatCode to seatNumber to match schema
-    status: ss.status,
-    lockedUntil: ss.lockedUntil,
-  }))
+  // Get Redis locks
+  const lockedSeats = await seatLockService.getLockedSeats(tripId)
+  const lockedSeatIds = new Set(lockedSeats.map(s => s.seatId))
+
+  return seatStatuses.map((ss) => {
+    let status = ss.status
+    
+    // If seat is locked in Redis, override status
+    if (lockedSeatIds.has(ss.seatId) && status === 'available') {
+      status = 'locked'
+    }
+
+    return {
+      id: ss.id,
+      seatId: ss.seatId,
+      seatCode: ss.seat.seatNumber, // Changed from seatCode to seatNumber to match schema
+      status: status,
+      lockedUntil: ss.lockedUntil,
+    }
+  })
 }
 
 const confirmBooking = async (bookingId, userId, paymentData) => {
@@ -345,7 +291,12 @@ const confirmBooking = async (bookingId, userId, paymentData) => {
       })
     }
 
-    return updatedBooking
+    // Attach meta info for controller broadcast
+    const resultWithMeta = {
+      ...updatedBooking,
+      __meta: { seatIdsBooked: seatIds }
+    }
+    return resultWithMeta
   })
 
   return result
@@ -414,7 +365,6 @@ export const bookingService = {
   createBooking,
   getBookingById,
   getUserBookings,
-  lockSeats,
   getSeatStatusesByTripId,
   confirmBooking,
   cancelBooking,

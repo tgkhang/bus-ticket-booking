@@ -2,16 +2,98 @@
 import express from 'express'
 import cors from 'cors'
 import exitHook from 'async-exit-hook'
+import { createServer } from 'http'
+import { Server } from 'socket.io'
 import { env } from '~/config/environment.js'
 import { APIs_V1 } from '~/routes/v1'
 import { errorHandlingMiddleware } from '~/middlewares/errorHandlingMiddleware'
 import { corsOptions } from '~/config/cors.js'
 import { CONNECT_DB, CLOSE_DB } from '~/config/prisma.js'
+import { connectRedis } from '~/config/redis.js'
 import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
 
-const START_SERVER = () => {
+import { seatLockService } from '~/services/seatLockService'
+import jwt from 'jsonwebtoken'
+
+const getCookieValue = (cookieHeader, name) => {
+  if (!cookieHeader) return null
+  const parts = cookieHeader.split(';')
+  for (const part of parts) {
+    const trimmed = part.trim()
+    if (!trimmed) continue
+    const eqIndex = trimmed.indexOf('=')
+    if (eqIndex === -1) continue
+    const key = trimmed.slice(0, eqIndex)
+    if (key !== name) continue
+    return trimmed.slice(eqIndex + 1)
+  }
+  return null
+}
+
+const START_SERVER = async () => {
+  await connectRedis()
   const app = express()
+  const httpServer = createServer(app)
+  const io = new Server(httpServer, {
+    cors: corsOptions,
+  })
+
+  io.on('connection', (socket) => {
+    // console.log('New client connected:', socket.id)
+    
+    // Try to identify user from token if present in handshake auth or cookies
+    let token = socket.handshake.auth?.token
+    if (!token) {
+      token = getCookieValue(socket.request.headers.cookie, 'accessToken')
+    }
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, env.ACCESS_TOKEN_SECRET)
+        socket.userId = decoded.id
+        // console.log('User identified:', socket.userId)
+      } catch (err) {
+        // console.log('Socket auth failed:', err.message)
+      }
+    }
+
+    if (socket.userId) {
+      seatLockService.registerUserSocket(socket.userId, socket.id).catch((err) => {
+        console.error('Error registering user socket:', err)
+      })
+    }
+
+    socket.on('disconnect', async () => {
+      // console.log('Client disconnected:', socket.id)
+      if (socket.userId) {
+        try {
+          const remainingSockets = await seatLockService.unregisterUserSocket(socket.userId, socket.id)
+
+          // Only unlock when the user has no other active sockets (multi-tab safe)
+          if (remainingSockets === 0) {
+            const unlocked = await seatLockService.unlockAllUserLocks(socket.userId)
+            if (unlocked) {
+              Object.keys(unlocked).forEach(tripId => {
+                socket.broadcast.emit('seats:unlocked', {
+                  tripId,
+                  seatIds: unlocked[tripId]
+                })
+              })
+            }
+          }
+        } catch (err) {
+          console.error('Error unlocking seats on disconnect:', err)
+        }
+      }
+    })
+  })
+
+  app.use((req, res, next) => {
+    req.io = io
+    next()
+  })
+
   app.use(helmet())
   const hostname = env.LOCAL_DEV_APP_HOST || 'localhost'
   const PORT = env.LOCAL_DEV_APP_PORT || 3000
@@ -45,11 +127,11 @@ const START_SERVER = () => {
   app.use(errorHandlingMiddleware)
 
   if (env.BUILD_MODE === 'production') {
-    app.listen(env.PORT, () => {
+    httpServer.listen(env.PORT, () => {
       console.log(`4.Production: Server is running at ${env.PORT}`)
     })
   } else {
-    app.listen(PORT, hostname, () => {
+    httpServer.listen(PORT, hostname, () => {
       console.log(`4.Local: Server is running on http://${hostname}:${PORT}`)
     })
   }

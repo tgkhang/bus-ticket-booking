@@ -13,15 +13,6 @@ Router.get(
   bookingController.getSeatStatuses
 )
 
-// Lock seats (requires auth)
-Router.post(
-  '/bookings/lock-seats',
-  authMiddleware.isAuthorized,
-  rbacMiddleware.isValidPermission([PERMISSIONS.CREATE_BOOKINGS]),
-  bookingValidation.lockSeats,
-  bookingController.lockSeats
-)
-
 // Create booking
 Router.post(
   '/bookings',
