@@ -21,6 +21,11 @@ async function main() {
       displayName: 'John Doe',
       role: 'client',
       isActive: true,
+      phoneNumber: '+84901234567',
+      address: '123 Nguyen Hue Street, District 1, Ho Chi Minh City',
+      bankAccount: '1234567890',
+      accountBalance: 150000,
+      currency: 'VND',
     },
   })
 
@@ -34,6 +39,11 @@ async function main() {
       displayName: 'Jane Smith',
       role: 'client',
       isActive: true,
+      phoneNumber: '+84912345678',
+      address: '456 Le Loi Boulevard, District 3, Ho Chi Minh City',
+      bankAccount: '9876543210',
+      accountBalance: 250000,
+      currency: 'VND',
     },
   })
 
@@ -48,6 +58,11 @@ async function main() {
       displayName: 'System Administrator',
       role: 'admin',
       isActive: true,
+      phoneNumber: '+84900000000',
+      address: 'Bus Ticket System HQ, District 1, Ho Chi Minh City',
+      bankAccount: '0000000000',
+      accountBalance: 0,
+      currency: 'VND',
     },
   })
 

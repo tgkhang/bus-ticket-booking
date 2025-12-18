@@ -50,7 +50,10 @@ const login = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   const correctCondition = Joi.object({
-    username: Joi.string().trim().strict(),
+    displayName: Joi.string().trim().strict(),
+    phoneNumber: Joi.string().trim(),
+    address: Joi.string().trim(),
+    bankAccount: Joi.string().trim(),
     currentPassword: Joi.string()
       .pattern(PASSWORD_RULE)
       .message('current_password: ' + PASSWORD_RULE_MESSAGE),

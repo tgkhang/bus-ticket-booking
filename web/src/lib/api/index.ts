@@ -63,6 +63,15 @@ export const oauthGoogleLoginAPI = async (userData: OAuthGoogleData) => {
   return response.data
 }
 
+export const updateProfileAPI = async (data: FormData) => {
+  const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/users/update`, data, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+  return response.data
+}
+
 // Stops API
 export const autocompleteStopsAPI = async (query: string, limit: number = 10, page: number = 1) => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/stops/autocomplete`, {
