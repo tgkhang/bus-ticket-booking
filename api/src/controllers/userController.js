@@ -76,10 +76,10 @@ const logout = async (req, res, next) => {
       const userId = req.user?.id || req.jwtDecoded?.id
       const unlocked = await seatLockService.unlockAllUserLocks(userId)
       if (unlocked) {
-        Object.keys(unlocked).forEach(tripId => {
-          req.io.emit('seats:unlocked', { 
-            tripId, 
-            seatIds: unlocked[tripId] 
+        Object.keys(unlocked).forEach((tripId) => {
+          req.io.emit('seats:unlocked', {
+            tripId,
+            seatIds: unlocked[tripId],
           })
         })
       }
@@ -141,13 +141,11 @@ const resetPassword = async (req, res, next) => {
 }
 
 const update = async (req, res, next) => {
-  try {
-    const userId = req.jwtDecoded.id
-    const updatedUser = await userService.update(userId, req.body)
-    res.status(StatusCodes.OK).json(updatedUser)
-  } catch (error) {
-    next(error)
-  }
+  const userId = req.jwtDecoded.id
+  const userAvatarFile = req.file
+  // console.log('userAvatarFile:', userAvatarFile)
+  const updatedUser = await userService.update(userId, req.body, userAvatarFile)
+  res.status(StatusCodes.OK).json(updatedUser)
 }
 
 const getMe = async (req, res, next) => {
@@ -182,42 +180,42 @@ const oauthGoogleLogin = async (req, res, next) => {
 // List users (admin)
 const listUsers = async (req, res, next) => {
   try {
-    const users = await userService.listUsers(req.query);
-    res.status(StatusCodes.OK).json(users);
+    const users = await userService.listUsers(req.query)
+    res.status(StatusCodes.OK).json(users)
   } catch (error) {
-    next(error);
+    next(error)
   }
-};
+}
 
 // Create user (admin)
 const createUser = async (req, res, next) => {
   try {
-    const user = await userService.createNew(req.body, true);
-    res.status(StatusCodes.CREATED).json(user);
+    const user = await userService.createNew(req.body, true)
+    res.status(StatusCodes.CREATED).json(user)
   } catch (error) {
-    next(error);
+    next(error)
   }
-};
+}
 
 // Update user (admin)
 const updateUser = async (req, res, next) => {
   try {
-    const user = await userService.updateByAdmin(req.params.id, req.body);
-    res.status(StatusCodes.OK).json(user);
+    const user = await userService.updateByAdmin(req.params.id, req.body)
+    res.status(StatusCodes.OK).json(user)
   } catch (error) {
-    next(error);
+    next(error)
   }
-};
+}
 
 // Delete user (admin)
 const deleteUser = async (req, res, next) => {
   try {
-    await userService.deleteUser(req.params.id);
-    res.status(StatusCodes.NO_CONTENT).end();
+    await userService.deleteUser(req.params.id)
+    res.status(StatusCodes.NO_CONTENT).end()
   } catch (error) {
-    next(error);
+    next(error)
   }
-};
+}
 
 export const userController = {
   createNew,
