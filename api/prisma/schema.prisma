@@ -178,6 +178,7 @@ model Bus {
   operatorId    String   @map("operator_id")
   plateNumber   String   @unique @map("plate_number")
   model         String
+  busType       String   @default("Seater") @map("bus_type") // Seater, Sleeper Bus, VIP Cabin Sleeper, Limousine
   seatCapacity  Int      @map("seat_capacity")
   amenities     String?  @map("amenities_json") // JSON string for amenities like WiFi, AC, etc.
   status        String   @default("active") // active, inactive, maintenance

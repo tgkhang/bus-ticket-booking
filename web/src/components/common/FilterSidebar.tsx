@@ -5,14 +5,17 @@ import {
   Clock, 
   DollarSign, 
   X, 
-  SlidersHorizontal
+  SlidersHorizontal,
+  Bus
 } from 'lucide-react'
 import { amenityOptions } from '@/utils/constants'
+import { BUS_LAYOUTS_VIETNAM_BRIEF } from '@/utils/baseBusType'
 
 interface FilterState {
   timeSlots: string[]
   priceRange: [number, number]
   amenities: string[]
+  busType: string[]
 }
 
 interface FilterSidebarProps {
@@ -56,6 +59,13 @@ function FilterSidebar({
       ? filters.amenities.filter((id) => id !== amenityId)
       : [...filters.amenities, amenityId]
     onFiltersChange({ ...filters, amenities: newAmenities })
+  }
+
+  const handleBusTypeToggle = (type: string) => {
+    const newBusTypes = filters.busType.includes(type)
+      ? filters.busType.filter((t) => t !== type)
+      : [...filters.busType, type]
+    onFiltersChange({ ...filters, busType: newBusTypes })
   }
 
   // Sync local strings from filters when not focused (avoid clobbering while user types)
@@ -107,6 +117,7 @@ function FilterSidebar({
   const hasActiveFilters =
     filters.timeSlots.length > 0 ||
     filters.amenities.length > 0 ||
+    filters.busType.length > 0 ||
     filters.priceRange[0] > 0 ||
     filters.priceRange[1] < 10000000
 
@@ -206,6 +217,29 @@ function FilterSidebar({
             <span>{(priceMinStr.trim() === '' ? 0 : Number(priceMinStr)).toLocaleString('vi-VN')} đ</span>
             <span>{(priceMaxStr.trim() === '' ? 0 : Number(priceMaxStr)).toLocaleString('vi-VN')} đ</span>
           </div>
+        </div>
+      </div>
+
+      {/* Bus Type */}
+      <div className="space-y-3 pb-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center gap-2">
+          <Bus className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          <h4 className="font-medium text-gray-900 dark:text-white">Bus Type</h4>
+        </div>
+        <div className="space-y-2">
+          {/* Get unique types from BUS_LAYOUTS_VIETNAM_BRIEF */}
+          {Array.from(new Set(BUS_LAYOUTS_VIETNAM_BRIEF.map(l => l.type))).map((type) => (
+            <label key={type} className="flex items-center gap-3 cursor-pointer group hover:bg-gray-50 dark:hover:bg-gray-700 p-2 rounded-lg transition-colors">
+              <input
+                type="checkbox"
+                checked={filters.busType.includes(type)}
+                onChange={() => handleBusTypeToggle(type)}
+                disabled={isLoading}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-900 dark:text-white">{type}</span>
+            </label>
+          ))}
         </div>
       </div>
 

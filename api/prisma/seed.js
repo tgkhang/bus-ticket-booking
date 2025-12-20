@@ -205,6 +205,7 @@ async function main() {
       model: 'Mercedes Sprinter Standard',
       seatCapacity: 32,
       layoutCode: '2-2',
+      busType: 'Seater',
       seatNumbers: Array.from({ length: 8 }, (_, row) => 
         ['A', 'B', 'C', 'D'].map(col => `${col}${row + 1}`)
       ).flat(),
@@ -215,6 +216,7 @@ async function main() {
       model: 'Hyundai Universe Sleeper 32',
       seatCapacity: 32,
       layoutCode: 'Sleeper-32',
+      busType: 'Sleeper Bus',
       seatNumbers: Array.from({ length: 11 }, (_, row) => 
         ['L', 'M', 'R'].map(col => `${col}${row + 1}`)
       ).flat().slice(0, 32),
@@ -225,6 +227,7 @@ async function main() {
       model: 'Thaco Universe Sleeper 40',
       seatCapacity: 40,
       layoutCode: 'Sleeper-40',
+      busType: 'Sleeper Bus',
       seatNumbers: Array.from({ length: 14 }, (_, row) => 
         ['L', 'M', 'R'].map(col => `${col}${row + 1}`)
       ).flat().slice(0, 40),
@@ -235,6 +238,7 @@ async function main() {
       model: 'Mercedes Cabin VIP',
       seatCapacity: 22,
       layoutCode: 'Cabin-VIP',
+      busType: 'VIP Cabin Sleeper',
       seatNumbers: Array.from({ length: 11 }, (_, row) => 
         ['L', 'R'].map(col => `${col}${row + 1}`)
       ).flat(),
@@ -245,6 +249,7 @@ async function main() {
       model: 'Ford Transit Limousine 9',
       seatCapacity: 9,
       layoutCode: 'Limo-9',
+      busType: 'Limousine',
       seatNumbers: Array.from({ length: 3 }, (_, row) => 
         ['A', 'B', 'C'].map(col => `${col}${row + 1}`)
       ).flat(),
@@ -255,6 +260,7 @@ async function main() {
       model: 'Hyundai Solati Limousine 16',
       seatCapacity: 16,
       layoutCode: 'Limo-16',
+      busType: 'Limousine',
       seatNumbers: Array.from({ length: 4 }, (_, row) => 
         ['A', 'B', 'C', 'D'].map(col => `${col}${row + 1}`)
       ).flat(),
@@ -271,6 +277,7 @@ async function main() {
         operatorId: operator.id,
         plateNumber: config.plateNumber,
         model: config.model,
+        busType: config.busType,
         seatCapacity: config.seatCapacity,
         amenities: JSON.stringify({
           wifi: true,

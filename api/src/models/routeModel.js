@@ -1,4 +1,5 @@
 import { GET_DB } from '~/config/prisma'
+import { Prisma } from '@prisma/client'
 
 const includeRelation = {
   originStop: true,
@@ -201,4 +202,44 @@ export const routeModel = {
   findMany,
   findUsedStopIds,
   getRoutes,
+  getPopularRoutes,
+}
+
+async function getPopularRoutes(limit = 4) {
+  const prisma = GET_DB()
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 4, 20))
+
+  // Popularity = confirmed/completed bookings per route (distinct routes)
+  const rows = await prisma.$queryRaw(
+    Prisma.sql`
+      SELECT
+        r.id AS "id",
+        r."originStopId" AS "originStopId",
+        r."destinationStopId" AS "destinationStopId",
+        os.name AS "from",
+        ds.name AS "to",
+        COUNT(b.id)::int AS "bookings",
+        COALESCE(MIN(t.base_price), 0) AS "minPrice",
+        COALESCE(AVG(EXTRACT(EPOCH FROM (t.arrival_time - t.departure_time)) / 60), 0)::int AS "avgDurationMinutes"
+      FROM routes r
+      JOIN stops os ON os.id = r."originStopId"
+      JOIN stops ds ON ds.id = r."destinationStopId"
+      JOIN trips t ON t.route_id = r.id
+      LEFT JOIN bookings b
+        ON b.trip_id = t.id
+        AND b.status IN ('confirmed', 'completed')
+      WHERE r.active = TRUE
+      GROUP BY r.id, r."originStopId", r."destinationStopId", os.name, ds.name
+      ORDER BY COUNT(b.id) DESC, MIN(t.base_price) ASC
+      LIMIT ${safeLimit}
+    `
+  )
+
+  // Ensure numeric fields are numbers (pg may return Decimal for minPrice)
+  return (rows || []).map((r) => ({
+    ...r,
+    bookings: Number(r.bookings || 0),
+    minPrice: Number(r.minPrice || 0),
+    avgDurationMinutes: Number(r.avgDurationMinutes || 0),
+  }))
 }
