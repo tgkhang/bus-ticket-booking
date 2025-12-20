@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense, useRef } from 'react'
+import { useEffect, useState, Suspense, useRef, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { searchTripsAPI, autocompleteStopsAPI } from '@/lib/api'
 import { 
@@ -70,6 +70,42 @@ const SORT_OPTIONS = [
   { value: 'duration:desc', label: 'Duration: Longest First' },
 ]
 
+// Helper to convert time slots to time ranges for API
+const getTimeRange = (slots: string[]) => {
+  if (slots.length === 0) return {}
+  
+  let minStart = '23:59'
+  let maxEnd = '00:00'
+  
+  const ranges: Record<string, { start: string; end: string }> = {
+    early_morning: { start: '00:00', end: '06:00' },
+    morning: { start: '06:01', end: '12:00' },
+    afternoon: { start: '12:01', end: '18:00' },
+    evening: { start: '18:01', end: '23:59' },
+  }
+
+  slots.forEach(slot => {
+    const range = ranges[slot]
+    if (range) {
+      if (range.start < minStart) minStart = range.start
+      if (range.end > maxEnd) maxEnd = range.end
+    }
+  })
+  
+  return { startTime: minStart, endTime: maxEnd }
+}
+
+// Helper to convert time range from API to time slots
+const getTimeSlotsFromRange = (start?: string | null, end?: string | null) => {
+  if (!start || !end) return []
+  const slots: string[] = []
+  if (start <= '00:00' && end >= '06:00') slots.push('early_morning')
+  if (start <= '06:01' && end >= '12:00') slots.push('morning')
+  if (start <= '12:01' && end >= '18:00') slots.push('afternoon')
+  if (start <= '18:01' && end >= '23:59') slots.push('evening')
+  return slots
+}
+
 function SearchContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -80,13 +116,68 @@ function SearchContent() {
   const isInitialLoad = useRef(true)
   const scrollPositionRef = useRef(0)
   
-  // Filter and sort state
-  const [filters, setFilters] = useState<FilterState>({
-    timeSlots: [],
-    priceRange: [0, 10000000],
-    amenities: [],
-  })
-  const [sortBy, setSortBy] = useState('departure:asc')
+  // Derived state from URL
+  const filters = useMemo<FilterState>(() => {
+    const minPrice = searchParams.get('minPrice')
+    const maxPrice = searchParams.get('maxPrice')
+    const amenities = searchParams.get('amenities')
+    const startTime = searchParams.get('startTime')
+    const endTime = searchParams.get('endTime')
+
+    return {
+      timeSlots: getTimeSlotsFromRange(startTime, endTime),
+      priceRange: [
+        minPrice ? parseInt(minPrice) : 0,
+        maxPrice ? parseInt(maxPrice) : 10000000
+      ],
+      amenities: amenities ? amenities.split(',') : [],
+    }
+  }, [searchParams])
+
+  const sortBy = useMemo(() => {
+    const field = searchParams.get('sortBy')
+    const order = searchParams.get('sortOrder')
+    if (field && order) {
+      return `${field}:${order}`
+    }
+    return 'departure:asc'
+  }, [searchParams])
+
+  const updateFilters = useCallback((newFilters: FilterState) => {
+    const params = new URLSearchParams(searchParams.toString())
+    
+    // Update price
+    if (newFilters.priceRange[0] > 0) params.set('minPrice', newFilters.priceRange[0].toString())
+    else params.delete('minPrice')
+    
+    if (newFilters.priceRange[1] < 10000000) params.set('maxPrice', newFilters.priceRange[1].toString())
+    else params.delete('maxPrice')
+
+    // Update amenities
+    if (newFilters.amenities.length > 0) params.set('amenities', newFilters.amenities.join(','))
+    else params.delete('amenities')
+
+    // Update time slots
+    const timeRange = getTimeRange(newFilters.timeSlots)
+    if (timeRange.startTime) params.set('startTime', timeRange.startTime)
+    else params.delete('startTime')
+    
+    if (timeRange.endTime) params.set('endTime', timeRange.endTime)
+    else params.delete('endTime')
+
+    // Reset page to 1 on filter change
+    params.set('page', '1')
+
+    router.push(`/trips/search?${params.toString()}`)
+  }, [searchParams, router])
+
+  const updateSort = useCallback((newSort: string) => {
+    const [field, order] = newSort.split(':')
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sortBy', field)
+    params.set('sortOrder', order)
+    router.push(`/trips/search?${params.toString()}`)
+  }, [searchParams, router])
 
   // Search editor state
   const [showSearchEditor, setShowSearchEditor] = useState(false)
@@ -165,24 +256,7 @@ function SearchContent() {
     return () => clearTimeout(timer)
   }, [editTo, showToDropdown])
 
-  // Convert time slots to time ranges for API
-  const getTimeRange = (slots: string[]) => {
-    if (slots.length === 0) return {}
-    // Map time slots to hour ranges
-    const timeMap: Record<string, { start: string; end: string }> = {
-      early_morning: { start: '00:00', end: '06:00' },
-      morning: { start: '06:01', end: '12:00' },
-      afternoon: { start: '12:01', end: '18:00' },
-      evening: { start: '18:01', end: '23:59' },
-    }
-    // For simplicity, if multiple slots selected, use the earliest start and latest end
-    // In a real app, you might want to handle this differently
-    if (slots.includes('early_morning')) return { startTime: '00:00', endTime: '06:00' }
-    if (slots.includes('morning')) return { startTime: '06:01', endTime: '12:00' }
-    if (slots.includes('afternoon')) return { startTime: '12:01', endTime: '18:00' }
-    if (slots.includes('evening')) return { startTime: '18:01', endTime: '23:59' }
-    return {}
-  }
+
 
   useEffect(() => {
     const fetchTrips = async () => {
@@ -257,7 +331,7 @@ function SearchContent() {
   }, [originStopId, destinationStopId, date, page, filters, sortBy])
 
   const handleClearFilters = () => {
-    setFilters({
+    updateFilters({
       timeSlots: [],
       priceRange: [0, 10000000],
       amenities: [],
@@ -529,7 +603,7 @@ function SearchContent() {
           <div className="lg:col-span-1">
             <FilterSidebar
               filters={filters}
-              onFiltersChange={setFilters}
+              onFiltersChange={updateFilters}
               onClearFilters={handleClearFilters}
               totalResults={meta?.total || trips.length}
               isLoading={loading}
@@ -559,7 +633,7 @@ function SearchContent() {
                         <select
                           id="sortBy"
                           value={sortBy}
-                          onChange={(e) => setSortBy(e.target.value)}
+                          onChange={(e) => updateSort(e.target.value)}
                           disabled={loading}
                           className="appearance-none bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 pr-10 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >
