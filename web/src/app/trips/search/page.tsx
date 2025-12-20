@@ -231,35 +231,39 @@ function SearchContent() {
 
   // Debounced autocomplete for "from" field
   useEffect(() => {
+    if (!showFromDropdown) {
+      setFromSuggestions([])
+      return
+    }
+
     const timer = setTimeout(async () => {
-      if (editFrom && editFrom.length >= 2 && showFromDropdown) {
-        try {
-          const results = await autocompleteStopsAPI(editFrom, 5)
-          setFromSuggestions(results)
-        } catch (error) {
-          setFromSuggestions([])
-        }
-      } else {
+      try {
+        const results = await autocompleteStopsAPI(editFrom || '', 5, 1)
+        setFromSuggestions(results)
+      } catch (error) {
         setFromSuggestions([])
       }
     }, 300)
+
     return () => clearTimeout(timer)
   }, [editFrom, showFromDropdown])
 
   // Debounced autocomplete for "to" field
   useEffect(() => {
+    if (!showToDropdown) {
+      setToSuggestions([])
+      return
+    }
+
     const timer = setTimeout(async () => {
-      if (editTo && editTo.length >= 2 && showToDropdown) {
-        try {
-          const results = await autocompleteStopsAPI(editTo, 5)
-          setToSuggestions(results)
-        } catch (error) {
-          setToSuggestions([])
-        }
-      } else {
+      try {
+        const results = await autocompleteStopsAPI(editTo || '', 5, 1)
+        setToSuggestions(results)
+      } catch (error) {
         setToSuggestions([])
       }
     }, 300)
+
     return () => clearTimeout(timer)
   }, [editTo, showToDropdown])
 
