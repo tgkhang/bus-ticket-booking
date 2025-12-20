@@ -59,6 +59,7 @@ interface FilterState {
   timeSlots: string[]
   priceRange: [number, number]
   amenities: string[]
+  busType: string[]
 }
 
 const SORT_OPTIONS = [
@@ -121,6 +122,7 @@ function SearchContent() {
     const minPrice = searchParams.get('minPrice')
     const maxPrice = searchParams.get('maxPrice')
     const amenities = searchParams.get('amenities')
+    const busType = searchParams.get('busType')
     const startTime = searchParams.get('startTime')
     const endTime = searchParams.get('endTime')
 
@@ -131,6 +133,7 @@ function SearchContent() {
         maxPrice ? parseInt(maxPrice) : 10000000
       ],
       amenities: amenities ? amenities.split(',') : [],
+      busType: busType ? busType.split(',') : [],
     }
   }, [searchParams])
 
@@ -156,6 +159,10 @@ function SearchContent() {
     // Update amenities
     if (newFilters.amenities.length > 0) params.set('amenities', newFilters.amenities.join(','))
     else params.delete('amenities')
+
+    // Update busType
+    if (newFilters.busType.length > 0) params.set('busType', newFilters.busType.join(','))
+    else params.delete('busType')
 
     // Update time slots
     const timeRange = getTimeRange(newFilters.timeSlots)
@@ -294,6 +301,7 @@ function SearchContent() {
           minPrice: filters.priceRange[0] > 0 ? filters.priceRange[0] : undefined,
           maxPrice: filters.priceRange[1] < 10000000 ? filters.priceRange[1] : undefined,
           amenities: filters.amenities.length > 0 ? filters.amenities.join(',') : undefined,
+          busType: filters.busType.length > 0 ? filters.busType.join(',') : undefined,
           ...timeRange,
         })
 
@@ -335,6 +343,7 @@ function SearchContent() {
       timeSlots: [],
       priceRange: [0, 10000000],
       amenities: [],
+      busType: [],
     })
   }
 

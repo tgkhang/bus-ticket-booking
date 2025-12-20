@@ -43,9 +43,10 @@ const buildWhere = (filters) => {
   if (filters.status) {
     where.status = filters.status
   }
-  if (filters.busModel || filters.amenities?.length) {
+  if (filters.busModel || filters.amenities?.length || filters.busType?.length) {
     where.bus = {}
     if (filters.busModel) where.bus.model = { contains: filters.busModel, mode: 'insensitive' }
+    if (filters.busType?.length) where.bus.busType = { in: filters.busType }
     if (filters.amenities?.length) {
       // Match each amenity key set to true in the serialized JSON
       const amenityClauses = filters.amenities.map((a) => ({ amenities: { contains: `"${a}":true` } }))
@@ -118,6 +119,7 @@ const searchTrips = async (filters) => {
       destinationStop: t.route.destinationStop,
       bus: {
         model: t.bus.model,
+        busType: t.bus.busType,
         amenities: t.bus.amenities ? JSON.parse(t.bus.amenities) : {},
       },
     }

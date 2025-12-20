@@ -259,6 +259,7 @@ export const searchTripsAPI = async (params: {
   minPrice?: number
   maxPrice?: number
   busModel?: string
+  busType?: string
   amenities?: string
   status?: string
   sortBy?: string

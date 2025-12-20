@@ -15,6 +15,11 @@ const searchTrips = async (query) => {
     minPrice: query.minPrice ? Number(query.minPrice) : undefined,
     maxPrice: query.maxPrice ? Number(query.maxPrice) : undefined,
     busModel: query.busModel,
+    busType: query.busType
+      ? (Array.isArray(query.busType) ? query.busType : query.busType.split(','))
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [],
     amenities: query.amenities
       ? query.amenities
           .split(',')

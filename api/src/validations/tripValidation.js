@@ -15,8 +15,13 @@ const search = async (req, res, next) => {
     minPrice: Joi.number().min(0),
     maxPrice: Joi.number().min(0),
     busModel: Joi.string(),
+    busType: Joi.alternatives().try(
+      Joi.string(),
+      Joi.array().items(Joi.string()).min(1)
+    ),
     amenities: Joi.string(), // comma-separated
     status: Joi.string().valid('scheduled', 'active', 'completed', 'cancelled'),
+    passengers: Joi.number().integer().min(1).default(1),
     page: Joi.number().integer().min(1).default(1),
     limit: Joi.number().integer().min(1).max(100).default(20),
     sortBy: Joi.string().valid('price', 'departure', 'duration').default('departure'),

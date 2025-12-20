@@ -21,6 +21,7 @@ interface Trip {
   destinationStop: Stop
   bus: {
     model: string
+    busType?: string
     amenities: Record<string, boolean>
   }
   status: string
@@ -73,6 +74,11 @@ export default function TripCard({ trip, passengers = 1, currentPath }: TripCard
               <h3 className="text-gray-900 dark:text-white font-bold wrap-break-word" title={trip.bus.model}>
                 {trip.bus.model}
               </h3>
+              {trip.bus.busType && (
+                <div className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-0.5">
+                  {trip.bus.busType}
+                </div>
+              )}
               <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {trip.availableSeats !== undefined ? (
                   <span className={trip.availableSeats < passengers ? 'text-orange-600 font-medium' : 'text-green-600'}>
