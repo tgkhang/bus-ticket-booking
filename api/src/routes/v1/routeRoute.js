@@ -11,6 +11,9 @@ const Router = express.Router()
 // Public autocomplete endpoint (no auth required for search form)
 Router.get('/stops/autocomplete', routeController.autocompleteStops)
 
+// Popular routes for homepage (public)
+Router.get('/popular', routeController.getPopularRoutes)
+
 Router.post(
   '/',
   authMiddleware.isAuthorized,

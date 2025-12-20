@@ -242,6 +242,24 @@ export const getRouteDetailsAPI = async (routeId: string): Promise<Route> => {
   return response.data
 }
 
+export type PopularRouteItem = {
+  id: string
+  originStopId: string
+  destinationStopId: string
+  from: string
+  to: string
+  bookings: number
+  minPrice: number
+  avgDurationMinutes: number
+}
+
+export const getPopularRoutesAPI = async (limit: number = 4): Promise<PopularRouteItem[]> => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/routes/popular`, {
+    params: { limit },
+  })
+  return response.data
+}
+
 //=================================
 // Trip API Calls
 //=================================

@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense, useRef, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { searchTripsAPI, autocompleteStopsAPI } from '@/lib/api'
+import { addRecentSearch } from '@/utils/recentSearches'
 import { 
   Calendar, 
   MapPin, 
@@ -418,6 +419,15 @@ function SearchContent() {
       } else if (editTo) {
         params.set('toText', editTo)
       }
+
+      addRecentSearch({
+        fromText: selectedOriginStop?.name || editFrom || 'All Stops',
+        toText: selectedDestinationStop?.name || editTo || 'All Stops',
+        originStopId: selectedOriginStop?.id,
+        destinationStopId: selectedDestinationStop?.id,
+        date: editDate,
+        passengers: editPassengers,
+      })
 
       router.push(`/trips/search?${params.toString()}`)
       setShowSearchEditor(false)
