@@ -199,6 +199,60 @@ function SearchContent() {
   const [selectedOriginStop, setSelectedOriginStop] = useState<Stop | null>(null)
   const [selectedDestinationStop, setSelectedDestinationStop] = useState<Stop | null>(null)
 
+  // Pagination state for stop suggestions (mirrors homepage dropdown)
+  const [fromPage, setFromPage] = useState(1)
+  const [toPage, setToPage] = useState(1)
+  const [hasMoreFrom, setHasMoreFrom] = useState(true)
+  const [hasMoreTo, setHasMoreTo] = useState(true)
+  const [loadingFrom, setLoadingFrom] = useState(false)
+  const [loadingTo, setLoadingTo] = useState(false)
+
+  const fetchStops = async (query: string, page: number, type: 'from' | 'to') => {
+    try {
+      if (type === 'from') setLoadingFrom(true)
+      else setLoadingTo(true)
+
+      const limit = 5
+      const results = await autocompleteStopsAPI(query, limit, page)
+
+      if (type === 'from') {
+        if (page === 1) setFromSuggestions(results)
+        else setFromSuggestions((prev) => [...prev, ...results])
+        setHasMoreFrom(results.length === limit)
+      } else {
+        if (page === 1) setToSuggestions(results)
+        else setToSuggestions((prev) => [...prev, ...results])
+        setHasMoreTo(results.length === limit)
+      }
+    } catch (error) {
+      if (type === 'from') {
+        if (page === 1) setFromSuggestions([])
+        setHasMoreFrom(false)
+      } else {
+        if (page === 1) setToSuggestions([])
+        setHasMoreTo(false)
+      }
+    } finally {
+      if (type === 'from') setLoadingFrom(false)
+      else setLoadingTo(false)
+    }
+  }
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>, type: 'from' | 'to') => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    if (scrollHeight - scrollTop <= clientHeight + 1) {
+      if (type === 'from' && hasMoreFrom && !loadingFrom) {
+        const nextPage = fromPage + 1
+        setFromPage(nextPage)
+        fetchStops(editFrom, nextPage, 'from')
+      } else if (type === 'to' && hasMoreTo && !loadingTo) {
+        const nextPage = toPage + 1
+        setToPage(nextPage)
+        fetchStops(editTo, nextPage, 'to')
+      }
+    }
+  }
+
   const originStopId = searchParams.get('originStopId')
   const destinationStopId = searchParams.get('destinationStopId')
   const fromText = searchParams.get('fromText')
@@ -236,13 +290,9 @@ function SearchContent() {
       return
     }
 
-    const timer = setTimeout(async () => {
-      try {
-        const results = await autocompleteStopsAPI(editFrom || '', 5, 1)
-        setFromSuggestions(results)
-      } catch (error) {
-        setFromSuggestions([])
-      }
+    const timer = setTimeout(() => {
+      setFromPage(1)
+      fetchStops(editFrom || '', 1, 'from')
     }, 300)
 
     return () => clearTimeout(timer)
@@ -255,13 +305,9 @@ function SearchContent() {
       return
     }
 
-    const timer = setTimeout(async () => {
-      try {
-        const results = await autocompleteStopsAPI(editTo || '', 5, 1)
-        setToSuggestions(results)
-      } catch (error) {
-        setToSuggestions([])
-      }
+    const timer = setTimeout(() => {
+      setToPage(1)
+      fetchStops(editTo || '', 1, 'to')
     }, 300)
 
     return () => clearTimeout(timer)
@@ -491,12 +537,15 @@ function SearchContent() {
                     <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
                     
                     {showFromDropdown && fromSuggestions.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div
+                        className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                        onScroll={(e) => handleScroll(e, 'from')}
+                      >
                         {fromSuggestions.map((stop) => (
                           <button
                             key={stop.id}
                             type="button"
-                            onClick={() => {
+                            onMouseDown={() => {
                               setEditFrom(stop.name)
                               setSelectedOriginStop(stop)
                               setShowFromDropdown(false)
@@ -509,6 +558,9 @@ function SearchContent() {
                             </div>
                           </button>
                         ))}
+                        {loadingFrom && (
+                          <div className="p-2 text-center text-gray-500 dark:text-gray-400 text-sm">Loading...</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -534,12 +586,15 @@ function SearchContent() {
                     <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
                     
                     {showToDropdown && toSuggestions.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div
+                        className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                        onScroll={(e) => handleScroll(e, 'to')}
+                      >
                         {toSuggestions.map((stop) => (
                           <button
                             key={stop.id}
                             type="button"
-                            onClick={() => {
+                            onMouseDown={() => {
                               setEditTo(stop.name)
                               setSelectedDestinationStop(stop)
                               setShowToDropdown(false)
@@ -552,6 +607,9 @@ function SearchContent() {
                             </div>
                           </button>
                         ))}
+                        {loadingTo && (
+                          <div className="p-2 text-center text-gray-500 dark:text-gray-400 text-sm">Loading...</div>
+                        )}
                       </div>
                     )}
                   </div>
