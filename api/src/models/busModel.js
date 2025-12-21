@@ -17,6 +17,7 @@ const createBus = async (data) => {
 
     // Convert amenities object to JSON string
     const amenitiesJson = data.amenities ? JSON.stringify(data.amenities) : null
+    const imagesJson = data.images && data.images.length > 0 ? JSON.stringify(data.images) : null
 
     return await prisma.bus.create({
       data: {
@@ -25,6 +26,7 @@ const createBus = async (data) => {
         model: data.model,
         seatCapacity: data.seatCapacity,
         amenities: amenitiesJson,
+        images: imagesJson,
         status: data.status || 'active',
       },
       include: includeRelations,
@@ -42,9 +44,9 @@ const findBusById = async (id) => {
       include: includeRelations,
     })
 
-    // Parse amenities JSON
-    if (bus && bus.amenities) {
-      bus.amenities = JSON.parse(bus.amenities)
+    if (bus) {
+      if (bus.amenities) bus.amenities = JSON.parse(bus.amenities)
+      if (bus.images) bus.images = JSON.parse(bus.images)
     }
 
     return bus
@@ -114,9 +116,8 @@ const findAllBuses = async (filters = {}, pagination = {}) => {
 
     // Parse amenities JSON for each bus
     buses.forEach((bus) => {
-      if (bus.amenities) {
-        bus.amenities = JSON.parse(bus.amenities)
-      }
+      if (bus.amenities) bus.amenities = JSON.parse(bus.amenities)
+      if (bus.images) bus.images = JSON.parse(bus.images)
     })
 
     return {
@@ -145,6 +146,10 @@ const updateBus = async (id, data) => {
     if (data.status) updateData.status = data.status
     if (data.amenities) updateData.amenities = JSON.stringify(data.amenities)
 
+    if (data.images !== undefined) {
+      updateData.images = data.images && data.images.length > 0 ? JSON.stringify(data.images) : null
+    }
+
     const updated = await prisma.bus.update({
       where: { id },
       data: updateData,
@@ -152,8 +157,9 @@ const updateBus = async (id, data) => {
     })
 
     // Parse amenities JSON
-    if (updated && updated.amenities) {
-      updated.amenities = JSON.parse(updated.amenities)
+    if (updated) {
+      if (updated.amenities) updated.amenities = JSON.parse(updated.amenities)
+      if (updated.images) updated.images = JSON.parse(updated.images)
     }
 
     return updated
@@ -255,8 +261,9 @@ const getBusWithTrips = async (busId, filters = {}) => {
     })
 
     // Parse amenities JSON
-    if (bus && bus.amenities) {
-      bus.amenities = JSON.parse(bus.amenities)
+    if (bus) {
+      if (bus.amenities) bus.amenities = JSON.parse(bus.amenities)
+      if (bus.images) bus.images = JSON.parse(bus.images)
     }
 
     return bus
@@ -340,9 +347,8 @@ const searchBuses = async (filters = {}) => {
 
     // Parse amenities and filter by amenities if requested
     let filteredBuses = buses.map((bus) => {
-      if (bus.amenities) {
-        bus.amenities = JSON.parse(bus.amenities)
-      }
+      if (bus.amenities) bus.amenities = JSON.parse(bus.amenities)
+      if (bus.images) bus.images = JSON.parse(bus.images)
       return bus
     })
 

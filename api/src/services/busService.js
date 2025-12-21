@@ -4,6 +4,7 @@ import { busModel } from '~/models/busModel'
 import { seatModel } from '~/models/seatModel'
 import { calculateSeatCount, getLayoutByCode } from '~/utils/baseBusType'
 import { operatorModel } from '~/models/operatorModel'
+import { CloudinaryProvider } from '~/providers/CloudinaryProvider'
 
 // ============================================
 // HELPER FUNCTIONS
@@ -290,6 +291,158 @@ const checkAvailability = async (busId, startDate, endDate) => {
   }
 }
 
+const uploadBusImages = async (busId, files) => {
+  try {
+    // 1. Check if bus exists
+    const bus = await busModel.findBusById(busId)
+    if (!bus) throw new ApiError(StatusCodes.NOT_FOUND, 'Bus not found')
+
+    // 2. Upload images to Cloudinary (or your storage provider)
+    const uploadPromises = files.map((file) =>
+      cloudinaryProvider.uploadImage(file.buffer, {
+        folder: 'buses',
+        resource_type: 'image',
+      })
+    )
+
+    const uploadResults = await Promise.all(uploadPromises)
+    const imageUrls = uploadResults.map((result) => result.secure_url)
+
+    // 3. Get existing images
+    const existingImages = bus.images || []
+
+    // 4. Append new images to existing ones
+    const updatedImages = [...existingImages, ...imageUrls]
+
+    // 5. Validate total image count (max 10)
+    if (updatedImages.length > 10) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        `Cannot upload. Maximum 10 images allowed. Current: ${existingImages.length}, Trying to add: ${imageUrls.length}`
+      )
+    }
+
+    // 6. Update bus with new images
+    const updatedBus = await busModel.updateBus(busId, {
+      images: updatedImages,
+    })
+
+    return {
+      message: 'Images uploaded successfully',
+      data: updatedBus,
+      uploadedCount: imageUrls.length,
+      totalImages: updatedImages.length,
+    }
+  } catch (error) {
+    throw error
+  }
+}
+
+const updateBusImages = async (busId, files) => {
+  try {
+    // 1. Check if bus exists
+    const bus = await busModel.findBusById(busId)
+    if (!bus) throw new ApiError(StatusCodes.NOT_FOUND, 'Bus not found')
+
+    // 2. Delete old images from Cloudinary
+    if (bus.images && bus.images.length > 0) {
+      const deletePromises = bus.images.map((imageUrl) => CloudinaryProvider.deleteImage(imageUrl))
+      await Promise.allSettled(deletePromises) // Don't fail if some deletions fail
+    }
+
+    // 3. Upload new images to Cloudinary
+    const uploadPromises = files.map((file) =>
+      CloudinaryProvider.uploadImage(file.buffer, {
+        folder: 'buses',
+        resource_type: 'image',
+      })
+    )
+
+    const uploadResults = await Promise.all(uploadPromises)
+    const imageUrls = uploadResults.map((result) => result.secure_url)
+
+    // 4. Update bus with new images (replace all)
+    const updatedBus = await busModel.updateBus(busId, {
+      images: imageUrls,
+    })
+
+    return {
+      message: 'Images updated successfully',
+      data: updatedBus,
+      totalImages: imageUrls.length,
+    }
+  } catch (error) {
+    throw error
+  }
+}
+
+const deleteBusImage = async (busId, imageIndex) => {
+  try {
+    // 1. Check if bus exists
+    const bus = await busModel.findBusById(busId)
+    if (!bus) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Bus not found')
+    }
+
+    // 2. Check if bus has images
+    if (!bus.images || bus.images.length === 0) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Bus has no images')
+    }
+
+    // 3. Validate image index
+    if (imageIndex >= bus.images.length) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid image index')
+    }
+
+    // 4. Delete image from Cloudinary
+    const imageToDelete = bus.images[imageIndex]
+    await CloudinaryProvider.deleteImage(imageToDelete)
+
+    // 5. Remove image from array
+    const updatedImages = bus.images.filter((_, index) => index !== imageIndex)
+
+    // 6. Update bus
+    const updatedBus = await busModel.updateBus(busId, {
+      images: updatedImages.length > 0 ? updatedImages : null,
+    })
+
+    return {
+      message: 'Image deleted successfully',
+      data: updatedBus,
+      deletedImage: imageToDelete,
+    }
+  } catch (error) {
+    throw error
+  }
+}
+
+const deleteAllBusImages = async (busId) => {
+  try {
+    // 1. Check if bus exists
+    const bus = await busModel.findBusById(busId)
+    if (!bus) 
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Bus not found')
+    
+    // 2. Delete all images from Cloudinary
+    if (bus.images && bus.images.length > 0) {
+      const deletePromises = bus.images.map((imageUrl) => CloudinaryProvider.deleteImage(imageUrl))
+      await Promise.allSettled(deletePromises)
+    }
+
+    // 3. Update bus to remove all images
+    const updatedBus = await busModel.updateBus(busId, {
+      images: null,
+    })
+
+    return {
+      message: 'All images deleted successfully',
+      data: updatedBus,
+    }
+  } catch (error) {
+    throw error
+  }
+}
+
 export const busService = {
   // Bus CRUD
   createBus,
@@ -311,4 +464,10 @@ export const busService = {
   getBusTrips,
   searchBuses,
   checkAvailability,
+
+  // Upload bus images
+  uploadBusImages,
+  updateBusImages,
+  deleteBusImage,
+  deleteAllBusImages,
 }

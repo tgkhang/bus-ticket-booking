@@ -181,6 +181,7 @@ model Bus {
   busType       String   @default("Seater") @map("bus_type") // Seater, Sleeper Bus, VIP Cabin Sleeper, Limousine
   seatCapacity  Int      @map("seat_capacity")
   amenities     String?  @map("amenities_json") // JSON string for amenities like WiFi, AC, etc.
+  images        String?  @map("images_json") // JSON string array of image URLs
   status        String   @default("active") // active, inactive, maintenance
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
