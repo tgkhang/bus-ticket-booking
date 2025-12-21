@@ -5,6 +5,7 @@ import { rbacMiddleware } from '~/middlewares/rbacMiddleware'
 import { busValidation } from '~/validations/busValidation'
 import { PERMISSIONS } from '~/utils/constants'
 import { asyncHandler } from '~/helpers/asyncHandler'
+import { multerUploadMiddleware } from '~/middlewares/multerUploadMiddleware'
 
 const Router = express.Router()
 
@@ -59,6 +60,40 @@ Router.delete(
   authMiddleware.isAuthorized,
   rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_BUSES]),
   busController.deleteBus
+)
+
+// Upload multiple images for a bus (Create)
+Router.post(
+  '/:id/images',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_BUSES]),
+  multerUploadMiddleware.upload.array('images', 10),
+  asyncHandler(busController.uploadBusImages)
+)
+
+// Update bus images (Replace all images)
+Router.put(
+  '/:id/images',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_BUSES]),
+  multerUploadMiddleware.upload.array('images', 10),
+  asyncHandler(busController.updateBusImages)
+)
+
+// Delete a specific image from bus
+Router.delete(
+  '/:id/images/:imageIndex',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_BUSES]),
+  asyncHandler(busController.deleteBusImage)
+)
+
+// Delete all images for a bus
+Router.delete(
+  '/:id/images',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_BUSES]),
+  asyncHandler(busController.deleteAllBusImages)
 )
 
 // ============================================
