@@ -23,6 +23,7 @@ import {
   User,
   Bell,
   Search,
+  BarChart,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -79,6 +80,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Routes', href: '/admin/routes', icon: Route },
     { name: 'Trips', href: '/admin/trips', icon: Calendar },
     { name: 'Bookings', href: '/admin/bookings', icon: Ticket },
+    { name: 'Revenue Analytics', href: '/admin/revenue', icon: BarChart },
     { name: 'Users', href: '/admin/users', icon: Users },
   ]
 
