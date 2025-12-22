@@ -14,7 +14,7 @@ const getCookieOptions = (maxAge) => ({
 
 const createNew = async (req, res, next) => {
   try {
-    const createdUser = await userService.createNew(req.body, req)
+    const createdUser = await userService.createNew(req.body, false)
     res.status(StatusCodes.CREATED).json(createdUser)
   } catch (error) {
     next(error)

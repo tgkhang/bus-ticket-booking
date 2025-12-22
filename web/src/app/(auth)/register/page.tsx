@@ -90,9 +90,11 @@ export default function RegisterPage() {
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="email"
+                  id="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="your@email.com"
+                  autoComplete="email"
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
                   required
                 />
@@ -236,7 +238,10 @@ export default function RegisterPage() {
               Google
             </a>
 
-            <button className="flex items-center justify-center gap-2 border-2 border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium opacity-50 cursor-not-allowed" disabled>
+            <button
+              className="flex items-center justify-center gap-2 border-2 border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition-colors font-medium opacity-50 cursor-not-allowed"
+              disabled
+            >
               <svg className="w-5 h-5" fill="#1877F2" viewBox="0 0 24 24">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
               </svg>
@@ -287,7 +292,9 @@ export default function RegisterPage() {
           <div className="space-y-8">
             <div>
               <h1 className="text-5xl text-white mb-4 leading-tight">
-                Join Our<br />Community
+                Join Our
+                <br />
+                Community
               </h1>
               <p className="text-xl text-green-100 max-w-md">
                 Create your account and start exploring amazing travel destinations with exclusive benefits
@@ -339,9 +346,7 @@ export default function RegisterPage() {
             <p className="text-green-50 text-lg mb-2">
               🎉 <span className="text-white font-semibold">Special Offer!</span>
             </p>
-            <p className="text-green-100">
-              Get 20% off on your first booking when you create an account today!
-            </p>
+            <p className="text-green-100">Get 20% off on your first booking when you create an account today!</p>
           </div>
         </div>
       </div>

@@ -45,9 +45,12 @@ const createNew = async (reqBody, isAdminCreating = false) => {
 
     const createdUser = await userModel.createNew(newUser)
 
+    console.log('📧 Preparing to send verification email. isAdminCreating:', isAdminCreating)
+
     // Send verification email only for non-admin created users
     if (!isAdminCreating) {
       try {
+        console.log('📧 Sending verification email to:', createdUser.email)
         const verificationLink = `${WEBSITE_DOMAIN}/account/verification?email=${createdUser.email}&token=${createdUser.verifyToken}`
         const emailSubject = 'Please verify your email'
         const textContent = `Here is your verification link: ${verificationLink}\n\nThank you for registering!`
@@ -57,8 +60,11 @@ const createNew = async (reqBody, isAdminCreating = false) => {
           <h3>Thank you for registering!</h3>
         `
         await BrevoEmailProvider.sendEmail(createdUser.email, emailSubject, textContent, htmlContent)
+        console.log('✅ Verification email sent to:', createdUser.email)
         // eslint-disable-next-line no-unused-vars
       } catch (emailError) {
+        console.error('❌ Failed to send verification email:', emailError.message)
+        console.error('Email error details:', emailError.response?.body || emailError)
         throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to send verification email')
       }
     }
@@ -118,6 +124,14 @@ const login = async (reqBody, req) => {
     // Check if user exists
     if (!existingUser) {
       throw invalidCredentialsError
+    }
+
+    // Check if account is active (verified)
+    if (!existingUser.isActive) {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        'Your account is not verified. Please check your email for the verification link.'
+      )
     }
 
     // Verify password
