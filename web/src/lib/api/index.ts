@@ -167,6 +167,52 @@ export const generateSeatsAPI = async (
 }
 
 //=================================
+// Bus Image API Calls
+//=================================
+
+export const uploadBusImagesAPI = async (busId: string, images: File[]) => {
+  const formData = new FormData()
+  images.forEach((image) => {
+    formData.append('images', image)
+  })
+
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/buses/${busId}/images`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+  toast.success('Images uploaded successfully')
+  return response.data
+}
+
+export const updateBusImagesAPI = async (busId: string, images: File[]) => {
+  const formData = new FormData()
+  images.forEach((image) => {
+    formData.append('images', image)
+  })
+
+  const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/buses/${busId}/images`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+  toast.success('Images updated successfully')
+  return response.data
+}
+
+export const deleteBusImageAPI = async (busId: string, imageIndex: number) => {
+  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/buses/${busId}/images/${imageIndex}`)
+  toast.success('Image deleted successfully')
+  return response.data
+}
+
+export const deleteAllBusImagesAPI = async (busId: string) => {
+  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/buses/${busId}/images`)
+  toast.success('All images deleted successfully')
+  return response.data
+}
+
+//=================================
 // Stops API Calls
 //=================================
 
