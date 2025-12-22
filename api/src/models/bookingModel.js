@@ -110,10 +110,101 @@ const cancelBooking = async (id) => {
   })
 }
 
+// Tổng doanh thu, số đơn, giá trị trung bình, khách hàng duy nhất, revenue theo ngày
+const getRevenueOverview = async (from, to) => {
+  if (!from || !to || isNaN(new Date(from)) || isNaN(new Date(to))) {
+    return { totalRevenue: 0, avgTransaction: 0, totalOrders: 0, uniqueCustomers: 0, revenueOverTime: [] };
+  }
+  const prisma = GET_DB();
+  const bookings = await prisma.booking.findMany({
+    where: {
+      status: { in: ["confirmed", "completed"] },
+      bookedAt: {
+        gte: new Date(from),
+        lte: new Date(to + 'T23:59:59.999Z'),
+      },
+    },
+    select: {
+      totalAmount: true,
+      userId: true,
+      bookedAt: true,
+    },
+  });
+  const totalRevenue = bookings.reduce((sum, b) => sum + Number(b.totalAmount), 0);
+  const totalOrders = bookings.length;
+  const avgTransaction = totalOrders ? totalRevenue / totalOrders : 0;
+  const uniqueCustomers = new Set(bookings.map(b => b.userId)).size;
+  // Revenue theo ngày
+  const revenueByDate = {};
+  bookings.forEach(b => {
+    const d = b.bookedAt.toISOString().slice(0, 10);
+    revenueByDate[d] = (revenueByDate[d] || 0) + Number(b.totalAmount);
+  });
+  const revenueOverTime = Object.entries(revenueByDate).map(([date, revenue]) => ({ date, revenue }));
+  return { totalRevenue, avgTransaction, totalOrders, uniqueCustomers, revenueOverTime };
+};
+
+// Doanh thu theo tuyến
+const getRevenueByRoute = async (from, to) => {
+  if (!from || !to || isNaN(new Date(from)) || isNaN(new Date(to))) {
+    return [];
+  }
+  const prisma = GET_DB();
+  const bookings = await prisma.booking.findMany({
+    where: {
+      status: { in: ["confirmed", "completed"] },
+      bookedAt: {
+        gte: new Date(from),
+        lte: new Date(to + 'T23:59:59.999Z'),
+      },
+    },
+    select: {
+      totalAmount: true,
+      trip: { select: { route: { select: { name: true } } } },
+    },
+  });
+  const revenueByRoute = {};
+  bookings.forEach(b => {
+    const route = b.trip?.route?.name || "Unknown";
+    revenueByRoute[route] = (revenueByRoute[route] || 0) + Number(b.totalAmount);
+  });
+  return Object.entries(revenueByRoute).map(([route, revenue]) => ({ route, revenue }));
+};
+
+// Doanh thu theo phương thức thanh toán
+const getRevenueByPaymentMethod = async (from, to) => {
+  if (!from || !to || isNaN(new Date(from)) || isNaN(new Date(to))) {
+    return [];
+  }
+  const prisma = GET_DB();
+  const bookings = await prisma.booking.findMany({
+    where: {
+      status: { in: ["confirmed", "completed"] },
+      bookedAt: {
+        gte: new Date(from),
+        lte: new Date(to + 'T23:59:59.999Z'),
+      },
+    },
+    select: {
+      totalAmount: true,
+      payments: { select: { provider: true } },
+    },
+  });
+  const revenueByMethod = {};
+  bookings.forEach(b => {
+    const method = b.payments[0]?.provider || "Unknown";
+    revenueByMethod[method] = (revenueByMethod[method] || 0) + Number(b.totalAmount);
+  });
+  return Object.entries(revenueByMethod).map(([method, revenue]) => ({ method, revenue }));
+};
+
 export const bookingModel = {
   createBooking,
   getBookingById,
   getUserBookings,
   updateBookingStatus,
   cancelBooking,
+  getRevenueOverview,
+  getRevenueByRoute,
+  getRevenueByPaymentMethod,
 }
