@@ -72,6 +72,7 @@ export interface Bus {
   model: string
   seatCapacity: number
   amenities: BusAmenities
+  images?: string[] // Array of image URLs
   status: 'active' | 'inactive' | 'maintenance'
   seats: Seat[]
   createdAt: string

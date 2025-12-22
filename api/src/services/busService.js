@@ -299,7 +299,7 @@ const uploadBusImages = async (busId, files) => {
 
     // 2. Upload images to Cloudinary (or your storage provider)
     const uploadPromises = files.map((file) =>
-      cloudinaryProvider.uploadImage(file.buffer, {
+      CloudinaryProvider.uploadImage(file.buffer, {
         folder: 'buses',
         resource_type: 'image',
       })

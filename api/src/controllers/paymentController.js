@@ -3,6 +3,7 @@ import payOS from '~/providers/PayOSProvider.js'
 import { env } from '~/config/environment.js'
 import { GET_DB } from '~/config/prisma'
 import { bookingService } from '~/services/bookingService'
+import { eTicketService } from '~/services/eTicketService'
 
 const createPaymentLink = async (req, res, next) => {
   const { amount, description, items, bookingId } = req.body
@@ -103,6 +104,15 @@ const confirmWebhook = async (req, res, next) => {
       })
 
       console.log('Booking confirmed via webhook:', bookingId)
+
+      // Send e-ticket email (idempotent - won't fail if already sent)
+      try {
+        await eTicketService.sendETicketEmail(bookingId, booking.userId)
+        console.log('E-ticket sent via webhook:', bookingId)
+      } catch (emailError) {
+        console.error('Failed to send e-ticket via webhook:', emailError)
+        // Don't fail the webhook if email fails - booking is already confirmed
+      }
     } else if (verifiedData.code === '01' && verifiedData.status === 'CANCELLED') {
       // Payment cancelled - cancel booking and release seats
       await bookingService.cancelBooking(bookingId, booking.userId)

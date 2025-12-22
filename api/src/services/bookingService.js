@@ -214,9 +214,9 @@ const getSeatStatusesByTripId = async (tripId) => {
 
 const confirmBooking = async (bookingId, userId, paymentData) => {
   const prisma = GET_DB()
-  
+
   const booking = await bookingModel.getBookingById(bookingId)
-  
+
   if (!booking) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
   }
@@ -225,8 +225,14 @@ const confirmBooking = async (bookingId, userId, paymentData) => {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You do not have permission to confirm this booking')
   }
 
+  // Idempotency: If already confirmed, return the existing booking
+  if (booking.status === 'confirmed') {
+    console.log('Booking already confirmed (idempotent):', bookingId)
+    return booking
+  }
+
   if (booking.status !== 'pending') {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Booking is not in pending status')
+    throw new ApiError(StatusCodes.BAD_REQUEST, `Booking is not in pending status (current status: ${booking.status})`)
   }
 
   // Create payment and update booking status in transaction

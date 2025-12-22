@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, Loader2, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { confirmBookingAPI } from '@/lib/api'
+import { confirmBookingAPI, getBookingByIdAPI } from '@/lib/api'
 import { sendETicketEmailAPI } from '@/lib/api/eTicket'
 import { getPaymentLinkInfoAPI } from '@/lib/api/payment'
 
@@ -17,7 +17,7 @@ function SuccessContent() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const confirmPayment = async () => {
+    const waitForWebhookConfirmation = async () => {
       const bookingId = searchParams.get('bookingId')
       const orderCode = searchParams.get('orderCode')
 
@@ -28,27 +28,52 @@ function SuccessContent() {
       }
 
       try {
-        // Get payment information from PayOS
+        // Verify payment was successful from PayOS
         const paymentInfo = await getPaymentLinkInfoAPI(orderCode)
 
-        // Verify payment was successful
         if (paymentInfo.data.status !== 'PAID') {
           setError('Payment was not completed successfully')
           setIsProcessing(false)
           return
         }
 
-        // Confirm booking with payment details
-        await confirmBookingAPI(bookingId, {
-          provider: 'payos',
-          transactionRef: orderCode,
-        })
+        // Poll booking status until webhook confirms it (max 30 seconds)
+        const maxAttempts = 3
+        let attempts = 0
+        let bookingConfirmed = false
 
-        // Send e-ticket email
-        await sendETicketEmailAPI(bookingId)
+        while (attempts < maxAttempts && !bookingConfirmed) {
+          try {
+            const bookingData = await getBookingByIdAPI(bookingId)
 
-        setIsProcessing(false)
-        toast.success('Booking confirmed and e-ticket sent!')
+            if (bookingData?.data?.booking?.status === 'confirmed') {
+              bookingConfirmed = true
+              // Webhook already confirmed, just send e-ticket as backup
+              await sendETicketEmailAPI(bookingId)
+              setIsProcessing(false)
+              toast.success('Booking confirmed and e-ticket sent!')
+              break
+            }
+          } catch (err) {
+            console.error('Error checking booking status:', err)
+          }
+
+          // Wait 1 second before next attempt
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+          attempts++
+        }
+
+        // If webhook didn't confirm after 30 seconds, confirm manually as fallback
+        if (!bookingConfirmed) {
+          console.warn('Webhook confirmation timeout, confirming manually')
+          await confirmBookingAPI(bookingId, {
+            provider: 'payos',
+            transactionRef: orderCode,
+          })
+          await sendETicketEmailAPI(bookingId)
+          setIsProcessing(false)
+          toast.success('Booking confirmed and e-ticket sent!')
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         console.error('Error confirming payment:', err)
@@ -58,7 +83,7 @@ function SuccessContent() {
       }
     }
 
-    confirmPayment()
+    waitForWebhookConfirmation()
   }, [searchParams])
 
   useEffect(() => {
@@ -68,7 +93,7 @@ function SuccessContent() {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer)
-          router.push('/dashboard')
+          router.push('/')
           return 0
         }
         return prev - 1
@@ -83,9 +108,9 @@ function SuccessContent() {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
           <Loader2 className="w-20 h-20 text-blue-600 animate-spin mx-auto mb-6" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Processing Your Payment</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Confirming Your Booking</h1>
           <p className="text-gray-600 dark:text-gray-300">
-            Please wait while we confirm your booking and send your e-ticket...
+            Please wait while we verify your payment and prepare your e-ticket...
           </p>
         </div>
       </div>
@@ -106,7 +131,7 @@ function SuccessContent() {
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
             Please contact our support team with your order details for assistance.
           </p>
-          <Button onClick={() => router.push('/dashboard')} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+          <Button onClick={() => router.push('/')} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
             Go to Dashboard
             <ArrowRight className="w-5 h-5 ml-2" />
           </Button>
@@ -135,7 +160,7 @@ function SuccessContent() {
           </p>
         </div>
 
-        <Button onClick={() => router.push('/dashboard')} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+        <Button onClick={() => router.push('/')} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
           View My Bookings
           <ArrowRight className="w-5 h-5 ml-2" />
         </Button>

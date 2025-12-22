@@ -70,13 +70,24 @@ export interface TripDetail {
     destinationStopId?: string
     distanceKm?: number
     stops?: Array<{
+      id?: string
       stopId: string
-      stopName: string
-      stopAddress: string
-      distanceFromOrigin: number
-      estimatedMinutes: number
-      isPickup: boolean
-      isDropoff: boolean
+      stopName?: string
+      stopAddress?: string
+      sequence?: number
+      distanceFromOrigin?: number
+      estimatedMinutes?: number
+      isPickup?: boolean
+      isDropoff?: boolean
+      note?: string | null
+      // Nested stop object from API
+      stop?: {
+        id: string
+        name: string
+        address: string
+        latitude?: number
+        longitude?: number
+      }
     }>
   }
 
@@ -86,8 +97,17 @@ export interface TripDetail {
     model: string
     plateNumber: string
     capacity?: number
-    amenities?: string[]
+    seatCapacity?: number
+    busType?: string
+    amenities?: string[] | Record<string, boolean>
+    images?: string[] // Array of image URLs
     operatorId?: string
+    operator?: {
+      id: string
+      name: string
+      contactEmail?: string
+      contactPhone?: string
+    }
   }
 
   // Nested operator information
