@@ -140,6 +140,16 @@ const autocompleteStops = async (req, res, next) => {
   }
 }
 
+const getPopularRoutes = async (req, res, next) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 4
+    const result = await routeService.getPopularRoutes(Number.isFinite(limit) ? limit : 4)
+    res.status(StatusCodes.OK).json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const routeController = {
   // Routes
   createRoute,
@@ -154,4 +164,5 @@ export const routeController = {
   updateStop,
   deleteStop,
   autocompleteStops,
+  getPopularRoutes,
 }

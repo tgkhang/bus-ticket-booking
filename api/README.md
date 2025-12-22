@@ -192,3 +192,7 @@ DATABASE_URL=postgresql://demo:demo123@localhost:5433/bus_ticket_db
 npm run build
 npm run production
 ```
+
+
+
+npx prisma migrate reset --force

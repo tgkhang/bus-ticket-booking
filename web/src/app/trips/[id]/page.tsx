@@ -2,25 +2,29 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { getTripByIdAPI } from '@/lib/api'
+import { getTripByIdAPI, searchTripsAPI } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { 
-  MapPin, 
-  Calendar, 
-  Clock, 
-  Bus, 
+import TripCard from '@/components/common/TripCard'
+import {
+  MapPin,
+  Calendar,
+  Clock,
+  Bus,
   Star,
   ShieldCheck,
   AlertCircle,
   ChevronLeft,
   Info,
   Navigation,
-  Route
+  Route,
+  Image as ImageIcon,
+  ChevronRight
 } from 'lucide-react'
 import { toast } from 'sonner'
+import Image from 'next/image'
 
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
@@ -92,6 +96,7 @@ type TripDetailApi = {
     seatCapacity?: number
     operator?: { id?: string; name?: string }
     amenities?: Record<string, boolean> | string[] | null
+    images?: string[]
   }
 }
 
@@ -145,11 +150,40 @@ export default function TripDetailsPage() {
   const searchParams = useSearchParams()
   const [trip, setTrip] = useState<TripDetailApi | null>(null)
   const [loading, setLoading] = useState(true)
+  const [alternativeTrips, setAlternativeTrips] = useState<any[]>([])
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+
+  const handlePrevImage = () => {
+    if (trip?.bus?.images && trip.bus.images.length > 0) {
+      const imagesLength = trip.bus.images.length
+      setCurrentImageIndex((prev) => (prev === 0 ? imagesLength - 1 : prev - 1))
+    }
+  }
+
+  const handleNextImage = () => {
+    if (trip?.bus?.images && trip.bus.images.length > 0) {
+      const imagesLength = trip.bus.images.length
+      setCurrentImageIndex((prev) => (prev === imagesLength - 1 ? 0 : prev + 1))
+    }
+  }
 
   useEffect(() => {
     const fetchTrip = async () => {
       try {
         const data = await getTripByIdAPI(params.id as string)
+
+        // Parse images if they're stored as JSON string
+        if (data.bus && data.bus.images) {
+          if (typeof data.bus.images === 'string') {
+            try {
+              data.bus.images = JSON.parse(data.bus.images)
+            } catch (e) {
+              console.error('Failed to parse bus images:', e)
+              data.bus.images = []
+            }
+          }
+        }
+
         setTrip(data as TripDetailApi)
       } catch (error) {
         console.error('Failed to fetch trip details:', error)
@@ -163,6 +197,49 @@ export default function TripDetailsPage() {
       fetchTrip()
     }
   }, [params.id])
+
+  useEffect(() => {
+    const fetchAlternatives = async () => {
+      if (!trip) return
+
+      try {
+        // 1. Search same day
+        const date = new Date(trip.departureTime).toISOString().split('T')[0]
+        const results: any = await searchTripsAPI({
+          originStopId: trip.route.originStop.id,
+          destinationStopId: trip.route.destinationStop.id,
+          date: date,
+          limit: 5 // Fetch a few more to filter out current
+        })
+
+        let alts = (results.data || []).filter((t: any) => t.id !== trip.id)
+
+        // 2. If not enough, search next day
+        if (alts.length < 3) {
+          const nextDate = new Date(date)
+          nextDate.setDate(nextDate.getDate() + 1)
+          const nextDateStr = nextDate.toISOString().split('T')[0]
+
+          const nextDayResults: any = await searchTripsAPI({
+            originStopId: trip.route.originStop.id,
+            destinationStopId: trip.route.destinationStop.id,
+            date: nextDateStr,
+            limit: 3
+          })
+
+          alts = [...alts, ...(nextDayResults.data || [])]
+        }
+
+        setAlternativeTrips(alts.slice(0, 3))
+      } catch (err) {
+        console.error("Failed to fetch alternatives", err)
+      }
+    }
+
+    if (trip) {
+      fetchAlternatives()
+    }
+  }, [trip])
 
   const passengers = Math.max(1, Number(searchParams.get('passengers') || '1') || 1)
   const routeStops = trip?.route?.stops || []
@@ -312,6 +389,80 @@ export default function TripDetailsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Main Details */}
           <div className="lg:col-span-2 space-y-8">
+
+            {/* Bus Images Gallery */}
+            {trip.bus && trip.bus.images && trip.bus.images.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5 text-blue-600" />
+                    Bus Photos
+                  </CardTitle>
+                  <CardDescription>
+                    {trip.bus.images.length} photo{trip.bus.images.length !== 1 ? 's' : ''} of this bus
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Main Image Slider */}
+                    <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 shadow-lg">
+                      <Image
+                        src={trip.bus.images[currentImageIndex]}
+                        alt={`Bus ${trip.bus.plateNumber || trip.bus.model} - Photo ${currentImageIndex + 1}`}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 66vw"
+                        priority
+                      />
+
+                      {/* Navigation Arrows */}
+                      {trip.bus.images.length > 1 && (
+                        <>
+                          <button
+                            onClick={handlePrevImage}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full transition-all shadow-lg backdrop-blur-sm"
+                            aria-label="Previous image"
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={handleNextImage}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full transition-all shadow-lg backdrop-blur-sm"
+                            aria-label="Next image"
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
+
+                      {/* Image Counter */}
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-black/60 text-white rounded-full text-xs font-medium backdrop-blur-sm">
+                        {currentImageIndex + 1} / {trip.bus.images.length}
+                      </div>
+                    </div>
+
+                    {/* Thumbnail Navigation */}
+                    {trip.bus.images.length > 1 && (
+                      <div className="flex gap-2 overflow-x-auto pb-2">
+                        {trip.bus.images.map((imageUrl, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setCurrentImageIndex(index)}
+                            className={`relative shrink-0 w-20 h-14 rounded-lg overflow-hidden border-2 transition-all ${
+                              index === currentImageIndex
+                                ? 'border-blue-500 ring-2 ring-blue-500/50'
+                                : 'border-gray-300 dark:border-gray-700 hover:border-blue-400'
+                            }`}
+                          >
+                            <Image src={imageUrl} alt={`Thumbnail ${index + 1}`} fill className="object-cover" sizes="80px" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Route Map */}
             <Card>
@@ -688,6 +839,29 @@ export default function TripDetailsPage() {
             </div>
           </div>
         </div>
+
+        {/* Alternative Trips */}
+        {alternativeTrips.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Alternative Trips
+            </h2>
+
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              You might also be interested in these trips on the same route.
+            </p>
+
+            <div className="mt-6 grid grid-cols-1 gap-6">
+              {alternativeTrips.map((altTrip) => (
+                <TripCard 
+                  key={altTrip.id} 
+                  trip={altTrip} 
+                  passengers={passengers}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

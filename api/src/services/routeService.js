@@ -162,6 +162,10 @@ const listRoutes = async (filters, pagination) => {
   return await routeModel.getRoutes(filters, pagination)
 }
 
+const getPopularRoutes = async (limit = 4) => {
+  return await routeModel.getPopularRoutes(limit)
+}
+
 export const routeService = {
   // Stops
   createStop,
@@ -176,4 +180,5 @@ export const routeService = {
   deleteRoute,
   getRoute,
   listRoutes,
+  getPopularRoutes,
 }

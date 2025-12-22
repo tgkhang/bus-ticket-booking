@@ -12,6 +12,7 @@ import { CONNECT_DB, CLOSE_DB } from '~/config/prisma.js'
 import { connectRedis } from '~/config/redis.js'
 import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
+import morgan from 'morgan'
 
 import { seatLockService } from '~/services/seatLockService'
 import jwt from 'jsonwebtoken'
@@ -102,6 +103,13 @@ const START_SERVER = async () => {
     res.set('Cache-Control', 'no-store')
     next()
   })
+
+  // Morgan logging middleware - shows HTTP requests in color
+  if (env.BUILD_MODE === 'development') {
+    app.use(morgan('dev')) // Colored output for development
+  } else {
+    app.use(morgan('combined')) // Standard Apache-style logs for production
+  }
 
   app.use(cookieParser())
   app.use(cors(corsOptions))

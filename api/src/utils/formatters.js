@@ -27,5 +27,8 @@ export const pickUser = (user) => {
     'updatedAt',
     'lastLogin',
     'googleId',
+    'phoneNumber',
+    'address',
+    'bankAccount',
   ])
 }

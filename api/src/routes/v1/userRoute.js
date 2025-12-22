@@ -6,6 +6,8 @@ import { authMiddleware } from '~/middlewares/authMiddleware'
 import { rbacMiddleware } from '~/middlewares/rbacMiddleware'
 import { env } from '~/config/environment'
 import { PERMISSIONS } from '~/utils/constants'
+import { asyncHandler } from '~/helpers/asyncHandler'
+import { multerUploadMiddleware } from '~/middlewares/multerUploadMiddleware'
 
 const Router = express.Router()
 
@@ -69,7 +71,12 @@ Router.route('/reset_password').put(passwordResetLimiter, userValidation.resetPa
 
 Router.route('/me').get(authMiddleware.isAuthorized, userController.getMe)
 
-Router.route('/update').put(authMiddleware.isAuthorized, userValidation.update, userController.update)
+Router.route('/update').put(
+  authMiddleware.isAuthorized,
+  multerUploadMiddleware.upload.single('avatar'),
+  userValidation.update,
+  asyncHandler(userController.update)
+)
 
 Router.route('/logout_all_devices').delete(authMiddleware.isAuthorized, userController.logoutAllDevices)
 
@@ -161,7 +168,7 @@ Router.get(
   authMiddleware.isAuthorized,
   rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_USERS]),
   userController.listUsers
-);
+)
 
 // Create user
 Router.post(
@@ -170,7 +177,7 @@ Router.post(
   rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_USERS]),
   userValidation.createByAdmin,
   userController.createUser
-);
+)
 
 // Update user
 Router.put(
@@ -179,7 +186,7 @@ Router.put(
   rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_USERS]),
   userValidation.updateByAdmin,
   userController.updateUser
-);
+)
 
 // Delete user
 Router.delete(
@@ -187,7 +194,6 @@ Router.delete(
   authMiddleware.isAuthorized,
   rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_USERS]),
   userController.deleteUser
-);
-
+)
 
 export const userRoute = Router

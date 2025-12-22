@@ -11,16 +11,16 @@ const buildWhere = (filters) => {
   if (filters.date) {
     // Parse date as local time (Vietnam timezone UTC+7)
     const localDate = new Date(filters.date)
-    
+
     // Create day boundaries in local time
     const dayStart = new Date(localDate)
     dayStart.setHours(0, 0, 0, 0)
-    
+
     const dayEnd = new Date(localDate)
     dayEnd.setHours(23, 59, 59, 999)
-    
+
     where.departureTime = { gte: dayStart, lte: dayEnd }
-    
+
     // Apply time range filters if provided
     if (filters.timeFrom) {
       const [h, m] = filters.timeFrom.split(':')
@@ -43,9 +43,10 @@ const buildWhere = (filters) => {
   if (filters.status) {
     where.status = filters.status
   }
-  if (filters.busModel || filters.amenities?.length) {
+  if (filters.busModel || filters.amenities?.length || filters.busType?.length) {
     where.bus = {}
     if (filters.busModel) where.bus.model = { contains: filters.busModel, mode: 'insensitive' }
+    if (filters.busType?.length) where.bus.busType = { in: filters.busType }
     if (filters.amenities?.length) {
       // Match each amenity key set to true in the serialized JSON
       const amenityClauses = filters.amenities.map((a) => ({ amenities: { contains: `"${a}":true` } }))
@@ -118,6 +119,7 @@ const searchTrips = async (filters) => {
       destinationStop: t.route.destinationStop,
       bus: {
         model: t.bus.model,
+        busType: t.bus.busType,
         amenities: t.bus.amenities ? JSON.parse(t.bus.amenities) : {},
       },
     }
@@ -154,19 +156,72 @@ const getTripById = async (id) => {
         },
       },
       bus: {
-        include: { operator: true },
+        include: {
+          operator: true,
+          seats: true,
+        },
+      },
+      seatStatuses: {
+        include: {
+          seat: true,
+        },
+      },
+      bookings: {
+        include: {
+          user: true,
+          passengerDetails: true,
+        },
       },
     },
   })
 
   if (trip) {
     trip.durationMinutes = Math.round((trip.arrivalTime.getTime() - trip.departureTime.getTime()) / 60000)
-    if (trip.bus.amenities) {
+
+    // Parse bus amenities
+    if (trip.bus?.amenities) {
       try {
         trip.bus.amenities = JSON.parse(trip.bus.amenities)
       } catch (e) {
         trip.bus.amenities = {}
       }
+    }
+
+    // Parse bus images
+    if (trip.bus?.images) {
+      try {
+        trip.bus.images = JSON.parse(trip.bus.images)
+      } catch (e) {
+        trip.bus.images = []
+      }
+    }
+
+    // Transform seatStatuses into a seats array with combined data for the admin view
+    if (trip.seatStatuses && trip.seatStatuses.length > 0) {
+      trip.seats = trip.seatStatuses.map((ss) => {
+        // Find passenger for this seat if it's booked
+        let passengerName = null
+        if (ss.status === 'booked' && trip.bookings) {
+          // Look for a passenger detail with matching seatCode
+          for (const booking of trip.bookings) {
+            if (booking.passengerDetails) {
+              const passenger = booking.passengerDetails.find((pd) => pd.seatCode === ss.seat.seatNumber)
+              if (passenger) {
+                passengerName = passenger.fullName
+                break
+              }
+            }
+          }
+        }
+
+        return {
+          id: ss.seat.id,
+          seatNumber: ss.seat.seatNumber,
+          seatType: ss.seat.seatType,
+          status: ss.status,
+          passengerName: passengerName,
+        }
+      })
     }
   }
   return trip

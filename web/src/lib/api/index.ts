@@ -63,6 +63,15 @@ export const oauthGoogleLoginAPI = async (userData: OAuthGoogleData) => {
   return response.data
 }
 
+export const updateProfileAPI = async (data: FormData) => {
+  const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/users/update`, data, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+  return response.data
+}
+
 // Stops API
 export const autocompleteStopsAPI = async (query: string, limit: number = 10, page: number = 1) => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/stops/autocomplete`, {
@@ -158,6 +167,52 @@ export const generateSeatsAPI = async (
 }
 
 //=================================
+// Bus Image API Calls
+//=================================
+
+export const uploadBusImagesAPI = async (busId: string, images: File[]) => {
+  const formData = new FormData()
+  images.forEach((image) => {
+    formData.append('images', image)
+  })
+
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/buses/${busId}/images`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+  toast.success('Images uploaded successfully')
+  return response.data
+}
+
+export const updateBusImagesAPI = async (busId: string, images: File[]) => {
+  const formData = new FormData()
+  images.forEach((image) => {
+    formData.append('images', image)
+  })
+
+  const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/buses/${busId}/images`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+  toast.success('Images updated successfully')
+  return response.data
+}
+
+export const deleteBusImageAPI = async (busId: string, imageIndex: number) => {
+  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/buses/${busId}/images/${imageIndex}`)
+  toast.success('Image deleted successfully')
+  return response.data
+}
+
+export const deleteAllBusImagesAPI = async (busId: string) => {
+  const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/buses/${busId}/images`)
+  toast.success('All images deleted successfully')
+  return response.data
+}
+
+//=================================
 // Stops API Calls
 //=================================
 
@@ -233,6 +288,24 @@ export const getRouteDetailsAPI = async (routeId: string): Promise<Route> => {
   return response.data
 }
 
+export type PopularRouteItem = {
+  id: string
+  originStopId: string
+  destinationStopId: string
+  from: string
+  to: string
+  bookings: number
+  minPrice: number
+  avgDurationMinutes: number
+}
+
+export const getPopularRoutesAPI = async (limit: number = 4): Promise<PopularRouteItem[]> => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/routes/popular`, {
+    params: { limit },
+  })
+  return response.data
+}
+
 //=================================
 // Trip API Calls
 //=================================
@@ -250,6 +323,7 @@ export const searchTripsAPI = async (params: {
   minPrice?: number
   maxPrice?: number
   busModel?: string
+  busType?: string
   amenities?: string
   status?: string
   sortBy?: string

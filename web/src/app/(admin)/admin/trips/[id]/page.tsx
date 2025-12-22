@@ -18,6 +18,9 @@ import {
   Phone,
   Mail,
   User,
+  Image as ImageIcon,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { TripDetail, TripStatus } from '@/types/trip'
 import { Card, CardContent } from '@/components/ui/card'
@@ -25,6 +28,13 @@ import { Badge } from '@/components/ui/badge'
 import { getTripDetailsAPI, updateTripAPI } from '@/lib/api'
 import { toast } from 'sonner'
 import { amenityOptions } from '@/utils/constants'
+import Image from 'next/image'
+import {
+  organizeSeatsByFloor,
+  organizeSeatsByRows,
+  getSeatStatusColor,
+  getSeatTypeBorderColor,
+} from '@/utils/seatLayout'
 
 type TripFormInputs = {
   departureTime: string
@@ -42,6 +52,23 @@ export default function TripDetailPage() {
   const [loading, setLoading] = useState(true)
   const [isEditingTrip, setIsEditingTrip] = useState(false)
 
+  // Image slider state
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+
+  const handlePrevImage = () => {
+    if (trip?.bus?.images && trip.bus.images.length > 0) {
+      const imagesLength = trip.bus.images.length
+      setCurrentImageIndex((prev) => (prev === 0 ? imagesLength - 1 : prev - 1))
+    }
+  }
+
+  const handleNextImage = () => {
+    if (trip?.bus?.images && trip.bus.images.length > 0) {
+      const imagesLength = trip.bus.images.length
+      setCurrentImageIndex((prev) => (prev === imagesLength - 1 ? 0 : prev + 1))
+    }
+  }
+
   const {
     register,
     handleSubmit,
@@ -58,9 +85,23 @@ export default function TripDetailPage() {
 
   useEffect(() => {
     const fetchTripDetails = async () => {
+      console.log('FETCHING TRIP DETAILS FOR ID:', tripId)
       try {
         setLoading(true)
         const response = await getTripDetailsAPI(tripId)
+        
+        // Parse images if they're stored as JSON string
+        if (response.bus && response.bus.images) {
+          if (typeof response.bus.images === 'string') {
+            try {
+              response.bus.images = JSON.parse(response.bus.images)
+            } catch (e) {
+              console.error('Failed to parse bus images:', e)
+              response.bus.images = []
+            }
+          }
+        }
+        
         setTrip(response)
         reset({
           departureTime: response.departureTime.slice(0, 16), // Format for datetime-local
@@ -68,6 +109,7 @@ export default function TripDetailPage() {
           basePrice: response.basePrice,
           status: response.status,
         })
+        console.log('TRIP HERE', response)
       } catch (error) {
         console.error('Error fetching trip details:', error)
         toast.error('Failed to fetch trip details')
@@ -116,29 +158,7 @@ export default function TripDetailPage() {
     }
   }
 
-  const getSeatStatusColor = (status: string) => {
-    switch (status) {
-      case 'available':
-        return 'bg-green-500 hover:bg-green-600'
-      case 'locked':
-        return 'bg-yellow-500'
-      case 'booked':
-        return 'bg-gray-400'
-      default:
-        return 'bg-gray-300'
-    }
-  }
-
-  const getSeatTypeColor = (type: string) => {
-    switch (type) {
-      case 'premium':
-        return 'border-purple-400'
-      case 'sleeper':
-        return 'border-blue-400'
-      default:
-        return 'border-gray-400'
-    }
-  }
+  const [selectedFloor, setSelectedFloor] = useState(1)
 
   if (loading || !trip) {
     return (
@@ -299,7 +319,9 @@ export default function TripDetailPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600 dark:text-gray-400 text-sm">Occupancy</span>
-                    <span className="text-gray-900 dark:text-white font-semibold">{occupancyPercentage.toFixed(0)}%</span>
+                    <span className="text-gray-900 dark:text-white font-semibold">
+                      {occupancyPercentage.toFixed(0)}%
+                    </span>
                   </div>
                 </div>
               </div>
@@ -325,26 +347,99 @@ export default function TripDetailPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Capacity</span>
-                    <span className="text-gray-900 dark:text-white">{trip.bus.capacity || 'N/A'} seats</span>
+                    <span className="text-gray-900 dark:text-white">{trip.bus.seatCapacity || 'N/A'} seats</span>
                   </div>
-                  {trip.bus.amenities && trip.bus.amenities.length > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Type</span>
+                    <span className="text-gray-900 dark:text-white">{trip.bus.busType || 'N/A'}</span>
+                  </div>
+
+                  {/* Compact Bus Images Section */}
+                  {trip.bus.images && trip.bus.images.length > 0 && (
+                    <div className="pt-3 border-t border-gray-200 dark:border-gray-800">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                          <ImageIcon className="w-4 h-4" />
+                          Bus Images
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-500">
+                          {currentImageIndex + 1} / {trip.bus.images.length}
+                        </span>
+                      </div>
+                      <div className="relative aspect-3/2 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                        <Image
+                          src={trip.bus.images[currentImageIndex]}
+                          alt={`Bus ${trip.bus.plateNumber} - Image ${currentImageIndex + 1}`}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, 400px"
+                        />
+                        {trip.bus.images.length > 1 && (
+                          <>
+                            <button
+                              onClick={handlePrevImage}
+                              className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full transition-all"
+                              aria-label="Previous image"
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={handleNextImage}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full transition-all"
+                              aria-label="Next image"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                      {trip.bus.images.length > 1 && (
+                        <div className="flex gap-1.5 mt-2 overflow-x-auto">
+                          {trip.bus.images.map((imageUrl, index) => (
+                            <button
+                              key={index}
+                              onClick={() => setCurrentImageIndex(index)}
+                              className={`relative shrink-0 w-16 h-10 rounded overflow-hidden border-2 transition-all ${
+                                index === currentImageIndex
+                                  ? 'border-blue-500 ring-1 ring-blue-500/50'
+                                  : 'border-gray-300 dark:border-gray-700 hover:border-blue-400'
+                              }`}
+                            >
+                              <Image src={imageUrl} alt={`Thumbnail ${index + 1}`} fill className="object-cover" sizes="64px" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {trip.bus.amenities && (
                     <div>
                       <span className="text-gray-600 dark:text-gray-400 block mb-2">Amenities</span>
                       <div className="flex flex-wrap gap-2">
-                        {trip.bus.amenities.map((amenity) => {
-                          const option = amenityOptions.find((a) => a.value === amenity)
-                          if (!option) return null
-                          const Icon = option.icon
-                          return (
-                            <div
-                              key={amenity}
-                              className="flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg"
-                            >
-                              <Icon className="w-4 h-4" />
-                              <span className="text-sm">{option.label}</span>
-                            </div>
-                          )
-                        })}
+                        {(() => {
+                          // Handle both object and array formats
+                          const amenityList = Array.isArray(trip.bus.amenities)
+                            ? trip.bus.amenities
+                            : Object.entries(trip.bus.amenities)
+                                .filter(([, value]) => value === true)
+                                .map(([key]) => key)
+
+                          return amenityList.map((amenity) => {
+                            const option = amenityOptions.find((a) => a.value === amenity)
+                            if (!option) return null
+                            const Icon = option.icon
+                            return (
+                              <div
+                                key={amenity}
+                                className="flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg"
+                              >
+                                <Icon className="w-4 h-4" />
+                                <span className="text-sm">{option.label}</span>
+                              </div>
+                            )
+                          })
+                        })()}
                       </div>
                     </div>
                   )}
@@ -354,7 +449,7 @@ export default function TripDetailPage() {
           )}
 
           {/* Operator Information */}
-          {trip.operator && (
+          {trip.bus?.operator && (
             <Card className="mt-6">
               <CardContent className="p-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -364,29 +459,29 @@ export default function TripDetailPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Name</span>
-                    <span className="text-gray-900 dark:text-white">{trip.operator.name}</span>
+                    <span className="text-gray-900 dark:text-white">{trip.bus.operator.name}</span>
                   </div>
-                  {trip.operator.phone && (
+                  {trip.bus.operator.contactPhone && (
                     <div className="flex items-center justify-between">
                       <span className="text-gray-600 dark:text-gray-400">Phone</span>
                       <a
-                        href={`tel:${trip.operator.phone}`}
+                        href={`tel:${trip.bus.operator.contactPhone}`}
                         className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2"
                       >
                         <Phone className="w-4 h-4" />
-                        {trip.operator.phone}
+                        {trip.bus.operator.contactPhone}
                       </a>
                     </div>
                   )}
-                  {trip.operator.email && (
+                  {trip.bus.operator.contactEmail && (
                     <div className="flex items-center justify-between">
                       <span className="text-gray-600 dark:text-gray-400">Email</span>
                       <a
-                        href={`mailto:${trip.operator.email}`}
+                        href={`mailto:${trip.bus.operator.contactEmail}`}
                         className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-2"
                       >
                         <Mail className="w-4 h-4" />
-                        {trip.operator.email}
+                        {trip.bus.operator.contactEmail}
                       </a>
                     </div>
                   )}
@@ -447,7 +542,9 @@ export default function TripDetailPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">Revenue</p>
-                    <p className="text-gray-900 dark:text-white text-2xl font-bold">₫{(totalRevenue / 1000).toFixed(0)}K</p>
+                    <p className="text-gray-900 dark:text-white text-2xl font-bold">
+                      ₫{(totalRevenue / 1000).toFixed(0)}K
+                    </p>
                   </div>
                   <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-lg">
                     <DollarSign className="w-6 h-6 text-purple-600 dark:text-purple-400" />
@@ -457,10 +554,10 @@ export default function TripDetailPage() {
             </Card>
           </div>
 
-          {/* Seat Layout */}
+          {/* Seat Layout - Bus View */}
           <Card className="mb-6">
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Seat Layout</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Bus Seat Layout</h3>
 
               {/* Legend */}
               <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -486,25 +583,189 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              {/* Seat Grid */}
+              {/* Bus Layout View */}
               {trip.seats && trip.seats.length > 0 ? (
-                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
-                  {trip.seats.map((seat) => (
-                    <div key={seat.id} className="relative group">
-                      <div
-                        className={`w-full aspect-square rounded-lg text-white transition-all border-4 flex items-center justify-center ${getSeatStatusColor(
-                          seat.status
-                        )} ${getSeatTypeColor(seat.seatType)}`}
-                      >
-                        <span className="text-sm font-semibold">{seat.seatNumber}</span>
-                      </div>
-                      {seat.status === 'booked' && seat.passengerName && (
-                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                          {seat.passengerName}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div className="space-y-4">
+                  {(() => {
+                    const floorSeats = organizeSeatsByFloor(trip.seats)
+                    const floorNumbers = Object.keys(floorSeats).map(Number).sort()
+                    const hasMultipleFloors = floorNumbers.length > 1
+
+                    return (
+                      <>
+                        {/* Floor Tabs for multi-floor buses */}
+                        {hasMultipleFloors && (
+                          <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+                            {floorNumbers.map((floorNum) => (
+                              <button
+                                key={floorNum}
+                                onClick={() => setSelectedFloor(floorNum)}
+                                className={`px-4 py-2 font-medium transition-colors ${
+                                  selectedFloor === floorNum
+                                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                }`}
+                              >
+                                Floor {floorNum}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Display seats for selected floor */}
+                        {floorNumbers.map((floorNum) => {
+                          if (hasMultipleFloors && floorNum !== selectedFloor) return null
+
+                          const seatsOnFloor = floorSeats[floorNum] || []
+                          const rowSeats = organizeSeatsByRows(seatsOnFloor)
+                          const rowNumbers = Object.keys(rowSeats)
+
+                          return (
+                            <div key={floorNum} className="space-y-4">
+                              {/* Driver section indicator */}
+                              <div className="flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                  🚗 Driver {hasMultipleFloors && `- Floor ${floorNum}`}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">Front of Bus</span>
+                              </div>
+
+                              {/* Seat Layout by Rows */}
+                              <div className="space-y-3 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+                                {rowNumbers.map((rowNum) => {
+                                  const seatsInRow = rowSeats[rowNum]
+
+                                  // Sort seats by column letter to ensure proper order
+                                  const sortedSeats = [...seatsInRow].sort((a, b) => {
+                                    const colA = a.seatNumber.replace(/\d/g, '')
+                                    const colB = b.seatNumber.replace(/\d/g, '')
+                                    return colA.localeCompare(colB)
+                                  })
+
+                                  // Organize seats based on their column positions
+                                  const leftSeats: typeof trip.seats = []
+                                  const middleSeats: typeof trip.seats = []
+                                  const rightSeats: typeof trip.seats = []
+
+                                  // Determine the layout type based on columns present
+                                  const columns = [...new Set(sortedSeats.map((s) => s.seatNumber.replace(/\d/g, '')))]
+                                  const totalColumns = columns.length
+
+                                  sortedSeats.forEach((seat) => {
+                                    const col = seat.seatNumber.replace(/\d/g, '')
+
+                                    if (totalColumns === 2) {
+                                      // 1-1 layout: A (left) | B (right)
+                                      if (col === 'A') {
+                                        leftSeats.push(seat)
+                                      } else {
+                                        rightSeats.push(seat)
+                                      }
+                                    } else if (totalColumns === 3) {
+                                      // 1-1-1 layout: A (left) | B (middle) | C (right)
+                                      if (col === 'A') {
+                                        leftSeats.push(seat)
+                                      } else if (col === 'B') {
+                                        middleSeats.push(seat)
+                                      } else {
+                                        rightSeats.push(seat)
+                                      }
+                                    } else if (totalColumns >= 4) {
+                                      // 2-2 layout: AB (left) | CD (right)
+                                      if (col === 'A' || col === 'B') {
+                                        leftSeats.push(seat)
+                                      } else {
+                                        rightSeats.push(seat)
+                                      }
+                                    } else {
+                                      // Single column, put on left
+                                      leftSeats.push(seat)
+                                    }
+                                  })
+
+                                  return (
+                                    <div key={rowNum} className="flex items-center gap-3 justify-center">
+                                      {/* Left seats */}
+                                      <div className="flex gap-2">
+                                        {leftSeats.map((seat) => (
+                                          <div key={seat.id} className="relative group">
+                                            <div
+                                              className={`w-12 h-12 rounded-lg text-white text-xs font-semibold transition-all border-4 flex items-center justify-center ${getSeatStatusColor(
+                                                seat.status
+                                              )} ${getSeatTypeBorderColor(seat.seatType)}`}
+                                              title={`${seat.seatNumber} - ${seat.seatType} (${seat.status})`}
+                                            >
+                                              {seat.seatNumber}
+                                            </div>
+                                            {seat.status === 'booked' && seat.passengerName && (
+                                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                                {seat.passengerName}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+
+                                      {/* Aisle */}
+                                      <div className="w-8 border-l-2 border-r-2 border-dashed border-gray-300 dark:border-gray-600 h-12"></div>
+
+                                      {/* Middle seats (for 1-1-1 layouts) */}
+                                      {middleSeats.length > 0 && (
+                                        <>
+                                          <div className="flex gap-2">
+                                            {middleSeats.map((seat) => (
+                                              <div key={seat.id} className="relative group">
+                                                <div
+                                                  className={`w-12 h-12 rounded-lg text-white text-xs font-semibold transition-all border-4 flex items-center justify-center ${getSeatStatusColor(
+                                                    seat.status
+                                                  )} ${getSeatTypeBorderColor(seat.seatType)}`}
+                                                  title={`${seat.seatNumber} - ${seat.seatType} (${seat.status})`}
+                                                >
+                                                  {seat.seatNumber}
+                                                </div>
+                                                {seat.status === 'booked' && seat.passengerName && (
+                                                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                                    {seat.passengerName}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                          {/* Another aisle */}
+                                          <div className="w-8 border-l-2 border-r-2 border-dashed border-gray-300 dark:border-gray-600 h-12"></div>
+                                        </>
+                                      )}
+
+                                      {/* Right seats */}
+                                      <div className="flex gap-2">
+                                        {rightSeats.map((seat) => (
+                                          <div key={seat.id} className="relative group">
+                                            <div
+                                              className={`w-12 h-12 rounded-lg text-white text-xs font-semibold transition-all border-4 flex items-center justify-center ${getSeatStatusColor(
+                                                seat.status
+                                              )} ${getSeatTypeBorderColor(seat.seatType)}`}
+                                              title={`${seat.seatNumber} - ${seat.seatType} (${seat.status})`}
+                                            >
+                                              {seat.seatNumber}
+                                            </div>
+                                            {seat.status === 'booked' && seat.passengerName && (
+                                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                                                {seat.passengerName}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </>
+                    )
+                  })()}
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">No seat data available</div>
@@ -594,32 +855,75 @@ export default function TripDetailPage() {
                   )}
                   {trip.route.stops && trip.route.stops.length > 0 && (
                     <div>
-                      <span className="text-gray-600 dark:text-gray-400 block mb-3">Stops ({trip.route.stops.length})</span>
+                      <span className="text-gray-600 dark:text-gray-400 block mb-3">
+                        Stops ({trip.route.stops.length})
+                      </span>
                       <div className="space-y-2">
-                        {trip.route.stops.map((stop, index) => (
-                          <div
-                            key={stop.stopId}
-                            className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
-                              <span className="text-blue-600 dark:text-blue-400 text-sm font-semibold">{index + 1}</span>
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-gray-900 dark:text-white">{stop.stopName}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">{stop.stopAddress}</p>
-                              <div className="flex gap-3 mt-1">
-                                <span className="text-xs text-gray-500">
-                                  <Navigation className="w-3 h-3 inline mr-1" />
-                                  {stop.distanceFromOrigin} km
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  <Clock className="w-3 h-3 inline mr-1" />
-                                  {Math.floor(stop.estimatedMinutes / 60)}h {stop.estimatedMinutes % 60}m
+                        {trip.route.stops.map((routeStop, index) => {
+                          // Handle both API formats
+                          const stopName = routeStop.stopName || routeStop.stop?.name || 'Unknown Stop'
+                          const stopAddress = routeStop.stopAddress || routeStop.stop?.address || ''
+                          const distanceFromOrigin = routeStop.distanceFromOrigin || 0
+                          const estimatedMinutes = routeStop.estimatedMinutes || 0
+
+                          return (
+                            <div
+                              key={routeStop.stopId || routeStop.id}
+                              className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                            >
+                              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
+                                <span className="text-blue-600 dark:text-blue-400 text-sm font-semibold">
+                                  {routeStop.sequence || index + 1}
                                 </span>
                               </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">{stopName}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{stopAddress}</p>
+                                {(distanceFromOrigin > 0 || estimatedMinutes > 0) && (
+                                  <div className="flex gap-3 mt-1">
+                                    {distanceFromOrigin > 0 && (
+                                      <span className="text-xs text-gray-500">
+                                        <Navigation className="w-3 h-3 inline mr-1" />
+                                        {distanceFromOrigin} km
+                                      </span>
+                                    )}
+                                    {estimatedMinutes > 0 && (
+                                      <span className="text-xs text-gray-500">
+                                        <Clock className="w-3 h-3 inline mr-1" />
+                                        {Math.floor(estimatedMinutes / 60)}h {estimatedMinutes % 60}m
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                {/* Show pickup/dropoff badges */}
+                                <div className="flex gap-2 mt-2">
+                                  {routeStop.isPickup !== undefined && (
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-xs ${
+                                        routeStop.isPickup
+                                          ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                                          : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'
+                                      }`}
+                                    >
+                                      {routeStop.isPickup ? '✓ Pickup' : '✗ No Pickup'}
+                                    </span>
+                                  )}
+                                  {routeStop.isDropoff !== undefined && (
+                                    <span
+                                      className={`px-2 py-0.5 rounded text-xs ${
+                                        routeStop.isDropoff
+                                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                                          : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'
+                                      }`}
+                                    >
+                                      {routeStop.isDropoff ? '✓ Drop-off' : '✗ No Drop-off'}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                   )}
