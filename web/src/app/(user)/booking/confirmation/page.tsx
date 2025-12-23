@@ -74,7 +74,7 @@ function ConfirmationContent() {
     )
   }
 
-  if (!bookingRef || !booking) {
+  if (!booking) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -105,7 +105,9 @@ function ConfirmationContent() {
         {/* Booking Reference */}
         <div className="bg-linear-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-6 mb-8 text-center">
           <p className="text-blue-100 mb-2">Booking Reference Number</p>
-          <h2 className="text-3xl font-bold text-white tracking-wider">{bookingRef}</h2>
+          <h2 className="text-3xl font-bold text-white tracking-wider">
+            {bookingRef || booking.bookingReference || booking.bookingRef || booking.id}
+          </h2>
           <p className="text-blue-100 mt-4">
             A confirmation email has been sent to your email address
           </p>

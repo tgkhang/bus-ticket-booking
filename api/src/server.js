@@ -15,6 +15,7 @@ import cookieParser from 'cookie-parser'
 import morgan from 'morgan'
 import passport from '~/config/passport'
 import { seatLockService } from '~/services/seatLockService'
+import { bookingAutoConfirmService } from '~/services/bookingAutoConfirmService'
 import jwt from 'jsonwebtoken'
 
 const getCookieValue = (cookieHeader, name) => {
@@ -134,6 +135,9 @@ const START_SERVER = async () => {
 
   app.use('/v1', APIs_V1)
   app.use(errorHandlingMiddleware)
+
+  // Background job: auto-confirm pending bookings after 5 minute with the check every 2 minutes
+  bookingAutoConfirmService.startBookingAutoConfirmJob({ intervalMs: 120_000 })
 
   if (env.BUILD_MODE === 'production') {
     httpServer.listen(env.PORT, () => {

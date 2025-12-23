@@ -392,6 +392,34 @@ export const cancelBookingAPI = async (bookingId: string) => {
 }
 
 //=================================
+// Feedback API Calls
+//=================================
+
+export const listTripFeedbacksAPI = async (tripId: string, params?: { page?: number; limit?: number }) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${tripId}/feedbacks`, { params })
+  return response.data
+}
+
+export const getMyTripFeedbackContextAPI = async (tripId: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/${tripId}/my-feedback`)
+  return response.data
+}
+
+export const upsertBookingFeedbackAPI = async (
+  bookingId: string,
+  payload: { rating: number; comment?: string | null }
+) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/bookings/${bookingId}/feedback`, payload)
+  toast.success('Thanks for your review!')
+  return response.data
+}
+
+export const getBookingFeedbackContextAPI = async (bookingId: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/bookings/${bookingId}/feedback`)
+  return response.data
+}
+
+//=================================
 // Payment API Calls
 //=================================
 

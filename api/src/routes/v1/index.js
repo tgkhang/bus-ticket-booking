@@ -7,6 +7,7 @@ import { tripRoute } from './tripRoute'
 import { stopRoute } from './stopRoute'
 import { eTicketRoute } from './eTicketRoute'
 import { bookingRoute } from './bookingRoute'
+import { adminBookingRoute } from './adminBookingRoute'
 import { paymentRoute } from './paymentRoute'
 import { seatRoute } from './seatRoute'
 import { authRoute } from './authRoute'
@@ -43,7 +44,10 @@ Router.use('/payments', paymentRoute)
 // E-ticket routes
 Router.use('/', eTicketRoute)
 // Booking routes
-Router.use('/', bookingRoute)
+Router.use('/bookings', bookingRoute)
+
+// Admin booking routes
+Router.use('/admin/bookings', adminBookingRoute)
 
 // Revenue routes
 Router.use('/revenue', revenueRoute)

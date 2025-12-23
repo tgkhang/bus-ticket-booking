@@ -13,7 +13,11 @@ const createBooking = async (bookingData) => {
               destinationStop: true,
             },
           },
-          bus: true,
+          bus: {
+            include: {
+              operator: true,
+            },
+          },
         },
       },
       passengerDetails: true,
@@ -75,7 +79,11 @@ const getUserBookings = async (userId, filters = {}) => {
                 destinationStop: true,
               },
             },
-            bus: true,
+            bus: {
+              include: {
+                operator: true,
+              },
+            },
           },
         },
         passengerDetails: true,
@@ -92,6 +100,118 @@ const getUserBookings = async (userId, filters = {}) => {
       totalPages: Math.ceil(total / limit),
     },
   }
+}
+
+const getAdminBookings = async (filters = {}) => {
+  const prisma = GET_DB()
+  const where = {}
+
+  if (filters.status) {
+    where.status = filters.status
+  }
+
+  if (filters.from || filters.to) {
+    const bookedAt = {}
+    if (filters.from && !isNaN(new Date(filters.from))) {
+      bookedAt.gte = new Date(filters.from)
+    }
+    if (filters.to && !isNaN(new Date(filters.to))) {
+      // include whole day
+      bookedAt.lte = new Date(`${filters.to}T23:59:59.999Z`)
+    }
+    if (Object.keys(bookedAt).length > 0) {
+      where.bookedAt = bookedAt
+    }
+  }
+
+  const page = filters.page || 1
+  const limit = filters.limit || 10
+  const skip = (page - 1) * limit
+
+  const [total, bookings] = await Promise.all([
+    prisma.booking.count({ where }),
+    prisma.booking.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { bookedAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            username: true,
+            displayName: true,
+          },
+        },
+        trip: {
+          include: {
+            route: {
+              include: {
+                originStop: true,
+                destinationStop: true,
+              },
+            },
+            bus: {
+              include: {
+                operator: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            passengerDetails: true,
+            payments: true,
+          },
+        },
+      },
+    }),
+  ])
+
+  return {
+    data: bookings,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  }
+}
+
+const getBookingByIdAdmin = async (id) => {
+  const prisma = GET_DB()
+  return prisma.booking.findUnique({
+    where: { id },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          displayName: true,
+        },
+      },
+      trip: {
+        include: {
+          route: {
+            include: {
+              originStop: true,
+              destinationStop: true,
+            },
+          },
+          bus: {
+            include: {
+              operator: true,
+            },
+          },
+        },
+      },
+      passengerDetails: true,
+      payments: true,
+    },
+  })
 }
 
 const updateBookingStatus = async (id, status) => {
@@ -201,7 +321,9 @@ const getRevenueByPaymentMethod = async (from, to) => {
 export const bookingModel = {
   createBooking,
   getBookingById,
+  getBookingByIdAdmin,
   getUserBookings,
+  getAdminBookings,
   updateBookingStatus,
   cancelBooking,
   getRevenueOverview,

@@ -262,6 +262,7 @@ model Booking {
   payments        Payment[]
   notifications   Notification[]
   passengerDetails PassengerDetail[]
+  feedback        Feedback?
 
   @@map("bookings")
 }
@@ -313,6 +314,7 @@ model Notification {
 
 model Feedback {
   id          String   @id @default(uuid())
+  bookingId   String   @unique @map("booking_id") // 1 feedback per booking
   tripId      String   @map("trip_id")
   userId      String   @map("user_id")
   rating      Int      // 1-5 stars
@@ -320,9 +322,9 @@ model Feedback {
   submittedAt DateTime @default(now()) @map("submitted_at")
 
   // Relationships
-  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  trip    Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([tripId, userId]) // One feedback per user per trip
   @@map("feedbacks")
 }
