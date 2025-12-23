@@ -39,8 +39,6 @@ export default function SeatSelectionPage() {
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [lockExpiry, setLockExpiry] = useState<Date | null>(null)
-
   const selectedSeatsRef = useRef<string[]>([])
 
   useEffect(() => {
