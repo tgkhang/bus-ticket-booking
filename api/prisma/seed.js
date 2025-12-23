@@ -674,6 +674,40 @@ async function main() {
     }
   }
   console.log(`💺 Created ${seatStatusCount} seat statuses for all trips`)
+  // Seed sample bookings with payment for revenue analytics
+  const allUsers = [user1, user2]
+  const allPayments = ["VNPAY", "CASH"]
+  const allTripsForBooking = await prisma.trip.findMany({})
+  const allSeatsForBooking = await prisma.seat.findMany({})
+  const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
+  let bookingSeedCount = 0
+  for (let i = 0; i < 10; i++) {
+    const user = allUsers[randomInt(0, allUsers.length - 1)]
+    const trip = allTripsForBooking[randomInt(0, allTripsForBooking.length - 1)]
+    const seat = allSeatsForBooking.find(s => s.busId === trip.busId) || allSeatsForBooking[0]
+    const amount = randomInt(50000, 250000)
+    const bookedAt = new Date()
+    bookedAt.setDate(bookedAt.getDate() - randomInt(0, 6)) // trong tuần này
+    bookedAt.setHours(randomInt(8, 20), randomInt(0, 59), 0, 0)
+    const booking = await prisma.booking.create({
+      data: {
+        userId: user.id,
+        tripId: trip.id,
+        totalAmount: amount,
+        status: "completed",
+        bookedAt,
+        payments: {
+          create: {
+            provider: allPayments[randomInt(0, allPayments.length - 1)],
+            amount: amount,
+            status: "success"
+          }
+        }
+      }
+    })
+    bookingSeedCount++
+  }
+  console.log(`💵 Seeded ${bookingSeedCount} sample bookings with payment for revenue analytics`)
 
   console.log('✅ Database seeding completed!')
 }
