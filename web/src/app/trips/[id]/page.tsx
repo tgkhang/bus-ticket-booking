@@ -1015,14 +1015,16 @@ export default function TripDetailsPage() {
                       <span>{formatCurrency(total)}</span>
                     </div>
 
-                    <div className="pt-4">
-                      <Button className="w-full h-12 text-lg" onClick={() => router.push(`/booking/seats/${trip.id}?passengers=${passengers}`)}>
-                        Book Now
-                      </Button>
-                      <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
-                        By clicking Book Now, you agree to our Terms & Conditions
-                      </p>
-                    </div>
+                    {!shouldOpenReviewEditor && (
+                      <div className="pt-4">
+                        <Button className="w-full h-12 text-lg" onClick={() => router.push(`/booking/seats/${trip.id}?passengers=${passengers}`)}>
+                          Book Now
+                        </Button>
+                        <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
+                          By clicking Book Now, you agree to our Terms & Conditions
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
