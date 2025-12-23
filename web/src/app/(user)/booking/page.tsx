@@ -1,80 +1,137 @@
-'use client'
-
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { getUserBookingsAPI } from '@/lib/api'
-import { toast } from 'sonner'
-import { Ticket, Calendar, MapPin, ArrowRight, Loader2, AlertCircle, X, Eye } from 'lucide-react'
+import Link from 'next/link'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { API_ROOT } from '@/lib/utils/constants'
+import { Ticket, Calendar, MapPin, ArrowRight, AlertCircle, X, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 
-export default function MyBookingsPage() {
-  const router = useRouter()
-  const [bookings, setBookings] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState('all')
+export const dynamic = 'force-dynamic'
 
-  const TABS = [
-    { key: 'all', label: 'All Bookings' },
-    { key: 'upcoming', label: 'Upcoming' },
-    { key: 'past', label: 'Past' },
-    { key: 'cancelled', label: 'Cancelled' },
-  ]
+type StatusParam = 'all' | 'confirmed' | 'pending' | 'completed' | 'cancelled'
 
-  const currentDate = new Date('2025-12-17T00:00:00')
+const PAGE_SIZE = 5
 
-  const filteredBookings = bookings.filter((b) => {
-    const departureDate = new Date(b.trip?.departureTime || b.departureTime)
-    switch (activeTab) {
-      case 'upcoming':
-        return (b.status === 'confirmed' || b.status === 'pending') && departureDate > currentDate
-      case 'past':
-        return b.status === 'completed'
-      case 'cancelled':
-        return b.status === 'cancelled'
-      default:
-        return true
-    }
+async function buildCookieHeader() {
+  const cookieStore = await cookies()
+  return cookieStore
+    .getAll()
+    .map((c: { name: string; value: string }) => `${c.name}=${c.value}`)
+    .join('; ')
+}
+
+async function cancelBookingAction(formData: FormData) {
+  'use server'
+
+  const bookingId = String(formData.get('bookingId') || '')
+  const status = String(formData.get('status') || 'all')
+  const page = String(formData.get('page') || '1')
+
+  if (!bookingId) {
+    redirect(`/booking?status=${encodeURIComponent(status)}&page=${encodeURIComponent(page)}`)
+  }
+
+  const cookieHeader = await buildCookieHeader()
+
+  await fetch(`${API_ROOT}/v1/bookings/${bookingId}/cancel`, {
+    method: 'POST',
+    headers: {
+      cookie: cookieHeader,
+      'Content-Type': 'application/json',
+    },
+    cache: 'no-store',
   })
 
-  useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        const response = await getUserBookingsAPI()
-        setBookings(response.data?.data || response.data || [])
-      } catch (err) {
-        console.error('Failed to fetch bookings:', err)
-        setError('Failed to load your bookings')
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchBookings()
-  }, [])
+  redirect(`/booking?status=${encodeURIComponent(status)}&page=${encodeURIComponent(page)}`)
+}
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return 'bg-green-500 text-white'
-      case 'pending':
-        return 'bg-yellow-500 text-white'
-      case 'cancelled':
-        return 'bg-red-500 text-white'
-      case 'completed':
-        return 'bg-gray-500 text-white'
-      default:
-        return 'bg-gray-400 text-white'
+function normalizeStatusParam(raw: unknown): StatusParam {
+  const value = typeof raw === 'string' ? raw : ''
+  if (value === 'confirmed' || value === 'pending' || value === 'completed' || value === 'cancelled') return value
+  return 'all'
+}
+
+function normalizePage(raw: unknown): number {
+  const value = typeof raw === 'string' ? parseInt(raw, 10) : NaN
+  if (!Number.isFinite(value) || value < 1) return 1
+  return value
+}
+
+function buildBookingsUrl(status: StatusParam, page: number) {
+  const params = new URLSearchParams()
+  params.set('status', status)
+  params.set('page', String(page))
+  return `/booking?${params.toString()}`
+}
+
+function getStatusBadge(status: string) {
+  switch (status) {
+    case 'confirmed':
+      return 'bg-green-500 text-white'
+    case 'pending':
+      return 'bg-yellow-500 text-white'
+    case 'cancelled':
+      return 'bg-red-500 text-white'
+    case 'completed':
+      return 'bg-gray-500 text-white'
+    default:
+      return 'bg-gray-400 text-white'
+  }
+}
+
+export default async function MyBookingsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const resolvedSearchParams = (await searchParams) || {}
+  const statusParam = normalizeStatusParam(resolvedSearchParams.status)
+  const page = normalizePage(resolvedSearchParams.page)
+  const apiStatus = statusParam === 'all' ? undefined : statusParam
+
+  const cookieHeader = await buildCookieHeader()
+
+  const url = new URL(`${API_ROOT}/v1/bookings`)
+  url.searchParams.set('page', String(page))
+  url.searchParams.set('limit', String(PAGE_SIZE))
+  if (apiStatus) url.searchParams.set('status', apiStatus)
+
+  let bookings: any[] = []
+  let meta: { page: number; limit: number; total: number; totalPages: number } | null = null
+  let error: string | null = null
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: { cookie: cookieHeader },
+      cache: 'no-store',
+    })
+
+    if (!res.ok) {
+      error = `Failed to load your bookings (HTTP ${res.status})`
+    } else {
+      const json = await res.json()
+      bookings = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []
+      meta = json?.meta || null
     }
+  } catch (e) {
+    console.error('Failed to fetch bookings:', e)
+    error = 'Failed to load your bookings'
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
-      </div>
-    )
+  const totalPages = Math.max(1, meta?.totalPages || 1)
+  const safePage = Math.min(Math.max(page, 1), totalPages)
+
+  if (safePage !== page) {
+    redirect(buildBookingsUrl(statusParam, safePage))
   }
+
+  const TABS: Array<{ key: StatusParam; label: string }> = [
+    { key: 'all', label: 'All Bookings' },
+    { key: 'confirmed', label: 'Confirmed' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'completed', label: 'Completed' },
+    { key: 'cancelled', label: 'Cancelled' },
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -91,56 +148,56 @@ export default function MyBookingsPage() {
           </div>
         )}
 
+        {/* Tabs (always visible) */}
+        <div className="mb-8 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex gap-8">
+            {TABS.map((tab) => (
+              <Link
+                key={tab.key}
+                href={buildBookingsUrl(tab.key, 1)}
+                className={`pb-4 px-1 text-sm font-medium border-b-2 transition-colors ${
+                  statusParam === tab.key
+                    ? 'text-blue-600 border-blue-600'
+                    : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                {tab.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Booking List */}
         {bookings.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-12 text-center">
-            <Ticket className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">No Bookings Yet</h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              You haven't made any bookings yet. Start exploring bus trips now!
-            </p>
-            <Button onClick={() => router.push('/homepage')} className="bg-blue-600 hover:bg-blue-700">
-              Book Your First Trip
-            </Button>
-          </div>
-        ) : (
-          <>
-            {/* Tabs */}
-            <div className="mb-8 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex gap-8">
-                {TABS.map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`pb-4 px-1 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === tab.key
-                        ? 'text-blue-600 border-blue-600'
-                        : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Booking List */}
-            {filteredBookings.length === 0 ? (
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-12 text-center">
+            {statusParam === 'all' ? (
+              <>
+                <Ticket className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">No Bookings Yet</h2>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  You haven't made any bookings yet. Start exploring bus trips now!
+                </p>
+                <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                  <Link href="/homepage">Book Your First Trip</Link>
+                </Button>
+              </>
+            ) : (
+              <>
                 <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">No bookings found</h2>
                 <p className="text-gray-600 dark:text-gray-300 mb-6">
-                  Try selecting a different tab or book a new trip.
+                  Try selecting a different status or book a new trip.
                 </p>
-                <Button onClick={() => router.push('/homepage')} className="bg-blue-600 hover:bg-blue-700">
-                  Book New Trip
+                <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                  <Link href="/homepage">Book New Trip</Link>
                 </Button>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {filteredBookings.map((booking) => {
-                  const isCancellable =
-                    (booking.status === 'confirmed' || booking.status === 'pending') &&
-                    new Date(booking.trip?.departureTime || booking.departureTime) > currentDate
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-6">
+                {bookings.map((booking) => {
+                  const isCancellable = booking.status === 'confirmed' || booking.status === 'pending'
 
                   return (
                     <div
@@ -216,35 +273,30 @@ export default function MyBookingsPage() {
                             </span>
                           </div>
                           <div className="flex gap-3">
-                            <Button
-                              onClick={() =>
-                                router.push(`/booking/confirmation?bookingId=${booking.id}&bookingRef=${booking.bookingReference}`)
-                              }
-                              className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 py-2.5 text-sm font-medium"
-                            >
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Ticket
+                            <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 py-2.5 text-sm font-medium">
+                              <Link
+                                href={`/booking/confirmation?bookingId=${booking.id}&bookingRef=${encodeURIComponent(
+                                  booking.bookingReference || booking.bookingRef || booking.id
+                                )}`}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Ticket
+                              </Link>
                             </Button>
                             {isCancellable && (
-                              <Button
-                                variant="outline"
-                                className="border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full px-6 py-2.5 text-sm font-medium"
-                                onClick={async () => {
-                                  try {
-                                    await import('@/lib/api').then(api => api.cancelBookingAPI(booking.id))
-                                    toast.success('Booking cancelled successfully')
-                                    setLoading(true)
-                                    const response = await getUserBookingsAPI()
-                                    setBookings(response.data?.data || response.data || [])
-                                    setLoading(false)
-                                  } catch (err) {
-                                    toast.error('Failed to cancel booking')
-                                  }
-                                }}
-                              >
-                                <X className="w-4 h-4 mr-2" />
-                                Cancel
-                              </Button>
+                              <form action={cancelBookingAction}>
+                                <input type="hidden" name="bookingId" value={booking.id} />
+                                <input type="hidden" name="status" value={statusParam} />
+                                <input type="hidden" name="page" value={safePage} />
+                                <Button
+                                  type="submit"
+                                  variant="outline"
+                                  className="border-red-500 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full px-6 py-2.5 text-sm font-medium"
+                                >
+                                  <X className="w-4 h-4 mr-2" />
+                                  Cancel
+                                </Button>
+                              </form>
                             )}
                           </div>
                         </div>
@@ -252,9 +304,37 @@ export default function MyBookingsPage() {
                     </div>
                   )
                 })}
+
+                {/* Pagination */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Showing {(safePage - 1) * PAGE_SIZE + 1}-{Math.min(safePage * PAGE_SIZE, meta?.total || safePage * PAGE_SIZE)} of {meta?.total ?? '—'}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {safePage <= 1 ? (
+                      <Button variant="outline" className="rounded-full" disabled>
+                        Previous
+                      </Button>
+                    ) : (
+                      <Button asChild variant="outline" className="rounded-full">
+                        <Link href={buildBookingsUrl(statusParam, safePage - 1)}>Previous</Link>
+                      </Button>
+                    )}
+
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Page {safePage} / {totalPages}</span>
+
+                    {safePage >= totalPages ? (
+                      <Button variant="outline" className="rounded-full" disabled>
+                        Next
+                      </Button>
+                    ) : (
+                      <Button asChild variant="outline" className="rounded-full">
+                        <Link href={buildBookingsUrl(statusParam, safePage + 1)}>Next</Link>
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-          </>
         )}
       </div>
     </div>

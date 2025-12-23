@@ -185,7 +185,9 @@ function CheckoutContent() {
       toast.success('Payment simulated successfully!')
 
       // Redirect to success page
-      router.push(`/payment/success?bookingId=${booking.id}`)
+      // router.push(`/payment/success?bookingId=${booking.id}`)
+      // Redirect to confirmation page (the PayOS success page requires orderCode)
+      router.push(`/booking/confirmation?bookingId=${booking.id}&bookingRef=${booking.id}`)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error('Dev payment failed:', err)

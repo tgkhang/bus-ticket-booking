@@ -79,7 +79,7 @@ const createBooking = async (userId, bookingData) => {
           userId,
           tripId,
           totalAmount: parseFloat(totalAmount.toString()), // Ensure proper number format for Decimal
-          status: 'pending',
+          status: 'confirmed',
         },
       })
 

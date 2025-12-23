@@ -13,7 +13,11 @@ const createBooking = async (bookingData) => {
               destinationStop: true,
             },
           },
-          bus: true,
+          bus: {
+            include: {
+              operator: true,
+            },
+          },
         },
       },
       passengerDetails: true,
@@ -75,7 +79,11 @@ const getUserBookings = async (userId, filters = {}) => {
                 destinationStop: true,
               },
             },
-            bus: true,
+            bus: {
+              include: {
+                operator: true,
+              },
+            },
           },
         },
         passengerDetails: true,
