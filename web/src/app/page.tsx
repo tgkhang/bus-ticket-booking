@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { PublicLayout } from '@/components/layout'
 import Link from 'next/link'
 import Image from 'next/image'
 import TripSearchForm from '@/components/common/TripSearchForm'
+import { toast } from 'sonner'
 import {
   ArrowRight,
   Shield,
@@ -24,8 +25,24 @@ import {
 } from 'lucide-react'
 
 export default function Home() {
-  const { isAuthenticated, isInitialized, user, logout  } = useAuth()
+  const { isAuthenticated, isInitialized, user, logout, refreshUser  } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Handle OAuth callback
+  useEffect(() => {
+    const loginSuccess = searchParams.get('login')
+    const provider = searchParams.get('provider')
+    // the login success something like: https://yourapp.com/?login=success&provider=google
+    if (loginSuccess === 'success' && provider) {
+      // OAuth login successful, fetch user data
+      refreshUser().then(() => {
+        toast.success(`Successfully logged in with ${provider}!`)
+        // Remove query params
+        router.replace('/')
+      })
+    }
+  }, [searchParams, refreshUser, router])
 
   useEffect(() => {
     if (!isInitialized || !isAuthenticated) return;

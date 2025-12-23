@@ -9,6 +9,7 @@ import { eTicketRoute } from './eTicketRoute'
 import { bookingRoute } from './bookingRoute'
 import { paymentRoute } from './paymentRoute'
 import { seatRoute } from './seatRoute'
+import { authRoute } from './authRoute'
 
 const Router = express.Router()
 
@@ -23,6 +24,8 @@ Router.get('/health', (req, res) => {
 
 // User routes
 Router.use('/users', userRoute)
+
+Router.use('/auth', authRoute)
 
 Router.use('/buses', busRoute)
 
