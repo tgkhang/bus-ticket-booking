@@ -13,7 +13,7 @@ import { connectRedis } from '~/config/redis.js'
 import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
 import morgan from 'morgan'
-
+import passport from '~/config/passport'
 import { seatLockService } from '~/services/seatLockService'
 import jwt from 'jsonwebtoken'
 
@@ -42,7 +42,7 @@ const START_SERVER = async () => {
 
   io.on('connection', (socket) => {
     // console.log('New client connected:', socket.id)
-    
+
     // Try to identify user from token if present in handshake auth or cookies
     let token = socket.handshake.auth?.token
     if (!token) {
@@ -75,10 +75,10 @@ const START_SERVER = async () => {
           if (remainingSockets === 0) {
             const unlocked = await seatLockService.unlockAllUserLocks(socket.userId)
             if (unlocked) {
-              Object.keys(unlocked).forEach(tripId => {
+              Object.keys(unlocked).forEach((tripId) => {
                 socket.broadcast.emit('seats:unlocked', {
                   tripId,
-                  seatIds: unlocked[tripId]
+                  seatIds: unlocked[tripId],
                 })
               })
             }
@@ -114,6 +114,7 @@ const START_SERVER = async () => {
   app.use(cookieParser())
   app.use(cors(corsOptions))
   app.use(express.json())
+  app.use(passport.initialize())
 
   // Swagger UI Documentation
   // try {
