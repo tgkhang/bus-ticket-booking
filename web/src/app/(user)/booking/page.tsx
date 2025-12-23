@@ -283,6 +283,14 @@ export default async function MyBookingsPage({
                                 View Ticket
                               </Link>
                             </Button>
+
+                            {booking.status === 'completed' && booking.trip?.id && (
+                              <Button asChild variant="outline" className="rounded-full px-6 py-2.5 text-sm font-medium">
+                                <Link href={`/trips/${booking.trip.id}?reviewBookingId=${booking.id}#reviews`}>
+                                  Review
+                                </Link>
+                              </Button>
+                            )}
                             {isCancellable && (
                               <form action={cancelBookingAction}>
                                 <input type="hidden" name="bookingId" value={booking.id} />

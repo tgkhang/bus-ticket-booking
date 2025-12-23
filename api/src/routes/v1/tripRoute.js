@@ -3,7 +3,9 @@ import { authMiddleware } from '~/middlewares/authMiddleware'
 import { rbacMiddleware } from '~/middlewares/rbacMiddleware'
 import { tripController } from '~/controllers/tripController'
 import { bookingController } from '~/controllers/bookingController'
+import { feedbackController } from '~/controllers/feedbackController'
 import { tripValidation } from '~/validations/tripValidation'
+import { feedbackValidation } from '~/validations/feedbackValidation'
 import { PERMISSIONS } from '~/utils/constants'
 import { asyncHandler } from '~/helpers/asyncHandler.js'
 
@@ -19,6 +21,22 @@ Router.get(
 
 // Get seat statuses for a trip (public - no auth required for viewing)
 Router.get('/:tripId/seats', bookingController.getSeatStatuses)
+
+// Trip feedbacks (public list)
+Router.get(
+  '/:tripId/feedbacks',
+  feedbackValidation.listTripFeedbacks,
+  feedbackController.listTripFeedbacks
+)
+
+// Trip feedback context for current user (eligible booking + existing feedback)
+Router.get(
+  '/:tripId/my-feedback',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.READ_BOOKINGS]),
+  feedbackValidation.getMyTripFeedbackContext,
+  feedbackController.getMyTripFeedbackContext
+)
 
 Router.get(
   '/:id',

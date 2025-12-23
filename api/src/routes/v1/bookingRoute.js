@@ -2,7 +2,9 @@ import express from 'express'
 import { authMiddleware } from '~/middlewares/authMiddleware'
 import { rbacMiddleware } from '~/middlewares/rbacMiddleware'
 import { bookingController } from '~/controllers/bookingController'
+import { feedbackController } from '~/controllers/feedbackController'
 import { bookingValidation } from '~/validations/bookingValidation'
+import { feedbackValidation } from '~/validations/feedbackValidation'
 import { PERMISSIONS } from '~/utils/constants'
 
 const Router = express.Router()
@@ -33,6 +35,15 @@ Router.get(
   bookingController.getBookingById
 )
 
+// Booking feedback context (eligibility + existing feedback)
+Router.get(
+  '/:id/feedback',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.READ_BOOKINGS]),
+  feedbackValidation.getBookingFeedbackContext,
+  feedbackController.getBookingFeedbackContext
+)
+
 // Confirm booking (payment)
 Router.post(
   '/:id/confirm',
@@ -49,6 +60,15 @@ Router.post(
   rbacMiddleware.isValidPermission([PERMISSIONS.UPDATE_BOOKINGS]),
   bookingValidation.getBookingById,
   bookingController.cancelBooking
+)
+
+// Create or update feedback for a booking (1 feedback per booking)
+Router.post(
+  '/:id/feedback',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.UPDATE_BOOKINGS]),
+  feedbackValidation.upsertBookingFeedback,
+  feedbackController.upsertBookingFeedback
 )
 
 export const bookingRoute = Router
