@@ -136,8 +136,8 @@ const START_SERVER = async () => {
   app.use('/v1', APIs_V1)
   app.use(errorHandlingMiddleware)
 
-  // Background job: auto-confirm pending bookings after 5 minute
-  bookingAutoConfirmService.startBookingAutoConfirmJob({ intervalMs: 60_000 })
+  // Background job: auto-confirm pending bookings after 5 minute with the check every 2 minutes
+  bookingAutoConfirmService.startBookingAutoConfirmJob({ intervalMs: 120_000 })
 
   if (env.BUILD_MODE === 'production') {
     httpServer.listen(env.PORT, () => {

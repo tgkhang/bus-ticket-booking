@@ -184,6 +184,20 @@ const getUserBookings = async (userId, filters) => {
   return bookingModel.getUserBookings(userId, filters)
 }
 
+const getAdminBookings = async (filters) => {
+  return bookingModel.getAdminBookings(filters)
+}
+
+const getBookingByIdAdmin = async (bookingId) => {
+  const booking = await bookingModel.getBookingByIdAdmin(bookingId)
+
+  if (!booking) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
+  }
+
+  return booking
+}
+
 const getSeatStatusesByTripId = async (tripId) => {
   // Release expired locks first
   await seatStatusModel.releaseExpiredLocks()
@@ -367,11 +381,87 @@ const cancelBooking = async (bookingId, userId) => {
   return { success: true, message: 'Booking cancelled successfully' }
 }
 
+const confirmBookingAdmin = async (bookingId) => {
+  const booking = await bookingModel.getBookingByIdAdmin(bookingId)
+
+  if (!booking) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
+  }
+
+  // Idempotency: If already confirmed, return the existing booking
+  if (booking.status === 'confirmed') {
+    return booking
+  }
+
+  if (booking.status !== 'pending') {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `Booking is not in pending status (current status: ${booking.status})`
+    )
+  }
+
+  return bookingModel.updateBookingStatus(bookingId, 'confirmed')
+}
+
+const cancelBookingAdmin = async (bookingId) => {
+  const booking = await bookingModel.getBookingByIdAdmin(bookingId)
+
+  if (!booking) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
+  }
+
+  if (booking.status === 'cancelled') {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Booking is already cancelled')
+  }
+
+  if (booking.status === 'completed') {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot cancel completed booking')
+  }
+
+  // Admin cancel should also release seats like user cancel
+  const prisma = GET_DB()
+  await prisma.$transaction(async (tx) => {
+    await tx.booking.update({
+      where: { id: bookingId },
+      data: { status: 'cancelled' },
+    })
+
+    const seatCodes = (booking.passengerDetails || []).map((p) => p.seatCode)
+    const seats = await tx.seat.findMany({
+      where: {
+        seatNumber: { in: seatCodes },
+        busId: booking.trip.busId,
+      },
+    })
+
+    const seatIds = seats.map((s) => s.id)
+
+    if (seatIds.length > 0) {
+      await tx.seatStatus.updateMany({
+        where: {
+          tripId: booking.tripId,
+          seatId: { in: seatIds },
+        },
+        data: {
+          status: 'available',
+          lockedUntil: null,
+        },
+      })
+    }
+  })
+
+  return { success: true, message: 'Booking cancelled successfully' }
+}
+
 export const bookingService = {
   createBooking,
   getBookingById,
   getUserBookings,
+  getAdminBookings,
+  getBookingByIdAdmin,
   getSeatStatusesByTripId,
   confirmBooking,
   cancelBooking,
+  confirmBookingAdmin,
+  cancelBookingAdmin,
 }

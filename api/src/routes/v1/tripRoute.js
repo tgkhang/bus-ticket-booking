@@ -2,6 +2,7 @@ import express from 'express'
 import { authMiddleware } from '~/middlewares/authMiddleware'
 import { rbacMiddleware } from '~/middlewares/rbacMiddleware'
 import { tripController } from '~/controllers/tripController'
+import { bookingController } from '~/controllers/bookingController'
 import { tripValidation } from '~/validations/tripValidation'
 import { PERMISSIONS } from '~/utils/constants'
 import { asyncHandler } from '~/helpers/asyncHandler.js'
@@ -15,6 +16,9 @@ Router.get(
   tripValidation.search,
   tripController.search
 )
+
+// Get seat statuses for a trip (public - no auth required for viewing)
+Router.get('/:tripId/seats', bookingController.getSeatStatuses)
 
 Router.get(
   '/:id',

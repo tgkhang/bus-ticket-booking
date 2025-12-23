@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 
 export const dynamic = 'force-dynamic'
 
-type StatusParam = 'all' | 'confirmed' | 'pending' | 'completed' | 'cancelled'
+type StatusParam = 'all' | 'pending' | 'confirmed'  | 'completed' | 'cancelled'
 
 const PAGE_SIZE = 5
 
@@ -127,8 +127,8 @@ export default async function MyBookingsPage({
 
   const TABS: Array<{ key: StatusParam; label: string }> = [
     { key: 'all', label: 'All Bookings' },
-    { key: 'confirmed', label: 'Confirmed' },
     { key: 'pending', label: 'Pending' },
+    { key: 'confirmed', label: 'Confirmed' },
     { key: 'completed', label: 'Completed' },
     { key: 'cancelled', label: 'Cancelled' },
   ]
