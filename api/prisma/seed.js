@@ -681,20 +681,48 @@ async function main() {
   const allSeatsForBooking = await prisma.seat.findMany({})
   const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
   let bookingSeedCount = 0
-  for (let i = 0; i < 10; i++) {
-    const user = allUsers[randomInt(0, allUsers.length - 1)]
-    const trip = allTripsForBooking[randomInt(0, allTripsForBooking.length - 1)]
-    const seat = allSeatsForBooking.find(s => s.busId === trip.busId) || allSeatsForBooking[0]
-    const amount = randomInt(50000, 250000)
-    const bookedAt = new Date()
-    bookedAt.setDate(bookedAt.getDate() - randomInt(0, 6)) // trong tuần này
-    bookedAt.setHours(randomInt(8, 20), randomInt(0, 59), 0, 0)
+  for (let i = 0; i < 200; i++) {
+    // Phân bổ đều ngày và giờ trong 7 ngày gần nhất
+    const day = Math.floor(i / 24) % 7; // 0-6
+    const hour = i % 24; // 0-23
+    const user = allUsers[randomInt(0, allUsers.length - 1)];
+    const trip = allTripsForBooking[(i + day + hour) % allTripsForBooking.length];
+    const seat = allSeatsForBooking.find(s => s.busId === trip.busId) || allSeatsForBooking[0];
+    const amount = randomInt(50000, 250000);
+    const bookedAt = new Date();
+    bookedAt.setDate(bookedAt.getDate() - day); // day 0 = hôm nay, day 6 = 6 ngày trước
+    bookedAt.setHours(hour, randomInt(0, 59), 0, 0);
+    // Tăng số lượng hành khách mỗi booking (2-4)
+    const numPassengers = randomInt(2, 4);
+    // Lấy các seatCode hợp lệ cho bus của trip
+    const tripSeats = allSeatsForBooking.filter(s => s.busId === trip.busId);
+    const usedSeats = new Set();
+    const passengerDetails = [];
+    for (let p = 0; p < numPassengers; p++) {
+      // Chọn seatCode chưa bị trùng
+      let seat;
+      do {
+        seat = tripSeats[randomInt(0, tripSeats.length - 1)];
+      } while (usedSeats.has(seat.seatNumber) && usedSeats.size < tripSeats.length);
+      usedSeats.add(seat.seatNumber);
+      passengerDetails.push({
+        fullName: `Passenger ${p + 1} Booking ${i + 1}`,
+        documentId: `ID${i + 1}${p + 1}${randomInt(1000,9999)}`,
+        seatCode: seat.seatNumber
+      });
+    }
+
+    // Phân phối trạng thái booking: 1/3 initiated, 1/3 confirmed, 1/3 completed
+    let status = "completed";
+    if (i % 3 === 0) status = "initiated";
+    else if (i % 3 === 1) status = "confirmed";
+
     const booking = await prisma.booking.create({
       data: {
         userId: user.id,
         tripId: trip.id,
         totalAmount: amount,
-        status: "completed",
+        status,
         bookedAt,
         payments: {
           create: {
@@ -702,10 +730,13 @@ async function main() {
             amount: amount,
             status: "success"
           }
+        },
+        passengerDetails: {
+          create: passengerDetails
         }
       }
-    })
-    bookingSeedCount++
+    });
+    bookingSeedCount++;
   }
   console.log(`💵 Seeded ${bookingSeedCount} sample bookings with payment for revenue analytics`)
 

@@ -9,7 +9,8 @@ import { eTicketRoute } from './eTicketRoute'
 import { bookingRoute } from './bookingRoute'
 import { paymentRoute } from './paymentRoute'
 import { seatRoute } from './seatRoute'
-const revenueRoute = require('./revenueRoute');
+import revenueRoute from './revenueRoute';
+const bookingAnalyticsRoute = require('./bookingAnalyticsRoute');
 
 const Router = express.Router()
 
@@ -44,6 +45,9 @@ Router.use('/', bookingRoute)
 
 // Revenue routes
 Router.use('/revenue', revenueRoute)
+
+// Booking analytics routes
+Router.use('/analytics', bookingAnalyticsRoute)
 
 Router.use('/seats', seatRoute)
 
