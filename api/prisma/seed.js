@@ -424,7 +424,7 @@ async function main() {
     return seats
   }
 
-  // Create buses for every layout type with images - All using proper 2-2 layout
+  // Create buses for every layout type with images
   const busConfigs = [
     {
       plateNumber: 'GBL-001',
@@ -445,10 +445,12 @@ async function main() {
       plateNumber: 'GBL-002',
       model: 'Hyundai Universe Sleeper 32',
       seatCapacity: 32,
-      layoutCode: '2-2',
-      busType: 'Sleeper',
+      layoutCode: 'Sleeper-32',
+      busType: 'Sleeper Bus',
       operatorIdx: 0,
-      seatNumbers: generate22Seats(8), // 8 rows × 4 seats = 32 seats
+      seatNumbers: Array.from({ length: 11 }, (_, row) => 
+        ['L', 'M', 'R'].map(col => `${col}${row + 1}`)
+      ).flat().slice(0, 32),
       seatType: 'sleeper',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&q=80',
@@ -459,10 +461,12 @@ async function main() {
       plateNumber: 'ETC-001',
       model: 'Thaco Universe Sleeper 40',
       seatCapacity: 40,
-      layoutCode: '2-2',
-      busType: 'Sleeper',
+      layoutCode: 'Sleeper-40',
+      busType: 'Sleeper Bus',
       operatorIdx: 1,
-      seatNumbers: generate22Seats(10), // 10 rows × 4 seats = 40 seats
+      seatNumbers: Array.from({ length: 14 }, (_, row) => 
+        ['L', 'M', 'R'].map(col => `${col}${row + 1}`)
+      ).flat().slice(0, 40),
       seatType: 'sleeper',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&q=85',
@@ -473,11 +477,13 @@ async function main() {
     {
       plateNumber: 'CCS-001',
       model: 'Mercedes Cabin VIP',
-      seatCapacity: 20,
-      layoutCode: '2-2',
-      busType: 'Seater',
+      seatCapacity: 22,
+      layoutCode: 'Cabin-VIP',
+      busType: 'VIP Cabin Sleeper',
       operatorIdx: 2,
-      seatNumbers: generate22Seats(5), // 5 rows × 4 seats = 20 seats
+      seatNumbers: Array.from({ length: 11 }, (_, row) => 
+        ['L', 'R'].map(col => `${col}${row + 1}`)
+      ).flat(),
       seatType: 'premium',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&q=90',
@@ -486,12 +492,14 @@ async function main() {
     },
     {
       plateNumber: 'VIP-001',
-      model: 'Ford Transit Limousine 12',
-      seatCapacity: 12,
-      layoutCode: '2-2',
-      busType: 'Seater',
+      model: 'Ford Transit Limousine 9',
+      seatCapacity: 9,
+      layoutCode: 'Limo-9',
+      busType: 'Limousine',
       operatorIdx: 3,
-      seatNumbers: generate22Seats(3), // 3 rows × 4 seats = 12 seats
+      seatNumbers:  Array.from({ length: 3 }, (_, row) => 
+        ['A', 'B', 'C'].map(col => `${col}${row + 1}`)
+      ).flat(),
       seatType: 'premium',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&q=95',
@@ -503,10 +511,12 @@ async function main() {
       plateNumber: 'VIP-002',
       model: 'Hyundai Solati Limousine 16',
       seatCapacity: 16,
-      layoutCode: '2-2',
-      busType: 'Seater',
+      layoutCode: 'Limo-16',
+      busType: 'Limousine',
       operatorIdx: 3,
-      seatNumbers: generate22Seats(4), // 4 rows × 4 seats = 16 seats
+      seatNumbers: Array.from({ length: 4 }, (_, row) => 
+        ['A', 'B', 'C', 'D'].map(col => `${col}${row + 1}`)
+      ).flat(),
       seatType: 'premium',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600',
