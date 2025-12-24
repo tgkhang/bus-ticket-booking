@@ -7,8 +7,10 @@ import { tripRoute } from './tripRoute'
 import { stopRoute } from './stopRoute'
 import { eTicketRoute } from './eTicketRoute'
 import { bookingRoute } from './bookingRoute'
+import { adminBookingRoute } from './adminBookingRoute'
 import { paymentRoute } from './paymentRoute'
 import { seatRoute } from './seatRoute'
+import { authRoute } from './authRoute'
 import revenueRoute from './revenueRoute';
 const bookingAnalyticsRoute = require('./bookingAnalyticsRoute');
 
@@ -26,6 +28,8 @@ Router.get('/health', (req, res) => {
 // User routes
 Router.use('/users', userRoute)
 
+Router.use('/auth', authRoute)
+
 Router.use('/buses', busRoute)
 
 Router.use('/operators', operatorRoute)
@@ -41,7 +45,10 @@ Router.use('/payments', paymentRoute)
 // E-ticket routes
 Router.use('/', eTicketRoute)
 // Booking routes
-Router.use('/', bookingRoute)
+Router.use('/bookings', bookingRoute)
+
+// Admin booking routes
+Router.use('/admin/bookings', adminBookingRoute)
 
 // Revenue routes
 Router.use('/revenue', revenueRoute)

@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { getTripByIdAPI, searchTripsAPI } from '@/lib/api'
+import { getTripByIdAPI, listTripFeedbacksAPI, getBookingFeedbackContextAPI, upsertBookingFeedbackAPI, searchTripsAPI } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Label } from '@/components/ui/label'
 import TripCard from '@/components/common/TripCard'
 import {
   MapPin,
@@ -25,37 +26,35 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import Image from 'next/image'
+import { useAuth } from '@/hooks/useAuth'
 
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
 
-// Mock Reviews Data
-const MOCK_REVIEWS = [
-  {
-    id: 1,
-    user: 'Alice Nguyen',
-    rating: 5,
-    date: '2023-10-15',
-    comment: 'Great trip! The bus was clean and on time. The driver was very professional.',
-    avatar: 'AN'
-  },
-  {
-    id: 2,
-    user: 'Minh Tran',
-    rating: 4,
-    date: '2023-10-12',
-    comment: 'Comfortable seats, but the wifi was a bit spotty. Overall good experience.',
-    avatar: 'MT'
-  },
-  {
-    id: 3,
-    user: 'Sarah Le',
-    rating: 5,
-    date: '2023-10-05',
-    comment: 'Excellent service. Will definitely book again.',
-    avatar: 'SL'
+type TripFeedback = {
+  id: string
+  rating: number
+  comment?: string | null
+  submittedAt: string
+  user?: {
+    id: string
+    email?: string
+    username?: string
+    displayName?: string
   }
-]
+}
+
+type MyTripFeedbackContext = {
+  eligible: boolean
+  tripId?: string
+  bookingId?: string
+  feedback?: {
+    id: string
+    rating: number
+    comment?: string | null
+    submittedAt: string
+  } | null
+}
 
 type Stop = {
   id: string
@@ -148,10 +147,22 @@ export default function TripDetailsPage() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { isAuthenticated, isInitialized } = useAuth()
   const [trip, setTrip] = useState<TripDetailApi | null>(null)
   const [loading, setLoading] = useState(true)
   const [alternativeTrips, setAlternativeTrips] = useState<any[]>([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [reviews, setReviews] = useState<TripFeedback[]>([])
+  const [myContextLoading, setMyContextLoading] = useState(false)
+  const [myContext, setMyContext] = useState<MyTripFeedbackContext | null>(null)
+  const [myRating, setMyRating] = useState<number>(5)
+  const [myComment, setMyComment] = useState<string>('')
+  const [submittingReview, setSubmittingReview] = useState(false)
+
+  const reviewBookingId = (searchParams.get('reviewBookingId') || '').trim()
+  const shouldOpenReviewEditor = !!reviewBookingId
 
   const handlePrevImage = () => {
     if (trip?.bus?.images && trip.bus.images.length > 0) {
@@ -197,6 +208,107 @@ export default function TripDetailsPage() {
       fetchTrip()
     }
   }, [params.id])
+
+  useEffect(() => {
+    const tripId = params.id as string | undefined
+    if (!tripId) return
+
+    const loadReviews = async () => {
+      setReviewsLoading(true)
+      try {
+        const result = await listTripFeedbacksAPI(tripId, { page: 1, limit: 50 })
+        setReviews(result?.data || [])
+      } catch {
+        setReviews([])
+      } finally {
+        setReviewsLoading(false)
+      }
+    }
+
+    loadReviews()
+  }, [params.id])
+
+  useEffect(() => {
+    if (!shouldOpenReviewEditor) {
+      setMyContext(null)
+      return
+    }
+
+    if (!isInitialized) return
+    if (!isAuthenticated) {
+      setMyContext(null)
+      return
+    }
+
+    const loadContext = async () => {
+      setMyContextLoading(true)
+      try {
+        const ctx = (await getBookingFeedbackContextAPI(reviewBookingId)) as MyTripFeedbackContext
+        setMyContext(ctx)
+
+        if (ctx?.feedback) {
+          setMyRating(Number(ctx.feedback.rating || 5))
+          setMyComment(ctx.feedback.comment || '')
+        } else {
+          setMyRating(5)
+          setMyComment('')
+        }
+      } catch {
+        setMyContext(null)
+      } finally {
+        setMyContextLoading(false)
+      }
+    }
+
+    loadContext()
+  }, [reviewBookingId, shouldOpenReviewEditor, isAuthenticated, isInitialized])
+
+  useEffect(() => {
+    if (!shouldOpenReviewEditor) return
+    // Scroll to the review section when coming from My Bookings.
+    const t = setTimeout(() => {
+      const el = document.getElementById('reviews')
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 150)
+    return () => clearTimeout(t)
+  }, [shouldOpenReviewEditor])
+
+  const averageRating = useMemo(() => {
+    if (!reviews || reviews.length === 0) return 0
+    const sum = reviews.reduce((acc, r) => acc + (Number(r.rating) || 0), 0)
+    return sum / reviews.length
+  }, [reviews])
+
+  const submitReview = async () => {
+    if (!shouldOpenReviewEditor) return
+    if (!myContext?.eligible) return
+    const bookingId = reviewBookingId
+    if (!bookingId) return
+    // Safety: only allow editing when booking belongs to this trip.
+    const currentTripId = String(params.id || '')
+    if (myContext?.tripId && myContext.tripId !== currentTripId) return
+
+    setSubmittingReview(true)
+    try {
+      await upsertBookingFeedbackAPI(bookingId, {
+        rating: myRating,
+        comment: myComment,
+      })
+
+      // Refresh list + context
+      const tripId = params.id as string
+      const [result, ctx] = await Promise.all([
+        listTripFeedbacksAPI(tripId, { page: 1, limit: 50 }),
+        getBookingFeedbackContextAPI(bookingId),
+      ])
+      setReviews(result?.data || [])
+      setMyContext(ctx)
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to submit review')
+    } finally {
+      setSubmittingReview(false)
+    }
+  }
 
   useEffect(() => {
     const fetchAlternatives = async () => {
@@ -740,7 +852,7 @@ export default function TripDetailsPage() {
             </Card>
 
             {/* Reviews */}
-            <Card>
+            <Card id="reviews">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Star className="w-5 h-5 text-yellow-500" />
@@ -749,38 +861,131 @@ export default function TripDetailsPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-4 mb-6 p-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-                  <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">4.8</div>
+                  <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                    {reviewsLoading ? '—' : averageRating ? averageRating.toFixed(1) : '0.0'}
+                  </div>
                   <div>
                     <div className="flex text-yellow-500">
                       {[1, 2, 3, 4, 5].map((star) => (
-                        <Star key={star} className="w-4 h-4 fill-current" />
+                        <Star
+                          key={star}
+                          className={`w-4 h-4 ${averageRating >= star ? 'fill-current' : ''}`}
+                        />
                       ))}
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Mock reviews (demo)</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      {reviewsLoading ? 'Loading reviews...' : `${reviews.length} review${reviews.length === 1 ? '' : 's'}`}
+                    </p>
                   </div>
                 </div>
 
-                <div className="space-y-6">
-                  {MOCK_REVIEWS.map((review) => (
-                    <div key={review.id} className="border-b border-gray-100 last:border-0 pb-6 last:pb-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Avatar>
-                            <AvatarFallback className="text-xs font-semibold">{review.avatar}</AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium text-gray-900 dark:text-gray-100">{review.user}</span>
+                {/* Review form (only opened from My Bookings) */}
+                <div className="mb-6 rounded-lg border border-gray-200 dark:border-gray-800 p-4 bg-white dark:bg-gray-900">
+                  <p className="font-medium text-gray-900 dark:text-gray-100 mb-3">Your review</p>
+
+                  {!shouldOpenReviewEditor ? (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      To leave a review, go to <span className="font-medium">My Bookings</span> and click <span className="font-medium">Review</span> on a completed trip.
+                    </p>
+                  ) : !isInitialized ? (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Loading...</p>
+                  ) : !isAuthenticated ? (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Log in to leave a review.</p>
+                  ) : myContextLoading ? (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Loading your booking...</p>
+                  ) : !myContext?.eligible || (myContext?.tripId && myContext.tripId !== String(params.id || '')) ? (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      This booking is not eligible for review.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="block mb-2">Rating</Label>
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setMyRating(star)}
+                              className="p-1"
+                              aria-label={`Rate ${star} star${star === 1 ? '' : 's'}`}
+                            >
+                              <Star
+                                className={`w-5 h-5 ${myRating >= star ? 'text-yellow-500 fill-current' : 'text-gray-300 dark:text-gray-600'}`}
+                              />
+                            </button>
+                          ))}
                         </div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(review.date).toLocaleDateString()}</span>
                       </div>
-                      <div className="flex text-yellow-400 mb-2">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} className={`w-3 h-3 ${i < review.rating ? 'fill-current' : 'text-gray-300'}`} />
-                        ))}
+
+                      <div>
+                        <Label className="block mb-2">Comment (optional)</Label>
+                        <textarea
+                          value={myComment}
+                          onChange={(e) => setMyComment(e.target.value)}
+                          className="w-full min-h-24 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-950 text-sm"
+                          placeholder="Share your experience..."
+                          maxLength={2000}
+                        />
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{review.comment}</p>
+
+                      <div className="flex justify-end">
+                        <Button type="button" onClick={submitReview} disabled={submittingReview}>
+                          {myContext?.feedback ? 'Update review' : 'Submit review'}
+                        </Button>
+                      </div>
                     </div>
-                  ))}
+                  )}
                 </div>
+
+                {/* Reviews list */}
+                {reviewsLoading ? (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Loading reviews...</p>
+                ) : reviews.length === 0 ? (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">No reviews yet.</p>
+                ) : (
+                  <div className="space-y-6">
+                    {reviews.map((review) => {
+                      const displayName = review.user?.displayName || review.user?.username || 'Anonymous'
+                      const initials = displayName
+                        .split(' ')
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((p) => p[0]?.toUpperCase())
+                        .join('')
+                        .slice(0, 2)
+
+                      return (
+                        <div key={review.id} className="border-b border-gray-100 last:border-0 pb-6 last:pb-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Avatar>
+                                <AvatarFallback className="text-xs font-semibold">{initials || 'U'}</AvatarFallback>
+                              </Avatar>
+                              <span className="font-medium text-gray-900 dark:text-gray-100">{displayName}</span>
+                            </div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {new Date(review.submittedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div className="flex text-yellow-400 mb-2">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`w-3 h-3 ${i < (Number(review.rating) || 0) ? 'fill-current' : 'text-gray-300 dark:text-gray-600'}`}
+                              />
+                            ))}
+                          </div>
+                          {review.comment ? (
+                            <p className="text-sm text-gray-600 dark:text-gray-400">{review.comment}</p>
+                          ) : (
+                            <p className="text-sm text-gray-500 dark:text-gray-500">No comment.</p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -810,14 +1015,16 @@ export default function TripDetailsPage() {
                       <span>{formatCurrency(total)}</span>
                     </div>
 
-                    <div className="pt-4">
-                      <Button className="w-full h-12 text-lg" onClick={() => router.push(`/booking/seats/${trip.id}?passengers=${passengers}`)}>
-                        Book Now
-                      </Button>
-                      <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
-                        By clicking Book Now, you agree to our Terms & Conditions
-                      </p>
-                    </div>
+                    {!shouldOpenReviewEditor && (
+                      <div className="pt-4">
+                        <Button className="w-full h-12 text-lg" onClick={() => router.push(`/booking/seats/${trip.id}?passengers=${passengers}`)}>
+                          Book Now
+                        </Button>
+                        <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
+                          By clicking Book Now, you agree to our Terms & Conditions
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

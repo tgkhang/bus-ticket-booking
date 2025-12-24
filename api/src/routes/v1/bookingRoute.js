@@ -2,20 +2,16 @@ import express from 'express'
 import { authMiddleware } from '~/middlewares/authMiddleware'
 import { rbacMiddleware } from '~/middlewares/rbacMiddleware'
 import { bookingController } from '~/controllers/bookingController'
+import { feedbackController } from '~/controllers/feedbackController'
 import { bookingValidation } from '~/validations/bookingValidation'
+import { feedbackValidation } from '~/validations/feedbackValidation'
 import { PERMISSIONS } from '~/utils/constants'
 
 const Router = express.Router()
 
-// Get seat statuses for a trip (public - no auth required for viewing)
-Router.get(
-  '/trips/:tripId/seats',
-  bookingController.getSeatStatuses
-)
-
 // Create booking
 Router.post(
-  '/bookings',
+  '/',
   authMiddleware.isAuthorized,
   rbacMiddleware.isValidPermission([PERMISSIONS.CREATE_BOOKINGS]),
   bookingValidation.createBooking,
@@ -24,7 +20,7 @@ Router.post(
 
 // Get user's bookings
 Router.get(
-  '/bookings',
+  '/',
   authMiddleware.isAuthorized,
   rbacMiddleware.isValidPermission([PERMISSIONS.READ_BOOKINGS]),
   bookingController.getUserBookings
@@ -32,16 +28,25 @@ Router.get(
 
 // Get booking by ID
 Router.get(
-  '/bookings/:id',
+  '/:id',
   authMiddleware.isAuthorized,
   rbacMiddleware.isValidPermission([PERMISSIONS.READ_BOOKINGS]),
   bookingValidation.getBookingById,
   bookingController.getBookingById
 )
 
+// Booking feedback context (eligibility + existing feedback)
+Router.get(
+  '/:id/feedback',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.READ_BOOKINGS]),
+  feedbackValidation.getBookingFeedbackContext,
+  feedbackController.getBookingFeedbackContext
+)
+
 // Confirm booking (payment)
 Router.post(
-  '/bookings/:id/confirm',
+  '/:id/confirm',
   authMiddleware.isAuthorized,
   rbacMiddleware.isValidPermission([PERMISSIONS.UPDATE_BOOKINGS]),
   bookingValidation.confirmBooking,
@@ -50,11 +55,20 @@ Router.post(
 
 // Cancel booking
 Router.post(
-  '/bookings/:id/cancel',
+  '/:id/cancel',
   authMiddleware.isAuthorized,
   rbacMiddleware.isValidPermission([PERMISSIONS.UPDATE_BOOKINGS]),
   bookingValidation.getBookingById,
   bookingController.cancelBooking
+)
+
+// Create or update feedback for a booking (1 feedback per booking)
+Router.post(
+  '/:id/feedback',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.UPDATE_BOOKINGS]),
+  feedbackValidation.upsertBookingFeedback,
+  feedbackController.upsertBookingFeedback
 )
 
 export const bookingRoute = Router

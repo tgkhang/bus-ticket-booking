@@ -148,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await getMeAPI()
       setUser(response)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       if (error.response?.status === 401 || error.response?.status === 403) {
         localStorage.removeItem(AUTH_STORAGE_KEY)
