@@ -11,7 +11,8 @@ import { adminBookingRoute } from './adminBookingRoute'
 import { paymentRoute } from './paymentRoute'
 import { seatRoute } from './seatRoute'
 import { authRoute } from './authRoute'
-const revenueRoute = require('./revenueRoute');
+import revenueRoute from './revenueRoute';
+const bookingAnalyticsRoute = require('./bookingAnalyticsRoute');
 
 const Router = express.Router()
 
@@ -51,6 +52,9 @@ Router.use('/admin/bookings', adminBookingRoute)
 
 // Revenue routes
 Router.use('/revenue', revenueRoute)
+
+// Booking analytics routes
+Router.use('/analytics', bookingAnalyticsRoute)
 
 Router.use('/seats', seatRoute)
 

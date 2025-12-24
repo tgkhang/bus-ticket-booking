@@ -1,9 +1,22 @@
 "use client";
 
 import React from "react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend, PieLabelRenderProps } from "recharts";
 
 const COLORS = ["#16a34a", "#2563eb", "#f59e42", "#eab308", "#a21caf"];
+
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value }: PieLabelRenderProps & { value: number }) => {
+  const RADIAN = Math.PI / 180;
+  // Calculate label position
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  return (
+    <text x={x} y={y} fill="#222" textAnchor="middle" dominantBaseline="central" fontSize={14} fontWeight={600}>
+      {value}
+    </text>
+  );
+};
 
 interface PaymentMethodPieChartProps {
   data: { method: string; revenue: number }[];
@@ -21,7 +34,8 @@ export default function PaymentMethodPieChart({ data }: PaymentMethodPieChartPro
           cy="50%"
           outerRadius={80}
           fill="#8884d8"
-          label
+          label={renderCustomizedLabel}
+          labelLine={false}
         >
           {data.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

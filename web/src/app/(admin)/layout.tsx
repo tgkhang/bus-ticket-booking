@@ -24,6 +24,7 @@ import {
   Bell,
   Search,
   BarChart,
+  TrendingUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -81,6 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Trips', href: '/admin/trips', icon: Calendar },
     { name: 'Bookings', href: '/admin/bookings', icon: Ticket },
     { name: 'Revenue Analytics', href: '/admin/revenue', icon: BarChart },
+    { name: 'Booking Analytics', href: '/admin/booking-analytics', icon: TrendingUp },
     { name: 'Users', href: '/admin/users', icon: Users },
   ]
 
