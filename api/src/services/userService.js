@@ -139,11 +139,21 @@ const login = async (reqBody, req) => {
       throw invalidCredentialsError
     }
 
+    // Get staff info if user is staff
+    let staffId = null
+    if (existingUser.role === 'staff') {
+      const staff = await GET_DB().staff.findUnique({
+        where: { userId: existingUser.id },
+      })
+      staffId = staff?.id || null
+    }
+
     // Create tokens
     const userInfo = {
       id: existingUser.id,
       email: existingUser.email,
       role: existingUser.role,
+      ...(staffId && { staffId }),
     }
 
     const accessToken = await JwtProvider.generateToken(userInfo, env.ACCESS_JWT_SECRET_KEY, env.ACCESS_JWT_EXPIRES_IN)
@@ -206,11 +216,21 @@ const refreshToken = async (clientRefreshToken, req) => {
     // Revoke old token (rotation)
     await refreshTokenModel.revokeToken(clientRefreshToken)
 
+    // Get staff info if user is staff
+    let staffId = refreshTokenDecoded.staffId || null
+    if (refreshTokenDecoded.role === 'staff' && !staffId) {
+      const staff = await GET_DB().staff.findUnique({
+        where: { userId: refreshTokenDecoded.id },
+      })
+      staffId = staff?.id || null
+    }
+
     // Generate new tokens
     const userInfo = {
       id: refreshTokenDecoded.id,
       email: refreshTokenDecoded.email,
       role: refreshTokenDecoded.role,
+      ...(staffId && { staffId }),
     }
 
     const newAccessToken = await JwtProvider.generateToken(

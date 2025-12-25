@@ -292,6 +292,48 @@ async function main() {
   }
   console.log(`🏢 Created ${operators.length} operators`)
 
+  // Create staff users and staff records
+  const staffUsers = []
+  const staffConfigs = [
+    { email: 'driver1@greenbus.com', username: 'driver1_green', name: 'Nguyen Van A', operatorIdx: 0 },
+    { email: 'driver2@greenbus.com', username: 'driver2_green', name: 'Tran Van B', operatorIdx: 0 },
+    { email: 'staff1@expresstravel.vn', username: 'staff1_express', name: 'Le Thi C', operatorIdx: 1 },
+    { email: 'staff2@expresstravel.vn', username: 'staff2_express', name: 'Pham Van D', operatorIdx: 1 },
+    { email: 'driver1@comfortcoach.vn', username: 'driver1_comfort', name: 'Hoang Van E', operatorIdx: 2 },
+    { email: 'staff1@viptransport.vn', username: 'staff1_vip', name: 'Vo Thi F', operatorIdx: 3 },
+  ]
+
+  const staffRecords = []
+  for (const config of staffConfigs) {
+    const staffUser = await prisma.user.upsert({
+      where: { email: config.email },
+      update: {},
+      create: {
+        email: config.email,
+        username: config.username,
+        password: hashedPassword,
+        displayName: config.name,
+        avatar: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70)}`,
+        role: 'staff',
+        isActive: true,
+        phoneNumber: `+8490${Math.floor(Math.random() * 10000000)}`,
+        address: 'HCMC',
+      },
+    })
+    staffUsers.push(staffUser)
+
+    const staff = await prisma.staff.upsert({
+      where: { userId: staffUser.id },
+      update: {},
+      create: {
+        userId: staffUser.id,
+        operatorId: operators[config.operatorIdx].id,
+      },
+    })
+    staffRecords.push(staff)
+  }
+  console.log(`👨‍✈️ Created ${staffRecords.length} staff members`)
+
   // Import real HCMC stops from stops.txt (name,latitude,longitude,address)
   const ensureStop = async (name, latitude, longitude, address) => {
     const existing = await prisma.stop.findFirst({ where: { name, latitude, longitude } })
@@ -661,6 +703,20 @@ async function main() {
   }
   console.log(`🎫 Created ${tripCount} trips across 7 days`)
 
+  // Assign staff to some trips
+  const allTripsForStaff = await prisma.trip.findMany({ take: 50 })
+  let staffAssignmentCount = 0
+  for (let i = 0; i < allTripsForStaff.length; i++) {
+    const trip = allTripsForStaff[i]
+    const staff = staffRecords[i % staffRecords.length]
+    await prisma.trip.update({
+      where: { id: trip.id },
+      data: { staffId: staff.id },
+    })
+    staffAssignmentCount++
+  }
+  console.log(`👥 Assigned staff to ${staffAssignmentCount} trips`)
+
   // Create seat statuses for all upcoming trips
   const allSeats = await prisma.seat.findMany()
   const allTrips = await prisma.trip.findMany()
@@ -749,6 +805,41 @@ async function main() {
     bookingSeedCount++;
   }
   console.log(`💵 Seeded ${bookingSeedCount} sample bookings with payment for revenue analytics`)
+
+  // Mark some passengers as boarded for trips that have departed
+  const pastTrips = await prisma.trip.findMany({
+    where: {
+      departureTime: { lt: new Date() },
+    },
+    take: 20,
+    include: {
+      bookings: {
+        include: {
+          passengerDetails: true,
+        },
+      },
+    },
+  })
+
+  let boardedCount = 0
+  for (const trip of pastTrips) {
+    for (const booking of trip.bookings) {
+      for (const passenger of booking.passengerDetails) {
+        // Mark 70% as boarded
+        if (Math.random() < 0.7) {
+          await prisma.passengerDetail.update({
+            where: { id: passenger.id },
+            data: {
+              isBoarded: true,
+              boardedAt: new Date(trip.departureTime.getTime() - 15 * 60 * 1000), // 15 mins before departure
+            },
+          })
+          boardedCount++
+        }
+      }
+    }
+  }
+  console.log(`✅ Marked ${boardedCount} passengers as boarded`)
 
   console.log('✅ Database seeding completed!')
 }

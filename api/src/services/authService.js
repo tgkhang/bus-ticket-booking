@@ -65,10 +65,20 @@ const findOrCreateOAuthUser = async (profile, provider) => {
  */
 const generateOAuthTokens = async (user, familyId = 'web') => {
   try {
+    // Get staff info if user is staff
+    let staffId = null
+    if (user.role === 'staff') {
+      const staff = await GET_DB().staff.findUnique({
+        where: { userId: user.id },
+      })
+      staffId = staff?.id || null
+    }
+
     const userInfo = {
       id: user.id,
       email: user.email,
       role: user.role,
+      ...(staffId && { staffId }),
     }
 
     const accessToken = await JwtProvider.generateToken(

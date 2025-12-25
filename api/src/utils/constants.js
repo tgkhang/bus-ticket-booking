@@ -23,6 +23,7 @@ export const USER_ROLES = {
   ADMIN: 'admin',
   CLIENT: 'client',
   OPERATOR: 'operator',
+  STAFF: 'staff',
 }
 
 // Available permissions in the system
@@ -52,6 +53,10 @@ export const PERMISSIONS = {
   MANAGE_BOOKINGS: 'manage-bookings',
   // User management
   MANAGE_USERS: 'manage-users',
+  // Staff trip management
+  READ_ASSIGNED_TRIPS: 'read-assigned-trips',
+  MANAGE_TRIP_STATUS: 'manage-trip-status',
+  MANAGE_PASSENGER_BOARDING: 'manage-passenger-boarding',
 }
 
 // Mock Roles with Permissions (RBAC)
@@ -107,6 +112,15 @@ export const MOCK_ROLES = [
       PERMISSIONS.READ_BOOKINGS,
       PERMISSIONS.CREATE_BOOKINGS,
       PERMISSIONS.UPDATE_BOOKINGS,
+    ],
+  },
+  {
+    name: USER_ROLES.STAFF,
+    permissions: [
+      PERMISSIONS.READ_ASSIGNED_TRIPS,
+      PERMISSIONS.MANAGE_TRIP_STATUS,
+      PERMISSIONS.MANAGE_PASSENGER_BOARDING,
+      PERMISSIONS.READ_BOOKINGS,
     ],
   },
 ]
