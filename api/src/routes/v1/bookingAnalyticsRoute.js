@@ -1,8 +1,8 @@
-const express = require('express');
-const bookingAnalyticsController = require('~/controllers/bookingAnalyticsController');
+import express from 'express';
+import { getBookingAnalytics } from '~/controllers/bookingAnalyticsController';
 
 const router = express.Router();
 
-router.get('/bookings', bookingAnalyticsController.getBookingAnalytics);
+router.get('/bookings', getBookingAnalytics);
 
-module.exports = router;
+export default router;

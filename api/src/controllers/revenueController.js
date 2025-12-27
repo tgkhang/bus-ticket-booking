@@ -1,29 +1,33 @@
-const revenueService = require("../services/revenueService");
+import {
+  getRevenueOverview as getRevenueOverviewService,
+  getRevenueByRoute as getRevenueByRouteService,
+  getRevenueByPaymentMethod as getRevenueByPaymentMethodService
+} from "../services/revenueService";
 
-exports.getRevenueOverview = async (req, res, next) => {
+export const getRevenueOverview = async (req, res, next) => {
   try {
     const { from, to } = req.query;
-    const data = await revenueService.getRevenueOverview({ from, to });
+    const data = await getRevenueOverviewService({ from, to });
     res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
 };
 
-exports.getRevenueByRoute = async (req, res, next) => {
+export const getRevenueByRoute = async (req, res, next) => {
   try {
     const { from, to } = req.query;
-    const data = await revenueService.getRevenueByRoute({ from, to });
+    const data = await getRevenueByRouteService({ from, to });
     res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
 };
 
-exports.getRevenueByPaymentMethod = async (req, res, next) => {
+export const getRevenueByPaymentMethod = async (req, res, next) => {
   try {
     const { from, to } = req.query;
-    const data = await revenueService.getRevenueByPaymentMethod({ from, to });
+    const data = await getRevenueByPaymentMethodService({ from, to });
     res.json({ success: true, data });
   } catch (err) {
     next(err);

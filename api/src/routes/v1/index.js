@@ -12,7 +12,7 @@ import { paymentRoute } from './paymentRoute'
 import { seatRoute } from './seatRoute'
 import { authRoute } from './authRoute'
 import revenueRoute from './revenueRoute';
-const bookingAnalyticsRoute = require('./bookingAnalyticsRoute');
+import bookingAnalyticsRoute from './bookingAnalyticsRoute';
 
 const Router = express.Router()
 
