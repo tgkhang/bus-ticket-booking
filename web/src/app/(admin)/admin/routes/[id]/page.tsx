@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,7 @@ import {
   AlertCircle,
   ChevronUp,
   ChevronDown,
+  Route as RouteIcon,
 } from 'lucide-react'
 import { getRouteDetailsAPI } from '@/lib/api'
 import { toast } from 'sonner'
@@ -38,15 +39,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-
-interface DisplayRoute extends Omit<Route, 'stops'> {
-  basePrice?: number
-  originStopName: string
-  destinationStopName: string
-  operatorName: string
-  stops: DisplayRouteStop[]
-  trips: Trip[]
-}
+import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import type { LatLngBoundsExpression } from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
 interface DisplayRouteStop {
   id: string
@@ -59,6 +54,16 @@ interface DisplayRouteStop {
   distanceFromOrigin?: number
   estimatedMinutes?: number
   note?: string
+  stop?: Stop
+}
+
+interface DisplayRoute extends Omit<Route, 'stops'> {
+  basePrice?: number
+  originStopName: string
+  destinationStopName: string
+  operatorName: string
+  stops: DisplayRouteStop[]
+  trips: Trip[]
 }
 
 interface Trip {
@@ -81,6 +86,14 @@ interface RouteStop {
   distanceFromOrigin?: number
   estimatedMinutes?: number
   note?: string
+}
+
+function FitBounds({ bounds }: { bounds: LatLngBoundsExpression }) {
+  const map = useMap()
+  useEffect(() => {
+    map.fitBounds(bounds, { padding: [24, 24] })
+  }, [map, bounds])
+  return null
 }
 
 export default function RouteDetailPage() {
@@ -143,6 +156,7 @@ export default function RouteDetailPage() {
             distanceFromOrigin: 0, // TODO: Add to API response if needed
             estimatedMinutes: 0, // TODO: Add to API response if needed
             note: routeStop.note || undefined,
+            stop: routeStop.stop, // Preserve the full stop object with coordinates
           })),
           trips: [], // TODO: Fetch trips separately if needed
         }
@@ -168,6 +182,55 @@ export default function RouteDetailPage() {
 
     fetchRouteDetails()
   }, [routeId])
+
+  // Map logic
+  const allStops = useMemo(() => {
+    if (!route) return []
+
+    const stops = [
+      {
+        id: `origin-${route.originStopId}`,
+        name: route.originStopName,
+        type: 'origin' as const,
+        latitude: route.originStop?.latitude,
+        longitude: route.originStop?.longitude,
+      },
+      ...route.stops.map((stop) => ({
+        id: stop.id,
+        name: stop.stopName,
+        type: 'intermediate' as const,
+        latitude: stop.stop?.latitude,
+        longitude: stop.stop?.longitude,
+      })),
+      {
+        id: `destination-${route.destinationStopId}`,
+        name: route.destinationStopName,
+        type: 'destination' as const,
+        latitude: route.destinationStop?.latitude,
+        longitude: route.destinationStop?.longitude,
+      },
+    ]
+    return stops
+  }, [route])
+
+  const mapPoints = useMemo(() => {
+    const pts = allStops
+      .map((s) => {
+        const lat = s.latitude
+        const lng = s.longitude
+        if (typeof lat !== 'number' || typeof lng !== 'number') return null
+        return { id: s.id, name: s.name, type: s.type, lat, lng }
+      })
+      .filter(Boolean) as Array<{ id: string; name: string; type: 'origin' | 'destination' | 'intermediate'; lat: number; lng: number }>
+    return pts
+  }, [allStops])
+
+  const polyline = useMemo(() => mapPoints.map((p) => [p.lat, p.lng] as [number, number]), [mapPoints])
+
+  const bounds = useMemo<LatLngBoundsExpression | null>(() => {
+    if (polyline.length < 1) return null
+    return polyline as unknown as LatLngBoundsExpression
+  }, [polyline])
 
   const handleSaveRouteDetails = () => {
     if (route) {
@@ -630,17 +693,56 @@ export default function RouteDetailPage() {
             </div>
 
             {/* Route Visualization */}
-            <div className="mt-8 pt-8 border-t border-gray-200">
-              <h3 className="text-gray-900 mb-4">Route Visualization</h3>
-              <div className="flex items-center justify-center p-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                <div className="text-center">
-                  <Map className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-2">Interactive Map View</p>
-                  <p className="text-sm text-gray-500">
-                    Map integration showing route path and stops would be displayed here
-                  </p>
+            <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-800">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <RouteIcon className="w-5 h-5 text-blue-600" />
+                Route Map
+              </h3>
+              {bounds ? (
+                <div className="h-[360px] w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+                  <MapContainer
+                    center={polyline[0] || [10.7758, 106.7009]}
+                    zoom={11}
+                    scrollWheelZoom
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer
+                      attribution='&copy; OpenStreetMap contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+
+                    <FitBounds bounds={bounds} />
+
+                    {polyline.length >= 2 && <Polyline positions={polyline} />}
+
+                    {mapPoints.map((p) => (
+                      <CircleMarker
+                        key={p.id}
+                        center={[p.lat, p.lng]}
+                        radius={p.type === 'origin' || p.type === 'destination' ? 8 : 6}
+                        pathOptions={{
+                          color: p.type === 'origin' ? '#10B981' : p.type === 'destination' ? '#EF4444' : '#3B82F6',
+                          fillColor: p.type === 'origin' ? '#10B981' : p.type === 'destination' ? '#EF4444' : '#3B82F6',
+                          fillOpacity: 0.8,
+                        }}
+                      >
+                        <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                          <div className="text-xs">
+                            <div className="font-semibold">{p.name}</div>
+                            <div>
+                              {p.type === 'origin' ? 'Origin' : p.type === 'destination' ? 'Destination' : 'Stop'}
+                            </div>
+                          </div>
+                        </Tooltip>
+                      </CircleMarker>
+                    ))}
+                  </MapContainer>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-sm text-gray-600 dark:text-gray-400">
+                  Map is unavailable because stop coordinates are missing.
+                </div>
+              )}
             </div>
           </div>
         )}

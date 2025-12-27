@@ -3,7 +3,6 @@ import { API_ROOT } from '@/lib/utils/constants'
 
 export const getMyTrips = async (filters?: { status?: string; date?: string }) => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/staff/trips`, { params: filters })
-  console.log('Staff Trips Response:', response.data)
   return response.data
 }
 
