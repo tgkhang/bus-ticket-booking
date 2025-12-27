@@ -1,11 +1,6 @@
 import authorizedAxiosInstance from '@/lib/axios/authorizeAxios'
 import { API_ROOT } from '@/lib/utils/constants'
-import type {
-
-  PaginationParams,
-  PaginatedResponse,
-
-} from '@/types/api'
+import type { PaginationParams, PaginatedResponse } from '@/types/api'
 import type { TripDetail, CreateTripData, UpdateTripData, ListTripsFilters, Trip } from '@/types/trip'
 import { toast } from 'sonner'
 

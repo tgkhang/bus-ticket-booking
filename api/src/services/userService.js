@@ -141,11 +141,23 @@ const login = async (reqBody, req) => {
 
     // Get staff info if user is staff
     let staffId = null
+    let operatorId = null
+    let operatorName = null
     if (existingUser.role === 'staff') {
       const staff = await GET_DB().staff.findUnique({
         where: { userId: existingUser.id },
+        include: {
+          operator: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
       })
       staffId = staff?.id || null
+      operatorId = staff?.operatorId || null
+      operatorName = staff?.operator?.name || null
     }
 
     // Create tokens
@@ -154,6 +166,8 @@ const login = async (reqBody, req) => {
       email: existingUser.email,
       role: existingUser.role,
       ...(staffId && { staffId }),
+      ...(operatorId && { operatorId }),
+      ...(operatorName && { operatorName }),
     }
 
     const accessToken = await JwtProvider.generateToken(userInfo, env.ACCESS_JWT_SECRET_KEY, env.ACCESS_JWT_EXPIRES_IN)
@@ -218,11 +232,24 @@ const refreshToken = async (clientRefreshToken, req) => {
 
     // Get staff info if user is staff
     let staffId = refreshTokenDecoded.staffId || null
+    let operatorId = refreshTokenDecoded.operatorId || null
+    let operatorName = refreshTokenDecoded.operatorName || null
+
     if (refreshTokenDecoded.role === 'staff' && !staffId) {
       const staff = await GET_DB().staff.findUnique({
         where: { userId: refreshTokenDecoded.id },
+        include: {
+          operator: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
       })
       staffId = staff?.id || null
+      operatorId = staff?.operatorId || null
+      operatorName = staff?.operator?.name || null
     }
 
     // Generate new tokens
@@ -231,6 +258,8 @@ const refreshToken = async (clientRefreshToken, req) => {
       email: refreshTokenDecoded.email,
       role: refreshTokenDecoded.role,
       ...(staffId && { staffId }),
+      ...(operatorId && { operatorId }),
+      ...(operatorName && { operatorName }),
     }
 
     const newAccessToken = await JwtProvider.generateToken(
@@ -409,7 +438,31 @@ const getMe = async (userId) => {
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'User not found')
     }
-    return pickUser(user)
+
+    const userData = pickUser(user)
+
+    // If user is staff, include operator information
+    if (user.role === 'staff') {
+      const staff = await GET_DB().staff.findUnique({
+        where: { userId: user.id },
+        include: {
+          operator: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      })
+
+      if (staff) {
+        userData.staffId = staff.id
+        userData.operatorId = staff.operatorId
+        userData.operatorName = staff.operator?.name || null
+      }
+    }
+
+    return userData
   } catch (error) {
     throw error
   }
@@ -451,11 +504,35 @@ const oauthGoogleLogin = async (reqBody, req) => {
       })
     }
 
+    // Get staff info if user is staff
+    let staffId = null
+    let operatorId = null
+    let operatorName = null
+    if (user.role === 'staff') {
+      const staff = await GET_DB().staff.findUnique({
+        where: { userId: user.id },
+        include: {
+          operator: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      })
+      staffId = staff?.id || null
+      operatorId = staff?.operatorId || null
+      operatorName = staff?.operator?.name || null
+    }
+
     // Create tokens (same as regular login)
     const userInfo = {
       id: user.id,
       email: user.email,
       role: user.role,
+      ...(staffId && { staffId }),
+      ...(operatorId && { operatorId }),
+      ...(operatorName && { operatorName }),
     }
 
     const accessToken = await JwtProvider.generateToken(userInfo, env.ACCESS_JWT_SECRET_KEY, env.ACCESS_JWT_EXPIRES_IN)
