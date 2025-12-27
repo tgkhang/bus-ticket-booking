@@ -89,10 +89,6 @@ export const BUS_LAYOUTS_VIETNAM_BRIEF = [
   { code: 'Cabin-VIP', type: 'VIP Cabin Sleeper', name: 'Giường nằm Cabin riêng' },
   { code: 'Limo-9', type: 'Limousine', name: 'Limousine 9 chỗ' },
   { code: 'Limo-16', type: 'Limousine', name: 'Limousine 16 chỗ' },
-  // { code: '2-1', type: 'VIP Seater', name: 'Ghế ngồi 2-1' },
-  // { code: '1-1', type: 'Luxury Seater', name: 'Ghế VIP 1-1' },
-  // { code: 'City-Transit', type: 'City Bus', name: 'Xe buýt nội thành' },
-  // { code: 'Mini-Bus', type: 'Mini Bus', name: 'Xe buýt nhỏ' },
 ]
 
 /**

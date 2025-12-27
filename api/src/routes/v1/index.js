@@ -11,8 +11,9 @@ import { adminBookingRoute } from './adminBookingRoute'
 import { paymentRoute } from './paymentRoute'
 import { seatRoute } from './seatRoute'
 import { authRoute } from './authRoute'
-import revenueRoute from './revenueRoute';
-import bookingAnalyticsRoute from './bookingAnalyticsRoute';
+import { revenueRoute } from './revenueRoute'
+import { bookingAnalyticsRoute } from './bookingAnalyticsRoute'
+import { staffRoute } from './staffRoute'
 
 const Router = express.Router()
 
@@ -57,5 +58,8 @@ Router.use('/revenue', revenueRoute)
 Router.use('/analytics', bookingAnalyticsRoute)
 
 Router.use('/seats', seatRoute)
+
+// Staff routes
+Router.use('/staff', staffRoute)
 
 export const APIs_V1 = Router

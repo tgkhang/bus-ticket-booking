@@ -161,6 +161,19 @@ const getTripById = async (id) => {
           seats: true,
         },
       },
+      staff: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              displayName: true,
+              email: true,
+              phoneNumber: true,
+              avatar: true,
+            },
+          },
+        },
+      },
       seatStatuses: {
         include: {
           seat: true,
@@ -322,6 +335,7 @@ const updateTrip = async (id, updateData) => {
   if (updateData.arrivalTime !== undefined) data.arrivalTime = new Date(updateData.arrivalTime)
   if (updateData.basePrice !== undefined) data.basePrice = updateData.basePrice
   if (updateData.status !== undefined) data.status = updateData.status
+  if (updateData.staffId !== undefined) data.staffId = updateData.staffId
 
   const trip = await prisma.trip.update({
     where: { id },
@@ -436,6 +450,10 @@ const buildListWhere = (filters) => {
   if (filters.routeId) where.routeId = filters.routeId
   if (filters.busId) where.busId = filters.busId
   if (filters.status) where.status = filters.status
+  if (filters.staffId) {
+    where.staffId = filters.staffId
+    where.NOT = { staffId: null }
+  }
 
   if (filters.departureTime) {
     where.departureTime = new Date(filters.departureTime)
@@ -447,6 +465,11 @@ const buildListWhere = (filters) => {
 
   if (filters.basePrice) {
     where.basePrice = Number(filters.basePrice)
+  }
+
+  // Filter by operator ID (trips where bus belongs to this operator)
+  if (filters.operatorId) {
+    where.bus = { ...(where.bus || {}), operatorId: filters.operatorId }
   }
 
   // Text search across route name, bus model, or plate number

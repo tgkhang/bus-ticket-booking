@@ -443,3 +443,9 @@ export const getLockedSeatsAPI = async (tripId: string) => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/seats/locked/${tripId}`)
   return response.data
 }
+
+//=================================
+// Staff API Calls
+//=================================
+
+export { getMyTrips, getTripPassengers, markPassengerBoarded, updateTripStatus, getStaffByOperatorAPI } from './staff'

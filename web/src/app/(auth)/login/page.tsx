@@ -44,10 +44,14 @@ function LoginContent() {
         router.push(decodeURIComponent(callbackUrl))
       } else if (user.role === 'admin') {
         router.push('/admin')
+      } else if (user.role === 'staff') {
+        router.push('/staff')
+      } else if (user.role === 'operator') {
+        router.push('/operator')
       } else {
         router.push('/')
       }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       setIsLoading(false)
     }
@@ -213,15 +217,6 @@ function LoginContent() {
 
             {/* Remember Me & Forgot Password */}
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.rememberMe}
-                  onChange={(e) => setFormData({ ...formData, rememberMe: e.target.checked })}
-                  className="rounded text-[#2563EB] focus:ring-[#2563EB] w-4 h-4"
-                />
-                <span className="text-gray-700 text-sm">Remember me</span>
-              </label>
               <Link href="/forgot-password" className="text-sm text-[#2563EB] hover:text-[#1d4ed8] transition-colors">
                 Forgot password?
               </Link>
