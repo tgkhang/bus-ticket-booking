@@ -87,6 +87,7 @@ const updateTrip = async (req, res, next) => {
     arrivalTime: Joi.date().iso(),
     basePrice: Joi.number().min(0),
     status: Joi.string().valid('scheduled', 'active', 'completed', 'cancelled'),
+    staffId: Joi.string().uuid(),
   }).custom((value, helpers) => {
     // If both departure and arrival are provided, ensure arrival > departure
     if (value.departureTime && value.arrivalTime) {

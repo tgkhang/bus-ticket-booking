@@ -154,9 +154,35 @@ const updateTripStatus = async (tripId, staffId, status) => {
   return updated
 }
 
+// Get staff by operator
+const getStaffByOperator = async (operatorId) => {
+  const staff = await prisma.staff.findMany({
+    where: {
+      operatorId,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+          phoneNumber: true,
+          avatar: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  })
+
+  return staff
+}
+
 export const staffService = {
   getAssignedTrips,
   getTripPassengers,
   markPassengerBoarded,
   updateTripStatus,
+  getStaffByOperator,
 }

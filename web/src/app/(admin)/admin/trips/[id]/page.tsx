@@ -5,9 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useForm, SubmitHandler } from 'react-hook-form'
 import {
   ArrowLeft,
-  Edit,
   Save,
-  X,
   MapPin,
   Navigation,
   Clock,
@@ -26,7 +24,7 @@ import {
 import { TripDetail, TripStatus } from '@/types/trip'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { getTripDetailsAPI, updateTripAPI } from '@/lib/api'
+import { getTripDetailsAPI, updateTripAPI, getStaffByOperatorAPI } from '@/lib/api'
 import { toast } from 'sonner'
 import { amenityOptions } from '@/utils/constants'
 import Image from 'next/image'
@@ -62,7 +60,13 @@ export default function TripDetailPage() {
 
   const [trip, setTrip] = useState<TripDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isEditingTrip, setIsEditingTrip] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [staffList, setStaffList] = useState<any[]>([])
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
+  const [originalStaffId, setOriginalStaffId] = useState<string | null>(null)
+  const [loadingStaff, setLoadingStaff] = useState(false)
+  const [savingStaff, setSavingStaff] = useState(false)
+  const [savingTrip, setSavingTrip] = useState(false)
 
   // Image slider state
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -85,7 +89,8 @@ export default function TripDetailPage() {
     register,
     handleSubmit,
     reset,
-    formState: { isSubmitting },
+    watch,
+    formState: { isDirty },
   } = useForm<TripFormInputs>({
     defaultValues: {
       departureTime: '',
@@ -95,13 +100,14 @@ export default function TripDetailPage() {
     },
   })
 
+  const watchedStatus = watch('status')
+
   useEffect(() => {
     const fetchTripDetails = async () => {
-      console.log('FETCHING TRIP DETAILS FOR ID:', tripId)
       try {
         setLoading(true)
         const response = await getTripDetailsAPI(tripId)
-        
+
         // Parse images if they're stored as JSON string
         if (response.bus && response.bus.images) {
           if (typeof response.bus.images === 'string') {
@@ -113,15 +119,29 @@ export default function TripDetailPage() {
             }
           }
         }
-        
+
         setTrip(response)
+        setSelectedStaffId(response.staffId || null)
+        setOriginalStaffId(response.staffId || null)
         reset({
           departureTime: response.departureTime.slice(0, 16), // Format for datetime-local
           arrivalTime: response.arrivalTime.slice(0, 16),
           basePrice: response.basePrice,
           status: response.status,
         })
-        console.log('TRIP HERE', response)
+
+        // Fetch staff if bus has operator
+        if (response.bus?.operator?.id) {
+          try {
+            setLoadingStaff(true)
+            const staffResponse = await getStaffByOperatorAPI(response.bus.operator.id)
+            setStaffList(staffResponse.data || [])
+          } catch (err) {
+            console.error('Error fetching staff:', err)
+          } finally {
+            setLoadingStaff(false)
+          }
+        }
       } catch (error) {
         console.error('Error fetching trip details:', error)
         toast.error('Failed to fetch trip details')
@@ -136,7 +156,14 @@ export default function TripDetailPage() {
   const onSubmit: SubmitHandler<TripFormInputs> = async (data) => {
     if (!trip) return
 
+    // Validate that active status requires staff assignment
+    if (data.status === 'active' && !selectedStaffId) {
+      toast.error('Please assign a staff member before setting trip to active')
+      return
+    }
+
     try {
+      setSavingTrip(true)
       await updateTripAPI(trip.id, {
         departureTime: data.departureTime,
         arrivalTime: data.arrivalTime,
@@ -147,11 +174,40 @@ export default function TripDetailPage() {
       // Refresh trip data
       const refreshedTrip = await getTripDetailsAPI(trip.id)
       setTrip(refreshedTrip)
-      setIsEditingTrip(false)
+      reset({
+        departureTime: refreshedTrip.departureTime.slice(0, 16),
+        arrivalTime: refreshedTrip.arrivalTime.slice(0, 16),
+        basePrice: refreshedTrip.basePrice,
+        status: refreshedTrip.status,
+      })
       toast.success('Trip details updated successfully')
     } catch (error) {
       console.error('Error updating trip:', error)
       toast.error('Failed to update trip details')
+    } finally {
+      setSavingTrip(false)
+    }
+  }
+
+  const handleSaveStaffAssignment = async () => {
+    if (!trip) return
+
+    try {
+      setSavingStaff(true)
+      await updateTripAPI(trip.id, {
+        staffId: selectedStaffId,
+      })
+
+      // Refresh trip data
+      const refreshedTrip = await getTripDetailsAPI(trip.id)
+      setTrip(refreshedTrip)
+      setOriginalStaffId(selectedStaffId)
+      toast.success('Staff assignment updated successfully')
+    } catch (error) {
+      console.error('Error updating staff assignment:', error)
+      toast.error('Failed to update staff assignment')
+    } finally {
+      setSavingStaff(false)
     }
   }
 
@@ -196,10 +252,16 @@ export default function TripDetailPage() {
           name: stopName,
           type,
           lat,
-          lng
+          lng,
         }
       })
-      .filter(Boolean) as Array<{ id: string; name: string; type: 'origin' | 'destination' | 'intermediate'; lat: number; lng: number }>
+      .filter(Boolean) as Array<{
+      id: string
+      name: string
+      type: 'origin' | 'destination' | 'intermediate'
+      lat: number
+      lng: number
+    }>
 
     return pts
   }, [trip])
@@ -258,41 +320,7 @@ export default function TripDetailPage() {
         <div className="lg:col-span-1">
           <Card>
             <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Trip Information</h2>
-                {!isEditingTrip ? (
-                  <button
-                    onClick={() => setIsEditingTrip(true)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-lg transition-colors"
-                  >
-                    <Edit className="w-5 h-5" />
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleSubmit(onSubmit)}
-                      disabled={isSubmitting}
-                      className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      <Save className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsEditingTrip(false)
-                        reset({
-                          departureTime: trip.departureTime.slice(0, 16),
-                          arrivalTime: trip.arrivalTime.slice(0, 16),
-                          basePrice: trip.basePrice,
-                          status: trip.status,
-                        })
-                      }}
-                      className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                )}
-              </div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Trip Information</h2>
 
               <div className="space-y-4">
                 <div>
@@ -307,59 +335,74 @@ export default function TripDetailPage() {
 
                 <div>
                   <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Departure Time</label>
-                  {isEditingTrip ? (
-                    <input
-                      type="datetime-local"
-                      {...register('departureTime', { required: true })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    />
-                  ) : (
-                    <p className="text-gray-900 dark:text-white">{new Date(trip.departureTime).toLocaleString()}</p>
-                  )}
+                  <input
+                    type="datetime-local"
+                    {...register('departureTime', { required: true })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    disabled={savingTrip}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Arrival Time</label>
-                  {isEditingTrip ? (
-                    <input
-                      type="datetime-local"
-                      {...register('arrivalTime', { required: true })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    />
-                  ) : (
-                    <p className="text-gray-900 dark:text-white">{new Date(trip.arrivalTime).toLocaleString()}</p>
-                  )}
+                  <input
+                    type="datetime-local"
+                    {...register('arrivalTime', { required: true })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    disabled={savingTrip}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Base Price</label>
-                  {isEditingTrip ? (
-                    <input
-                      type="number"
-                      {...register('basePrice', { required: true, valueAsNumber: true })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    />
-                  ) : (
-                    <p className="text-gray-900 dark:text-white">₫{trip.basePrice.toLocaleString()}</p>
-                  )}
+                  <input
+                    type="number"
+                    {...register('basePrice', { required: true, valueAsNumber: true })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    disabled={savingTrip}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Status</label>
-                  {isEditingTrip ? (
-                    <select
-                      {...register('status')}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    >
-                      <option value="scheduled">Scheduled</option>
-                      <option value="active">Active</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                  ) : (
-                    <p className="text-gray-900 dark:text-white">{trip.status}</p>
-                  )}
+                  <select
+                    {...register('status')}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    disabled={savingTrip}
+                  >
+                    <option value="scheduled">Scheduled</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
                 </div>
+
+                {watchedStatus === 'active' && !selectedStaffId && (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
+                    <span>⚠️</span>
+                    Cannot set to active without staff assignment
+                  </p>
+                )}
+
+                {isDirty && (
+                  <button
+                    onClick={handleSubmit(onSubmit)}
+                    disabled={savingTrip}
+                    className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {savingTrip ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        <span>Save Trip Details</span>
+                      </>
+                    )}
+                  </button>
+                )}
 
                 <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
                   <div className="flex items-center justify-between mb-2">
@@ -378,7 +421,77 @@ export default function TripDetailPage() {
               </div>
             </CardContent>
           </Card>
-
+          {/* Staff Assignment */}
+          {trip.bus?.operator && (
+            <Card className="mt-6">
+              <CardContent className="p-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  Staff Assignment
+                </h2>
+                {loadingStaff ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">
+                      Assigned Staff {trip.status === 'scheduled' && <span className="text-red-500">*</span>}
+                    </label>
+                    <select
+                      value={selectedStaffId || ''}
+                      onChange={(e) => setSelectedStaffId(e.target.value || null)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      disabled={savingStaff}
+                    >
+                      <option value="">No staff assigned</option>
+                      {staffList.map((staff) => (
+                        <option key={staff.id} value={staff.id}>
+                          {staff.user?.displayName || staff.user?.email} ({staff.user?.phoneNumber || 'No phone'})
+                        </option>
+                      ))}
+                    </select>
+                    {trip.status === 'scheduled' && !selectedStaffId && (
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
+                        <span>⚠️</span>
+                        Staff must be assigned before trip can be set to active
+                      </p>
+                    )}
+                    {selectedStaffId && staffList.find((s) => s.id === selectedStaffId) && (
+                      <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          <strong>Selected Staff:</strong>{' '}
+                          {staffList.find((s) => s.id === selectedStaffId)?.user?.displayName}
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                          Email: {staffList.find((s) => s.id === selectedStaffId)?.user?.email}
+                        </p>
+                      </div>
+                    )}
+                    {selectedStaffId !== originalStaffId && (
+                      <button
+                        onClick={handleSaveStaffAssignment}
+                        disabled={savingStaff}
+                        className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {savingStaff ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            <span>Saving...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            <span>Save Staff Assignment</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
           {/* Bus Information */}
           {trip.bus && (
             <Card className="mt-6">
@@ -456,7 +569,13 @@ export default function TripDetailPage() {
                                   : 'border-gray-300 dark:border-gray-700 hover:border-blue-400'
                               }`}
                             >
-                              <Image src={imageUrl} alt={`Thumbnail ${index + 1}`} fill className="object-cover" sizes="64px" />
+                              <Image
+                                src={imageUrl}
+                                alt={`Thumbnail ${index + 1}`}
+                                fill
+                                className="object-cover"
+                                sizes="64px"
+                              />
                             </button>
                           ))}
                         </div>
@@ -999,7 +1118,7 @@ export default function TripDetailPage() {
                     style={{ height: '100%', width: '100%' }}
                   >
                     <TileLayer
-                      attribution='&copy; OpenStreetMap contributors'
+                      attribution="&copy; OpenStreetMap contributors"
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
 

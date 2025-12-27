@@ -3,6 +3,7 @@ import ApiError from '~/utils/ApiError'
 import { StatusCodes } from 'http-status-codes'
 import { routeModel } from '~/models/routeModel'
 import { busModel } from '~/models/busModel'
+import { GET_DB } from '~/config/prisma'
 
 const searchTrips = async (query) => {
   // Prepare filters with defaults
@@ -16,9 +17,7 @@ const searchTrips = async (query) => {
     maxPrice: query.maxPrice ? Number(query.maxPrice) : undefined,
     busModel: query.busModel,
     busType: query.busType
-      ? (Array.isArray(query.busType) ? query.busType : query.busType.split(','))
-          .map((s) => s.trim())
-          .filter(Boolean)
+      ? (Array.isArray(query.busType) ? query.busType : query.busType.split(',')).map((s) => s.trim()).filter(Boolean)
       : [],
     amenities: query.amenities
       ? query.amenities
@@ -82,9 +81,7 @@ const updateTrip = async (id, updateData) => {
 
   // If updating route, validate it exists
   if (updateData.routeId) {
-    const { GET_DB } = await import('~/config/prisma')
-    const prisma = GET_DB()
-    const route = await prisma.route.findUnique({
+    const route = await GET_DB().route.findUnique({
       where: { id: updateData.routeId },
     })
     if (!route) {
@@ -94,13 +91,29 @@ const updateTrip = async (id, updateData) => {
 
   // If updating bus, validate it exists
   if (updateData.busId) {
-    const { GET_DB } = await import('~/config/prisma')
-    const prisma = GET_DB()
-    const bus = await prisma.bus.findUnique({
+    const bus = await GET_DB().bus.findUnique({
       where: { id: updateData.busId },
     })
     if (!bus) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Bus not found')
+    }
+  }
+
+  // If assigning staff, validate staff exists
+  if (updateData.staffId) {
+    const staff = await GET_DB().staff.findUnique({
+      where: { id: updateData.staffId },
+    })
+    if (!staff) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Staff not found')
+    }
+  }
+
+  // Validate that trip can only be set to active if staff is assigned
+  if (updateData.status === 'active') {
+    const finalStaffId = updateData.staffId !== undefined ? updateData.staffId : existingTrip.staffId
+    if (!finalStaffId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot set trip to active without assigning a staff member')
     }
   }
 
@@ -114,10 +127,7 @@ const deleteTrip = async (id) => {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Trip not found')
   }
 
-  // Check if trip has any confirmed bookings
-  const { GET_DB } = await import('~/config/prisma')
-  const prisma = GET_DB()
-  const confirmedBookings = await prisma.booking.findFirst({
+  const confirmedBookings = await GET_DB().booking.findFirst({
     where: {
       tripId: id,
       status: { in: ['confirmed', 'pending'] },

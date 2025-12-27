@@ -6,6 +6,11 @@ export const getMyTrips = async (filters?: { status?: string; date?: string }) =
   return response.data
 }
 
+export const getStaffByOperatorAPI = async (operatorId: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/staff/by-operator/${operatorId}`)
+  return response.data
+}
+
 // Get passengers for a specific trip
 export const getTripPassengers = async (tripId: string) => {}
 
@@ -17,10 +22,3 @@ export const updateTripStatus = async (
   tripId: string,
   status: 'departed' | 'arrived' | 'scheduled' | 'completed' | 'cancelled'
 ) => {}
-
-export const staffApi = {
-  getMyTrips,
-  getTripPassengers,
-  markPassengerBoarded,
-  updateTripStatus,
-}

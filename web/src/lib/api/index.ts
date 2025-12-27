@@ -448,4 +448,4 @@ export const getLockedSeatsAPI = async (tripId: string) => {
 // Staff API Calls
 //=================================
 
-
+export { getMyTrips, getTripPassengers, markPassengerBoarded, updateTripStatus, getStaffByOperatorAPI } from './staff'

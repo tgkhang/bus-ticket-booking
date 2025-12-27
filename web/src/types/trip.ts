@@ -59,6 +59,7 @@ export interface TripDetail {
   arrivalTime: string
   basePrice: number
   status: TripStatus
+  staffId?: string | null
   createdAt?: string
   updatedAt?: string
 
@@ -144,6 +145,7 @@ export interface UpdateTripData {
   arrivalTime?: string
   basePrice?: number
   status?: TripStatus
+  staffId?: string | null
 }
 
 export interface ListTripsFilters {
