@@ -41,11 +41,21 @@ export interface TripBooking {
 export interface Trip {
   id: string
   routeId: string
+  routeName?: string
   busId: string
+  busModel?: string
+  busPlateNumber?: string
   departureTime: string
   arrivalTime: string
   basePrice: number
   status: TripStatus
+  durationMinutes?: number
+  availableSeats?: number
+  seatsBooked?: number
+  totalSeats?: number
+  originStop?: string
+  destinationStop?: string
+  operatorName?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -62,6 +72,18 @@ export interface TripDetail {
   staffId?: string | null
   createdAt?: string
   updatedAt?: string
+
+  // Staff information
+  staff?: {
+    id: string
+    user?: {
+      id: string
+      displayName?: string
+      email?: string
+      phoneNumber?: string
+      avatar?: string
+    }
+  }
 
   // Nested route information
   route?: {
@@ -156,6 +178,8 @@ export interface ListTripsFilters {
   arrivalTime?: string
   basePrice?: number
   search?: string
+  staffId?: string
+  operatorId?: string
 }
 
 export interface SearchTripsFilters {
