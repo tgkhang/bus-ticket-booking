@@ -2,10 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { useForm, SubmitHandler } from 'react-hook-form'
 import {
   ArrowLeft,
-  Save,
   MapPin,
   Navigation,
   Clock,
@@ -21,10 +19,10 @@ import {
   ChevronRight,
   Route as RouteIcon,
 } from 'lucide-react'
-import { TripDetail, TripStatus } from '@/types/trip'
+import { TripDetail } from '@/types/trip'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { getTripDetailsAPI, updateTripAPI, getStaffByOperatorAPI } from '@/lib/api'
+import { getTripDetailsAPI } from '@/lib/api'
 import { toast } from 'sonner'
 import { amenityOptions } from '@/utils/constants'
 import Image from 'next/image'
@@ -38,13 +36,6 @@ import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from
 import type { LatLngBoundsExpression } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-type TripFormInputs = {
-  departureTime: string
-  arrivalTime: string
-  basePrice: number
-  status: TripStatus
-}
-
 function FitBounds({ bounds }: { bounds: LatLngBoundsExpression }) {
   const map = useMap()
   useEffect(() => {
@@ -53,23 +44,17 @@ function FitBounds({ bounds }: { bounds: LatLngBoundsExpression }) {
   return null
 }
 
-export default function TripDetailPage() {
+export default function StaffTripDetailPage() {
   const params = useParams()
   const router = useRouter()
   const tripId = params.id as string
 
   const [trip, setTrip] = useState<TripDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [staffList, setStaffList] = useState<any[]>([])
-  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
-  const [originalStaffId, setOriginalStaffId] = useState<string | null>(null)
-  const [loadingStaff, setLoadingStaff] = useState(false)
-  const [savingStaff, setSavingStaff] = useState(false)
-  const [savingTrip, setSavingTrip] = useState(false)
 
   // Image slider state
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [selectedFloor, setSelectedFloor] = useState(1)
 
   const handlePrevImage = () => {
     if (trip?.bus?.images && trip.bus.images.length > 0) {
@@ -84,23 +69,6 @@ export default function TripDetailPage() {
       setCurrentImageIndex((prev) => (prev === imagesLength - 1 ? 0 : prev + 1))
     }
   }
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    formState: { isDirty },
-  } = useForm<TripFormInputs>({
-    defaultValues: {
-      departureTime: '',
-      arrivalTime: '',
-      basePrice: 0,
-      status: 'scheduled',
-    },
-  })
-
-  const watchedStatus = watch('status')
 
   useEffect(() => {
     const fetchTripDetails = async () => {
@@ -121,27 +89,6 @@ export default function TripDetailPage() {
         }
 
         setTrip(response)
-        setSelectedStaffId(response.staffId || null)
-        setOriginalStaffId(response.staffId || null)
-        reset({
-          departureTime: response.departureTime.slice(0, 16), // Format for datetime-local
-          arrivalTime: response.arrivalTime.slice(0, 16),
-          basePrice: response.basePrice,
-          status: response.status,
-        })
-
-        // Fetch staff if bus has operator
-        if (response.bus?.operator?.id) {
-          try {
-            setLoadingStaff(true)
-            const staffResponse = await getStaffByOperatorAPI(response.bus.operator.id)
-            setStaffList(staffResponse.data || [])
-          } catch (err) {
-            console.error('Error fetching staff:', err)
-          } finally {
-            setLoadingStaff(false)
-          }
-        }
       } catch (error) {
         console.error('Error fetching trip details:', error)
         toast.error('Failed to fetch trip details')
@@ -151,67 +98,9 @@ export default function TripDetailPage() {
     }
 
     fetchTripDetails()
-  }, [tripId, reset])
+  }, [tripId])
 
-  const onSubmit: SubmitHandler<TripFormInputs> = async (data) => {
-    if (!trip) return
-
-    // Validate that active status requires staff assignment
-    if (data.status === 'active' && !selectedStaffId) {
-      toast.error('Please assign a staff member before setting trip to active')
-      return
-    }
-
-    try {
-      setSavingTrip(true)
-      await updateTripAPI(trip.id, {
-        departureTime: data.departureTime,
-        arrivalTime: data.arrivalTime,
-        basePrice: data.basePrice,
-        status: data.status,
-      })
-
-      // Refresh trip data
-      const refreshedTrip = await getTripDetailsAPI(trip.id)
-      setTrip(refreshedTrip)
-      reset({
-        departureTime: refreshedTrip.departureTime.slice(0, 16),
-        arrivalTime: refreshedTrip.arrivalTime.slice(0, 16),
-        basePrice: refreshedTrip.basePrice,
-        status: refreshedTrip.status,
-      })
-      toast.success('Trip details updated successfully')
-    } catch (error) {
-      console.error('Error updating trip:', error)
-      toast.error('Failed to update trip details')
-    } finally {
-      setSavingTrip(false)
-    }
-  }
-
-  const handleSaveStaffAssignment = async () => {
-    if (!trip) return
-
-    try {
-      setSavingStaff(true)
-      await updateTripAPI(trip.id, {
-        staffId: selectedStaffId,
-      })
-
-      // Refresh trip data
-      const refreshedTrip = await getTripDetailsAPI(trip.id)
-      setTrip(refreshedTrip)
-      setOriginalStaffId(selectedStaffId)
-      toast.success('Staff assignment updated successfully')
-    } catch (error) {
-      console.error('Error updating staff assignment:', error)
-      toast.error('Failed to update staff assignment')
-    } finally {
-      setSavingStaff(false)
-    }
-  }
-
-  const getStatusColor = (status: TripStatus) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled':
         return 'bg-blue-500'
@@ -226,9 +115,7 @@ export default function TripDetailPage() {
     }
   }
 
-  const [selectedFloor, setSelectedFloor] = useState(1)
-
-  // Map logic - only render map if we have stops with coordinates
+  // Map logic
   const mapPoints = useMemo(() => {
     if (!trip?.route?.stops || trip.route.stops.length === 0) return []
 
@@ -239,7 +126,6 @@ export default function TripDetailPage() {
         if (typeof lat !== 'number' || typeof lng !== 'number') return null
 
         const stopName = rs.stopName || rs.stop?.name || 'Stop'
-        // Determine type based on sequence or position
         const isFirst = rs.sequence === 1 || rs.sequence === 0
         const isLast = rs.sequence === trip.route!.stops!.length
 
@@ -277,6 +163,7 @@ export default function TripDetailPage() {
     return (
       <div className="p-8 flex items-center justify-center">
         <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading trip details...</p>
         </div>
       </div>
@@ -296,7 +183,7 @@ export default function TripDetailPage() {
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => router.push('/admin/trips')}
+            onClick={() => router.push('/staff/trips')}
             className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-6 h-6" />
@@ -335,74 +222,23 @@ export default function TripDetailPage() {
 
                 <div>
                   <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Departure Time</label>
-                  <input
-                    type="datetime-local"
-                    {...register('departureTime', { required: true })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    disabled={savingTrip}
-                  />
+                  <p className="text-gray-900 dark:text-white">{new Date(trip.departureTime).toLocaleString()}</p>
                 </div>
 
                 <div>
                   <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Arrival Time</label>
-                  <input
-                    type="datetime-local"
-                    {...register('arrivalTime', { required: true })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    disabled={savingTrip}
-                  />
+                  <p className="text-gray-900 dark:text-white">{new Date(trip.arrivalTime).toLocaleString()}</p>
                 </div>
 
                 <div>
                   <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Base Price</label>
-                  <input
-                    type="number"
-                    {...register('basePrice', { required: true, valueAsNumber: true })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    disabled={savingTrip}
-                  />
+                  <p className="text-gray-900 dark:text-white">₫{trip.basePrice.toLocaleString()}</p>
                 </div>
 
                 <div>
                   <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Status</label>
-                  <select
-                    {...register('status')}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    disabled={savingTrip}
-                  >
-                    <option value="scheduled">Scheduled</option>
-                    <option value="active">Active</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
+                  <Badge className={getStatusColor(trip.status)}>{trip.status}</Badge>
                 </div>
-
-                {watchedStatus === 'active' && !selectedStaffId && (
-                  <p className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                    <span>⚠️</span>
-                    Cannot set to active without staff assignment
-                  </p>
-                )}
-
-                {isDirty && (
-                  <button
-                    onClick={handleSubmit(onSubmit)}
-                    disabled={savingTrip}
-                    className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {savingTrip ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        <span>Save Trip Details</span>
-                      </>
-                    )}
-                  </button>
-                )}
 
                 <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
                   <div className="flex items-center justify-between mb-2">
@@ -421,77 +257,76 @@ export default function TripDetailPage() {
               </div>
             </CardContent>
           </Card>
-          {/* Staff Assignment */}
-          {trip.bus?.operator && (
+          {/* Staff Assignment  */}
+          {trip.staff && (
             <Card className="mt-6">
               <CardContent className="p-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  Staff Assignment
+                  Assigned Staff
                 </h2>
-                {loadingStaff ? (
-                  <div className="text-center py-4">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      Assigned Staff {trip.status === 'scheduled' && <span className="text-red-500">*</span>}
-                    </label>
-                    <select
-                      value={selectedStaffId || ''}
-                      onChange={(e) => setSelectedStaffId(e.target.value || null)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      disabled={savingStaff}
-                    >
-                      <option value="">No staff assigned</option>
-                      {staffList.map((staff) => (
-                        <option key={staff.id} value={staff.id}>
-                          {staff.user?.displayName || staff.user?.email} ({staff.user?.phoneNumber || 'No phone'})
-                        </option>
-                      ))}
-                    </select>
-                    {trip.status === 'scheduled' && !selectedStaffId && (
-                      <p className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                        <span>⚠️</span>
-                        Staff must be assigned before trip can be set to active
-                      </p>
-                    )}
-                    {selectedStaffId && staffList.find((s) => s.id === selectedStaffId) && (
-                      <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                          <strong>Selected Staff:</strong>{' '}
-                          {staffList.find((s) => s.id === selectedStaffId)?.user?.displayName}
-                        </p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          Email: {staffList.find((s) => s.id === selectedStaffId)?.user?.email}
-                        </p>
+                <div className="space-y-3">
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg">
+                        {trip.staff.user?.displayName?.charAt(0).toUpperCase() ||
+                          trip.staff.user?.email?.charAt(0).toUpperCase() ||
+                          'S'}
                       </div>
-                    )}
-                    {selectedStaffId !== originalStaffId && (
-                      <button
-                        onClick={handleSaveStaffAssignment}
-                        disabled={savingStaff}
-                        className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {savingStaff ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            <span>Saving...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Save className="w-4 h-4" />
-                            <span>Save Staff Assignment</span>
-                          </>
-                        )}
-                      </button>
-                    )}
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {trip.staff.user?.displayName || 'Staff Member'}
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Assigned to this trip</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2 pt-3 border-t border-blue-200 dark:border-blue-800">
+                      {trip.staff.user?.email && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Mail className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                          <a
+                            href={`mailto:${trip.staff.user.email}`}
+                            className="text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            {trip.staff.user.email}
+                          </a>
+                        </div>
+                      )}
+                      {trip.staff.user?.phoneNumber && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Phone className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                          <a
+                            href={`tel:${trip.staff.user.phoneNumber}`}
+                            className="text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            {trip.staff.user.phoneNumber}
+                          </a>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           )}
+
+          {!trip.staff && trip.status === 'scheduled' && (
+            <Card className="mt-6">
+              <CardContent className="p-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                  Assigned Staff
+                </h2>
+                <div className="p-4 bg-yellow-50 dark:bg-yellow-950 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200 flex items-center gap-2">
+                    <span>⚠️</span>
+                    No staff assigned to this trip yet
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Bus Information */}
           {trip.bus && (
             <Card className="mt-6">
@@ -518,7 +353,7 @@ export default function TripDetailPage() {
                     <span className="text-gray-900 dark:text-white">{trip.bus.busType || 'N/A'}</span>
                   </div>
 
-                  {/* Compact Bus Images Section */}
+                  {/* Bus Images */}
                   {trip.bus.images && trip.bus.images.length > 0 && (
                     <div className="pt-3 border-t border-gray-200 dark:border-gray-800">
                       <div className="flex items-center justify-between mb-2">
@@ -543,14 +378,12 @@ export default function TripDetailPage() {
                             <button
                               onClick={handlePrevImage}
                               className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full transition-all"
-                              aria-label="Previous image"
                             >
                               <ChevronLeft className="w-4 h-4" />
                             </button>
                             <button
                               onClick={handleNextImage}
                               className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-black/80 text-white rounded-full transition-all"
-                              aria-label="Next image"
                             >
                               <ChevronRight className="w-4 h-4" />
                             </button>
@@ -584,11 +417,10 @@ export default function TripDetailPage() {
                   )}
 
                   {trip.bus.amenities && (
-                    <div>
+                    <div className="pt-3 border-t border-gray-200 dark:border-gray-800">
                       <span className="text-gray-600 dark:text-gray-400 block mb-2">Amenities</span>
                       <div className="flex flex-wrap gap-2">
                         {(() => {
-                          // Handle both object and array formats
                           const amenityList = Array.isArray(trip.bus.amenities)
                             ? trip.bus.amenities
                             : Object.entries(trip.bus.amenities)
@@ -724,7 +556,7 @@ export default function TripDetailPage() {
             </Card>
           </div>
 
-          {/* Seat Layout - Bus View */}
+          {/* Seat Layout */}
           <Card className="mb-6">
             <CardContent className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Bus Seat Layout</h3>
@@ -763,7 +595,7 @@ export default function TripDetailPage() {
 
                     return (
                       <>
-                        {/* Floor Tabs for multi-floor buses */}
+                        {/* Floor Tabs */}
                         {hasMultipleFloors && (
                           <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
                             {floorNumbers.map((floorNum) => (
@@ -782,7 +614,7 @@ export default function TripDetailPage() {
                           </div>
                         )}
 
-                        {/* Display seats for selected floor */}
+                        {/* Display seats */}
                         {floorNumbers.map((floorNum) => {
                           if (hasMultipleFloors && floorNum !== selectedFloor) return null
 
@@ -792,7 +624,7 @@ export default function TripDetailPage() {
 
                           return (
                             <div key={floorNum} className="space-y-4">
-                              {/* Driver section indicator */}
+                              {/* Driver section */}
                               <div className="flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                   🚗 Driver {hasMultipleFloors && `- Floor ${floorNum}`}
@@ -800,55 +632,36 @@ export default function TripDetailPage() {
                                 <span className="text-xs text-gray-500 dark:text-gray-400">Front of Bus</span>
                               </div>
 
-                              {/* Seat Layout by Rows */}
+                              {/* Seat rows */}
                               <div className="space-y-3 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                                 {rowNumbers.map((rowNum) => {
                                   const seatsInRow = rowSeats[rowNum]
-
-                                  // Sort seats by column letter to ensure proper order
                                   const sortedSeats = [...seatsInRow].sort((a, b) => {
                                     const colA = a.seatNumber.replace(/\d/g, '')
                                     const colB = b.seatNumber.replace(/\d/g, '')
                                     return colA.localeCompare(colB)
                                   })
 
-                                  // Organize seats based on their column positions
                                   const leftSeats: typeof trip.seats = []
                                   const middleSeats: typeof trip.seats = []
                                   const rightSeats: typeof trip.seats = []
 
-                                  // Determine the layout type based on columns present
                                   const columns = [...new Set(sortedSeats.map((s) => s.seatNumber.replace(/\d/g, '')))]
                                   const totalColumns = columns.length
 
                                   sortedSeats.forEach((seat) => {
                                     const col = seat.seatNumber.replace(/\d/g, '')
-
                                     if (totalColumns === 2) {
-                                      // 1-1 layout: A (left) | B (right)
-                                      if (col === 'A') {
-                                        leftSeats.push(seat)
-                                      } else {
-                                        rightSeats.push(seat)
-                                      }
+                                      if (col === 'A') leftSeats.push(seat)
+                                      else rightSeats.push(seat)
                                     } else if (totalColumns === 3) {
-                                      // 1-1-1 layout: A (left) | B (middle) | C (right)
-                                      if (col === 'A') {
-                                        leftSeats.push(seat)
-                                      } else if (col === 'B') {
-                                        middleSeats.push(seat)
-                                      } else {
-                                        rightSeats.push(seat)
-                                      }
+                                      if (col === 'A') leftSeats.push(seat)
+                                      else if (col === 'B') middleSeats.push(seat)
+                                      else rightSeats.push(seat)
                                     } else if (totalColumns >= 4) {
-                                      // 2-2 layout: AB (left) | CD (right)
-                                      if (col === 'A' || col === 'B') {
-                                        leftSeats.push(seat)
-                                      } else {
-                                        rightSeats.push(seat)
-                                      }
+                                      if (col === 'A' || col === 'B') leftSeats.push(seat)
+                                      else rightSeats.push(seat)
                                     } else {
-                                      // Single column, put on left
                                       leftSeats.push(seat)
                                     }
                                   })
@@ -879,7 +692,7 @@ export default function TripDetailPage() {
                                       {/* Aisle */}
                                       <div className="w-8 border-l-2 border-r-2 border-dashed border-gray-300 dark:border-gray-600 h-12"></div>
 
-                                      {/* Middle seats (for 1-1-1 layouts) */}
+                                      {/* Middle seats */}
                                       {middleSeats.length > 0 && (
                                         <>
                                           <div className="flex gap-2">
@@ -901,7 +714,6 @@ export default function TripDetailPage() {
                                               </div>
                                             ))}
                                           </div>
-                                          {/* Another aisle */}
                                           <div className="w-8 border-l-2 border-r-2 border-dashed border-gray-300 dark:border-gray-600 h-12"></div>
                                         </>
                                       )}
@@ -1030,7 +842,6 @@ export default function TripDetailPage() {
                       </span>
                       <div className="space-y-2">
                         {trip.route.stops.map((routeStop, index) => {
-                          // Handle both API formats
                           const stopName = routeStop.stopName || routeStop.stop?.name || 'Unknown Stop'
                           const stopAddress = routeStop.stopAddress || routeStop.stop?.address || ''
                           const distanceFromOrigin = routeStop.distanceFromOrigin || 0
@@ -1065,7 +876,6 @@ export default function TripDetailPage() {
                                     )}
                                   </div>
                                 )}
-                                {/* Show pickup/dropoff badges */}
                                 <div className="flex gap-2 mt-2">
                                   {routeStop.isPickup !== undefined && (
                                     <span
@@ -1121,11 +931,8 @@ export default function TripDetailPage() {
                       attribution="&copy; OpenStreetMap contributors"
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
-
                     <FitBounds bounds={bounds} />
-
                     {polyline.length >= 2 && <Polyline positions={polyline} />}
-
                     {mapPoints.map((p) => (
                       <CircleMarker
                         key={p.id}
