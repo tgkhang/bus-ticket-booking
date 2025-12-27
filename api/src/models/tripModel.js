@@ -322,6 +322,7 @@ const updateTrip = async (id, updateData) => {
   if (updateData.arrivalTime !== undefined) data.arrivalTime = new Date(updateData.arrivalTime)
   if (updateData.basePrice !== undefined) data.basePrice = updateData.basePrice
   if (updateData.status !== undefined) data.status = updateData.status
+  if (updateData.staffId !== undefined) data.staffId = updateData.staffId
 
   const trip = await prisma.trip.update({
     where: { id },

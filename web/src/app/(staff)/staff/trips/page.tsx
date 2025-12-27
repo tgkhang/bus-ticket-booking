@@ -3,14 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
-import {
-  Plus,
-  Edit,
-  Trash2,
-  X,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react'
+import { Plus, Edit, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Trip, TripStatus, CreateTripData } from '@/types/trip'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -265,9 +258,7 @@ export default function TripManagementPage() {
                     <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
                       Route
                     </th>
-                    <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
-                      Bus
-                    </th>
+                    <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">Bus</th>
                     <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
                       Departure
                     </th>
@@ -297,7 +288,9 @@ export default function TripManagementPage() {
                         <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">
                           <span className="font-mono text-sm">{trip.id.substring(0, 8)}...</span>
                         </td>
-                        <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">{getRouteName(trip.routeId)}</td>
+                        <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">
+                          {getRouteName(trip.routeId)}
+                        </td>
                         <td className="px-6 py-4">
                           <div className="text-base text-gray-900 dark:text-gray-100">{busInfo.model}</div>
                           <div className="text-sm text-gray-500">{busInfo.plateNumber}</div>
