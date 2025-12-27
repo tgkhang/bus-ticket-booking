@@ -1,52 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import {
-  ArrowLeft,
-  Edit,
-  Save,
-  X,
-  Plus,
-  Trash2,
-  MapPin,
-  Navigation,
-  Clock,
-  DollarSign,
-  ArrowRight,
-  Map,
-  Calendar,
-  Bus,
-  TrendingUp,
-  Users,
-  AlertCircle,
-  ChevronUp,
-  ChevronDown,
-} from 'lucide-react'
+import { ArrowLeft, MapPin, Navigation, Clock, DollarSign, ArrowRight, Route as RouteIcon } from 'lucide-react'
 import { getRouteDetailsAPI } from '@/lib/api'
 import { toast } from 'sonner'
 import { Route, Stop } from '@/types/routeAndStop'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-
-interface DisplayRoute extends Omit<Route, 'stops'> {
-  basePrice?: number
-  originStopName: string
-  destinationStopName: string
-  operatorName: string
-  stops: DisplayRouteStop[]
-  trips: Trip[]
-}
+import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import type { LatLngBoundsExpression } from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
 interface DisplayRouteStop {
   id: string
@@ -59,28 +23,23 @@ interface DisplayRouteStop {
   distanceFromOrigin?: number
   estimatedMinutes?: number
   note?: string
+  stop?: Stop
 }
 
-interface Trip {
-  id: string
-  departureTime: string
-  status: 'scheduled' | 'active' | 'completed' | 'cancelled'
-  seatsBooked: number
-  totalSeats: number
+interface DisplayRoute extends Omit<Route, 'stops'> {
+  basePrice?: number
+  originStopName: string
+  destinationStopName: string
+  operatorName: string
+  stops: DisplayRouteStop[]
 }
 
-interface RouteStop {
-  id: string
-  stopId: string
-  stopName: string
-  stopAddress: string
-  sequence: number
-  isPickup: boolean
-
-  isDropoff: boolean
-  distanceFromOrigin?: number
-  estimatedMinutes?: number
-  note?: string
+function FitBounds({ bounds }: { bounds: LatLngBoundsExpression }) {
+  const map = useMap()
+  useEffect(() => {
+    map.fitBounds(bounds, { padding: [24, 24] })
+  }, [map, bounds])
+  return null
 }
 
 export default function RouteDetailPage() {
@@ -89,35 +48,8 @@ export default function RouteDetailPage() {
   const routeId = params.id as string
 
   const [route, setRoute] = useState<DisplayRoute | null>(null)
-  const [isEditingRoute, setIsEditingRoute] = useState(false)
-  const [showAddStopModal, setShowAddStopModal] = useState(false)
-  const [editingStop, setEditingStop] = useState<DisplayRouteStop | null>(null)
-  const [activeTab, setActiveTab] = useState<'info' | 'stops' | 'trips'>('info')
+  const [activeTab, setActiveTab] = useState<'info' | 'stops'>('info')
   const [loading, setLoading] = useState(true)
-  const [availableStops] = useState<Stop[]>([]) // TODO: Fetch when needed for editing
-  const [operators] = useState<Array<{ id: string; name: string }>>([]) // TODO: Fetch when needed for editing
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [stopToDelete, setStopToDelete] = useState<string | null>(null)
-
-  const [routeFormData, setRouteFormData] = useState({
-    name: '',
-    operatorId: '',
-    originStopId: '',
-    destinationStopId: '',
-    distanceKm: 0,
-    estimatedMinutes: 0,
-    basePrice: 0,
-    active: true,
-  })
-
-  const [stopFormData, setStopFormData] = useState({
-    stopId: '',
-    isPickup: true,
-    isDropoff: true,
-    distanceFromOrigin: 0,
-    estimatedMinutes: 0,
-    note: '',
-  })
 
   useEffect(() => {
     const fetchRouteDetails = async () => {
@@ -143,21 +75,11 @@ export default function RouteDetailPage() {
             distanceFromOrigin: 0, // TODO: Add to API response if needed
             estimatedMinutes: 0, // TODO: Add to API response if needed
             note: routeStop.note || undefined,
+            stop: routeStop.stop, // Preserve the full stop object with coordinates
           })),
-          trips: [], // TODO: Fetch trips separately if needed
         }
 
         setRoute(displayRoute)
-        setRouteFormData({
-          name: displayRoute.name,
-          operatorId: displayRoute.operatorId,
-          originStopId: displayRoute.originStopId,
-          destinationStopId: displayRoute.destinationStopId,
-          distanceKm: displayRoute.distanceKm,
-          estimatedMinutes: displayRoute.estimatedMinutes,
-          basePrice: displayRoute.basePrice || 0,
-          active: displayRoute.active,
-        })
       } catch (error) {
         toast.error('Failed to fetch route details')
         console.error('Error fetching route details:', error)
@@ -169,131 +91,60 @@ export default function RouteDetailPage() {
     fetchRouteDetails()
   }, [routeId])
 
-  const handleSaveRouteDetails = () => {
-    if (route) {
-      const originStop = availableStops.find((s) => s.id === routeFormData.originStopId)
-      const destStop = availableStops.find((s) => s.id === routeFormData.destinationStopId)
-      const operator = operators.find((o) => o.id === routeFormData.operatorId)
+  // Map logic
+  const allStops = useMemo(() => {
+    if (!route) return []
 
-      setRoute({
-        ...route,
-        ...routeFormData,
-        originStopName: originStop?.name || '',
-        destinationStopName: destStop?.name || '',
-        operatorName: operator?.name || '',
+    const stops = [
+      {
+        id: `origin-${route.originStopId}`,
+        name: route.originStopName,
+        type: 'origin' as const,
+        latitude: route.originStop?.latitude,
+        longitude: route.originStop?.longitude,
+      },
+      ...route.stops.map((stop) => ({
+        id: stop.id,
+        name: stop.stopName,
+        type: 'intermediate' as const,
+        latitude: stop.stop?.latitude,
+        longitude: stop.stop?.longitude,
+      })),
+      {
+        id: `destination-${route.destinationStopId}`,
+        name: route.destinationStopName,
+        type: 'destination' as const,
+        latitude: route.destinationStop?.latitude,
+        longitude: route.destinationStop?.longitude,
+      },
+    ]
+    return stops
+  }, [route])
+
+  const mapPoints = useMemo(() => {
+    const pts = allStops
+      .map((s) => {
+        const lat = s.latitude
+        const lng = s.longitude
+        if (typeof lat !== 'number' || typeof lng !== 'number') return null
+        return { id: s.id, name: s.name, type: s.type, lat, lng }
       })
-      setIsEditingRoute(false)
-      // TODO: Call API to update route
-    }
-  }
+      .filter(Boolean) as Array<{
+      id: string
+      name: string
+      type: 'origin' | 'destination' | 'intermediate'
+      lat: number
+      lng: number
+    }>
+    return pts
+  }, [allStops])
 
-  const handleOpenAddStopModal = (stop?: RouteStop) => {
-    if (stop) {
-      setEditingStop(stop)
-      setStopFormData({
-        stopId: stop.stopId,
-        isPickup: stop.isPickup,
-        isDropoff: stop.isDropoff,
-        distanceFromOrigin: stop.distanceFromOrigin || 0,
-        estimatedMinutes: stop.estimatedMinutes || 0,
-        note: stop.note || '',
-      })
-    } else {
-      setEditingStop(null)
-      setStopFormData({
-        stopId: '',
-        isPickup: true,
-        isDropoff: true,
-        distanceFromOrigin: 0,
-        estimatedMinutes: 0,
-        note: '',
-      })
-    }
-    setShowAddStopModal(true)
-  }
+  const polyline = useMemo(() => mapPoints.map((p) => [p.lat, p.lng] as [number, number]), [mapPoints])
 
-  const handleSaveStop = () => {
-    if (route) {
-      const stop = availableStops.find((s) => s.id === stopFormData.stopId)
-      if (!stop) return
-
-      if (editingStop) {
-        // Update existing stop
-        setRoute({
-          ...route,
-          stops: route.stops.map((s) =>
-            s.id === editingStop.id
-              ? {
-                  ...s,
-                  ...stopFormData,
-                  stopName: stop.name,
-                  stopAddress: stop.address,
-                }
-              : s
-          ),
-        })
-      } else {
-        // Add new stop
-        const newStop: RouteStop = {
-          id: `rs_${Date.now()}`,
-          ...stopFormData,
-          stopName: stop.name,
-          stopAddress: stop.address,
-          sequence: route.stops.length + 1,
-        }
-        setRoute({ ...route, stops: [...route.stops, newStop] })
-      }
-      setShowAddStopModal(false)
-      // TODO: Call API to add/update stop
-    }
-  }
-
-  const handleDeleteStop = (stopId: string) => {
-    setStopToDelete(stopId)
-    setDeleteDialogOpen(true)
-  }
-
-  const confirmDeleteStop = () => {
-    if (stopToDelete && route) {
-      const newStops = route.stops.filter((s) => s.id !== stopToDelete)
-      // Resequence
-      const resequenced = newStops.map((stop, i) => ({ ...stop, sequence: i + 1 }))
-      setRoute({ ...route, stops: resequenced })
-      setDeleteDialogOpen(false)
-      setStopToDelete(null)
-      // TODO: Call API to delete stop
-    }
-  }
-
-  const handleMoveStop = (index: number, direction: 'up' | 'down') => {
-    if (!route) return
-
-    const newStops = [...route.stops]
-    const newIndex = direction === 'up' ? index - 1 : index + 1
-
-    if (newIndex < 0 || newIndex >= newStops.length) return // Swap
-    ;[newStops[index], newStops[newIndex]] = [newStops[newIndex], newStops[index]]
-
-    // Resequence
-    const resequenced = newStops.map((stop, i) => ({ ...stop, sequence: i + 1 }))
-    setRoute({ ...route, stops: resequenced })
-    // TODO: Call API to reorder stops
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'scheduled':
-        return 'bg-blue-100 text-blue-700'
-      case 'active':
-        return 'bg-green-100 text-green-700'
-      case 'completed':
-        return 'bg-gray-100 text-gray-700'
-      case 'cancelled':
-        return 'bg-red-100 text-red-700'
-      default:
-        return 'bg-gray-100 text-gray-700'
-    }
-  }
+  const bounds = useMemo<LatLngBoundsExpression | null>(() => {
+    if (polyline.length < 1) return null
+    return polyline as unknown as LatLngBoundsExpression
+  }, [polyline])
 
   if (loading || !route) {
     return (
@@ -311,7 +162,7 @@ export default function RouteDetailPage() {
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => router.push('/admin/routes')}
+            onClick={() => router.push('/staff/routes')}
             className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-6 h-6" />
@@ -420,317 +271,165 @@ export default function RouteDetailPage() {
                 : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
             }
           >
-            Stops Management
-          </Button>
-          <Button
-            onClick={() => setActiveTab('trips')}
-            className={
-              activeTab === 'trips'
-                ? ''
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }
-          >
-            Scheduled Trips
+            Route Stops
           </Button>
         </div>
 
         {/* Route Information Tab */}
         {activeTab === 'info' && (
           <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-gray-900">Route Details</h2>
-              {!isEditingRoute ? (
-                <button
-                  onClick={() => setIsEditingRoute(true)}
-                  className="flex items-center gap-2 px-4 py-2 text-[#2563EB] hover:bg-blue-50 rounded-lg transition-colors"
-                >
-                  <Edit className="w-5 h-5" />
-                  Edit
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSaveRouteDetails}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    <Save className="w-5 h-5" />
-                    Save
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsEditingRoute(false)
-                      setRouteFormData({
-                        name: route.name,
-                        operatorId: route.operatorId,
-                        originStopId: route.originStopId,
-                        destinationStopId: route.destinationStopId,
-                        distanceKm: route.distanceKm,
-                        estimatedMinutes: route.estimatedMinutes,
-                        basePrice: route.basePrice || 0,
-                        active: route.active,
-                      })
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                    Cancel
-                  </button>
-                </div>
-              )}
-            </div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Route Details</h2>
 
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <label className="block text-gray-700 mb-2">Route Name</label>
-                {isEditingRoute ? (
-                  <input
-                    type="text"
-                    value={routeFormData.name}
-                    onChange={(e) => setRouteFormData({ ...routeFormData, name: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
-                  />
-                ) : (
-                  <p className="text-gray-900 py-3">{route.name}</p>
-                )}
+                <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Route Name</label>
+                <p className="text-gray-900 dark:text-white py-3">{route.name}</p>
               </div>
 
               <div>
-                <label className="block text-gray-700 mb-2">Operator</label>
-                {isEditingRoute ? (
-                  <select
-                    value={routeFormData.operatorId}
-                    onChange={(e) => setRouteFormData({ ...routeFormData, operatorId: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
-                  >
-                    {operators.map((op) => (
-                      <option key={op.id} value={op.id}>
-                        {op.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="text-gray-900 py-3">{route.operatorName}</p>
-                )}
+                <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Operator</label>
+                <p className="text-gray-900 dark:text-white py-3">{route.operatorName}</p>
               </div>
 
               <div>
-                <label className="block text-gray-700 mb-2">Origin Stop</label>
-                {isEditingRoute ? (
-                  <select
-                    value={routeFormData.originStopId}
-                    onChange={(e) => setRouteFormData({ ...routeFormData, originStopId: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
-                  >
-                    {availableStops.map((stop) => (
-                      <option key={stop.id} value={stop.id}>
-                        {stop.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="text-gray-900 py-3">{route.originStopName}</p>
-                )}
+                <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Origin Stop</label>
+                <p className="text-gray-900 dark:text-white py-3">{route.originStopName}</p>
               </div>
 
               <div>
-                <label className="block text-gray-700 mb-2">Destination Stop</label>
-                {isEditingRoute ? (
-                  <select
-                    value={routeFormData.destinationStopId}
-                    onChange={(e) => setRouteFormData({ ...routeFormData, destinationStopId: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
-                  >
-                    {availableStops.map((stop) => (
-                      <option key={stop.id} value={stop.id}>
-                        {stop.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="text-gray-900 py-3">{route.destinationStopName}</p>
-                )}
+                <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Destination Stop</label>
+                <p className="text-gray-900 dark:text-white py-3">{route.destinationStopName}</p>
               </div>
 
               <div>
-                <label className="block text-gray-700 mb-2">Total Distance (km)</label>
-                {isEditingRoute ? (
-                  <input
-                    type="number"
-                    value={routeFormData.distanceKm}
-                    onChange={(e) =>
-                      setRouteFormData({
-                        ...routeFormData,
-                        distanceKm: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
-                    step="0.1"
-                  />
-                ) : (
-                  <p className="text-gray-900 py-3">{route.distanceKm} km</p>
-                )}
+                <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Total Distance (km)</label>
+                <p className="text-gray-900 dark:text-white py-3">{route.distanceKm} km</p>
               </div>
 
               <div>
-                <label className="block text-gray-700 mb-2">Estimated Duration (minutes)</label>
-                {isEditingRoute ? (
-                  <input
-                    type="number"
-                    value={routeFormData.estimatedMinutes}
-                    onChange={(e) =>
-                      setRouteFormData({
-                        ...routeFormData,
-                        estimatedMinutes: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
-                  />
-                ) : (
-                  <p className="text-gray-900 py-3">
-                    {Math.floor(route.estimatedMinutes / 60)}h {route.estimatedMinutes % 60}m
-                  </p>
-                )}
+                <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Estimated Duration</label>
+                <p className="text-gray-900 dark:text-white py-3">
+                  {Math.floor(route.estimatedMinutes / 60)}h {route.estimatedMinutes % 60}m
+                </p>
               </div>
 
               <div>
-                <label className="block text-gray-700 mb-2">Base Price (VND)</label>
-                {isEditingRoute ? (
-                  <input
-                    type="number"
-                    value={routeFormData.basePrice}
-                    onChange={(e) =>
-                      setRouteFormData({
-                        ...routeFormData,
-                        basePrice: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
-                    step="1000"
-                  />
-                ) : (
-                  <p className="text-gray-900 py-3">₫{(route.basePrice || 0).toLocaleString()}</p>
-                )}
+                <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Base Price (VND)</label>
+                <p className="text-gray-900 dark:text-white py-3">₫{(route.basePrice || 0).toLocaleString()}</p>
               </div>
 
               <div>
-                <label className="block text-gray-700 mb-2">Status</label>
-                {isEditingRoute ? (
-                  <select
-                    value={routeFormData.active ? 'active' : 'inactive'}
-                    onChange={(e) => setRouteFormData({ ...routeFormData, active: e.target.value === 'active' })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB] text-gray-900"
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                ) : (
-                  <p className="text-gray-900 py-3">{route.active ? 'Active' : 'Inactive'}</p>
-                )}
+                <label className="block text-gray-600 dark:text-gray-400 text-sm mb-2">Status</label>
+                <p className="text-gray-900 dark:text-white py-3">{route.active ? 'Active' : 'Inactive'}</p>
               </div>
             </div>
 
             {/* Route Visualization */}
-            <div className="mt-8 pt-8 border-t border-gray-200">
-              <h3 className="text-gray-900 mb-4">Route Visualization</h3>
-              <div className="flex items-center justify-center p-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                <div className="text-center">
-                  <Map className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-2">Interactive Map View</p>
-                  <p className="text-sm text-gray-500">
-                    Map integration showing route path and stops would be displayed here
-                  </p>
+            <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-800">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <RouteIcon className="w-5 h-5 text-blue-600" />
+                Route Map
+              </h3>
+              {bounds ? (
+                <div className="h-[360px] w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+                  <MapContainer
+                    center={polyline[0] || [10.7758, 106.7009]}
+                    zoom={11}
+                    scrollWheelZoom
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer
+                      attribution="&copy; OpenStreetMap contributors"
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+
+                    <FitBounds bounds={bounds} />
+
+                    {polyline.length >= 2 && <Polyline positions={polyline} />}
+
+                    {mapPoints.map((p) => (
+                      <CircleMarker
+                        key={p.id}
+                        center={[p.lat, p.lng]}
+                        radius={p.type === 'origin' || p.type === 'destination' ? 8 : 6}
+                        pathOptions={{
+                          color: p.type === 'origin' ? '#10B981' : p.type === 'destination' ? '#EF4444' : '#3B82F6',
+                          fillColor: p.type === 'origin' ? '#10B981' : p.type === 'destination' ? '#EF4444' : '#3B82F6',
+                          fillOpacity: 0.8,
+                        }}
+                      >
+                        <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                          <div className="text-xs">
+                            <div className="font-semibold">{p.name}</div>
+                            <div>
+                              {p.type === 'origin' ? 'Origin' : p.type === 'destination' ? 'Destination' : 'Stop'}
+                            </div>
+                          </div>
+                        </Tooltip>
+                      </CircleMarker>
+                    ))}
+                  </MapContainer>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-sm text-gray-600 dark:text-gray-400">
+                  Map is unavailable because stop coordinates are missing.
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Stops Management Tab */}
+        {/* Stops Tab */}
         {activeTab === 'stops' && (
           <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-gray-900">Route Stops</h2>
-              <button
-                onClick={() => handleOpenAddStopModal()}
-                className="flex items-center gap-2 bg-[#2563EB] text-white px-4 py-2 rounded-lg hover:bg-[#1d4ed8] transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                Add Stop
-              </button>
-            </div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Route Stops</h2>
 
             {/* Journey Flow */}
             <div className="space-y-4">
               {/* Origin */}
               <div className="flex items-start gap-4">
                 <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                    <MapPin className="w-6 h-6 text-green-600" />
+                  <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                    <MapPin className="w-6 h-6 text-green-600 dark:text-green-400" />
                   </div>
-                  <div className="w-0.5 h-16 bg-gray-300"></div>
+                  <div className="w-0.5 h-16 bg-gray-300 dark:bg-gray-700"></div>
                 </div>
-                <div className="flex-1 bg-green-50 border-2 border-green-200 rounded-lg p-4">
+                <div className="flex-1 bg-green-50 dark:bg-green-900/30 border-2 border-green-200 dark:border-green-800 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-gray-900">Origin</h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Origin</h3>
                     <span className="px-3 py-1 bg-green-600 text-white rounded-full text-sm">0 km • 0h 0m</span>
                   </div>
-                  <p className="text-gray-700">{route.originStopName}</p>
+                  <p className="text-gray-700 dark:text-gray-300">{route.originStopName}</p>
                 </div>
               </div>
 
               {/* Intermediate Stops */}
-              {route.stops.map((stop, index) => (
+              {route.stops.map((stop) => (
                 <div key={stop.id} className="flex items-start gap-4">
                   <div className="flex flex-col items-center">
-                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                      <span className="text-blue-600">{stop.sequence}</span>
+                    <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                      <span className="text-blue-600 dark:text-blue-400 font-semibold">{stop.sequence}</span>
                     </div>
-                    <div className="w-0.5 h-16 bg-gray-300"></div>
+                    <div className="w-0.5 h-16 bg-gray-300 dark:bg-gray-700"></div>
                   </div>
-                  <div className="flex-1 bg-white border-2 border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                  <div className="flex-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg p-4">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <h3 className="text-gray-900 mb-1">{stop.stopName}</h3>
-                        <p className="text-sm text-gray-600">{stop.stopAddress}</p>
-                      </div>
-                      <div className="flex items-center gap-2 ml-4">
-                        <button
-                          onClick={() => handleMoveStop(index, 'up')}
-                          disabled={index === 0}
-                          className="p-1 text-gray-600 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <ChevronUp className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleMoveStop(index, 'down')}
-                          disabled={index === route.stops.length - 1}
-                          className="p-1 text-gray-600 hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <ChevronDown className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleOpenAddStopModal(stop)}
-                          className="p-1 text-[#2563EB] hover:bg-blue-50 rounded transition-colors"
-                        >
-                          <Edit className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteStop(stop.id)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
+                        <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{stop.stopName}</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{stop.stopAddress}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-6 mt-3">
                       <div className="flex items-center gap-2 text-sm">
                         <Navigation className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600">{stop.distanceFromOrigin || 0} km from origin</span>
+                        <span className="text-gray-600 dark:text-gray-400">
+                          {stop.distanceFromOrigin || 0} km from origin
+                        </span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <Clock className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600">
+                        <span className="text-gray-600 dark:text-gray-400">
                           {Math.floor((stop.estimatedMinutes || 0) / 60)}h {(stop.estimatedMinutes || 0) % 60}m
                         </span>
                       </div>
@@ -739,14 +438,18 @@ export default function RouteDetailPage() {
                     <div className="flex items-center gap-3 mt-3">
                       <span
                         className={`px-2 py-1 rounded text-xs ${
-                          stop.isPickup ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                          stop.isPickup
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'
                         }`}
                       >
                         {stop.isPickup ? '✓ Pickup' : '✗ No Pickup'}
                       </span>
                       <span
                         className={`px-2 py-1 rounded text-xs ${
-                          stop.isDropoff ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
+                          stop.isDropoff
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'
                         }`}
                       >
                         {stop.isDropoff ? '✓ Drop-off' : '✗ No Drop-off'}
@@ -754,7 +457,7 @@ export default function RouteDetailPage() {
                     </div>
 
                     {stop.note && (
-                      <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+                      <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded text-sm text-yellow-800 dark:text-yellow-300">
                         {stop.note}
                       </div>
                     )}
@@ -765,295 +468,34 @@ export default function RouteDetailPage() {
               {/* Destination */}
               <div className="flex items-start gap-4">
                 <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-                    <MapPin className="w-6 h-6 text-red-600" />
+                  <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
+                    <MapPin className="w-6 h-6 text-red-600 dark:text-red-400" />
                   </div>
                 </div>
-                <div className="flex-1 bg-red-50 border-2 border-red-200 rounded-lg p-4">
+                <div className="flex-1 bg-red-50 dark:bg-red-900/30 border-2 border-red-200 dark:border-red-800 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-gray-900">Destination</h3>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Destination</h3>
                     <span className="px-3 py-1 bg-red-600 text-white rounded-full text-sm">
                       {route.distanceKm} km • {Math.floor(route.estimatedMinutes / 60)}h {route.estimatedMinutes % 60}m
                     </span>
                   </div>
-                  <p className="text-gray-700">{route.destinationStopName}</p>
+                  <p className="text-gray-700 dark:text-gray-300">{route.destinationStopName}</p>
                 </div>
               </div>
             </div>
 
             {route.stops.length === 0 && (
-              <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-12 text-center mt-6">
-                <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-600 mb-2">No intermediate stops added yet</p>
-                <p className="text-sm text-gray-500 mb-4">
-                  Add stops along the route for pickups, drop-offs, or rest breaks
+              <div className="bg-gray-50 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-12 text-center mt-6">
+                <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-600 dark:text-gray-400 mb-2">No intermediate stops</p>
+                <p className="text-sm text-gray-500 dark:text-gray-500">
+                  This route goes directly from origin to destination
                 </p>
-                <button onClick={() => handleOpenAddStopModal()} className="text-[#2563EB] hover:underline">
-                  Add your first stop
-                </button>
               </div>
             )}
           </div>
         )}
-
-        {/* Trips Tab */}
-        {activeTab === 'trips' && (
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Scheduled Trips</h2>
-              <Button onClick={() => router.push('/admin/trips')} variant="outline" className="flex items-center gap-2">
-                View All Trips
-                <ArrowRight className="w-5 h-5" />
-              </Button>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-8 h-8 text-blue-600" />
-                  <div>
-                    <p className="text-sm text-blue-700">Total Trips</p>
-                    <p className="text-2xl text-blue-900">{route.trips.length}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <Users className="w-8 h-8 text-green-600" />
-                  <div>
-                    <p className="text-sm text-green-700">Total Bookings</p>
-                    <p className="text-2xl text-green-900">{route.trips.reduce((acc, t) => acc + t.seatsBooked, 0)}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <TrendingUp className="w-8 h-8 text-purple-600" />
-                  <div>
-                    <p className="text-sm text-purple-700">Avg. Occupancy</p>
-                    <p className="text-2xl text-purple-900">
-                      {Math.round(
-                        (route.trips.reduce((acc, t) => acc + t.seatsBooked, 0) /
-                          route.trips.reduce((acc, t) => acc + t.totalSeats, 0)) *
-                          100
-                      )}
-                      %
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Trips List */}
-            <div className="space-y-3">
-              {route.trips.map((trip) => {
-                const occupancyPercentage = (trip.seatsBooked / trip.totalSeats) * 100
-                return (
-                  <div
-                    key={trip.id}
-                    className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="bg-blue-100 p-3 rounded-lg">
-                          <Bus className="w-6 h-6 text-[#2563EB]" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-3 mb-1">
-                            <p className="text-gray-900">
-                              {new Date(trip.departureTime).toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric',
-                              })}
-                            </p>
-                            <span className="text-gray-400">•</span>
-                            <p className="text-gray-900">
-                              {new Date(trip.departureTime).toLocaleTimeString('en-US', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 rounded text-xs ${getStatusBadge(trip.status)}`}>
-                              {trip.status}
-                            </span>
-                            <span className="text-sm text-gray-600">
-                              {trip.seatsBooked}/{trip.totalSeats} seats booked
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="w-32">
-                          <div className="flex items-center justify-between text-sm mb-1">
-                            <span className="text-gray-600">Occupancy</span>
-                            <span className="text-gray-900">{occupancyPercentage.toFixed(0)}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className={`h-2 rounded-full ${
-                                occupancyPercentage >= 80
-                                  ? 'bg-red-500'
-                                  : occupancyPercentage >= 50
-                                  ? 'bg-yellow-500'
-                                  : 'bg-green-500'
-                              }`}
-                              style={{ width: `${occupancyPercentage}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
       </Card>
-
-      {/* Add/Edit Stop Modal */}
-      {showAddStopModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                {editingStop ? 'Edit Stop' : 'Add Intermediate Stop'}
-              </h2>
-              <button
-                onClick={() => setShowAddStopModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-gray-700 dark:text-gray-300 mb-2">
-                  Select Stop <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={stopFormData.stopId}
-                  onChange={(e) => setStopFormData({ ...stopFormData, stopId: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                >
-                  <option value="">Choose a stop</option>
-                  {route &&
-                    availableStops
-                      .filter((s) => s.id !== route.originStopId && s.id !== route.destinationStopId)
-                      .map((stop) => (
-                        <option key={stop.id} value={stop.id}>
-                          {stop.name} - {stop.address}
-                        </option>
-                      ))}
-                </select>
-              </div>{' '}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-700 dark:text-gray-300 mb-2">Distance from Origin (km)</label>
-                  <input
-                    type="number"
-                    value={stopFormData.distanceFromOrigin}
-                    onChange={(e) =>
-                      setStopFormData({
-                        ...stopFormData,
-                        distanceFromOrigin: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    step="0.1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 dark:text-gray-300 mb-2">
-                    Estimated Time from Origin (minutes)
-                  </label>
-                  <input
-                    type="number"
-                    value={stopFormData.estimatedMinutes}
-                    onChange={(e) =>
-                      setStopFormData({
-                        ...stopFormData,
-                        estimatedMinutes: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <label className="flex items-center gap-3 p-4 border-2 border-gray-300 dark:border-gray-700 rounded-lg cursor-pointer hover:border-blue-600 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={stopFormData.isPickup}
-                    onChange={(e) => setStopFormData({ ...stopFormData, isPickup: e.target.checked })}
-                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-600"
-                  />
-                  <div>
-                    <p className="text-gray-900 dark:text-white">Allow Pickup</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Passengers can board here</p>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-3 p-4 border-2 border-gray-300 dark:border-gray-700 rounded-lg cursor-pointer hover:border-blue-600 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={stopFormData.isDropoff}
-                    onChange={(e) => setStopFormData({ ...stopFormData, isDropoff: e.target.checked })}
-                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-600"
-                  />
-                  <div>
-                    <p className="text-gray-900 dark:text-white">Allow Drop-off</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Passengers can alight here</p>
-                  </div>
-                </label>
-              </div>
-              <div>
-                <label className="block text-gray-700 dark:text-gray-300 mb-2">Note (Optional)</label>
-                <textarea
-                  value={stopFormData.note}
-                  onChange={(e) => setStopFormData({ ...stopFormData, note: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  rows={3}
-                  placeholder="e.g., Rest stop - 15 min break"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-800">
-              <Button onClick={() => setShowAddStopModal(false)} variant="outline" className="px-6 py-3">
-                Cancel
-              </Button>
-              <Button onClick={handleSaveStop} className="px-6 py-3 bg-blue-600 hover:bg-blue-700">
-                {editingStop ? 'Update Stop' : 'Add Stop'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Stop Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Stop?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove this stop from the route? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteStop} className="bg-red-600 hover:bg-red-700">
-              Delete Stop
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

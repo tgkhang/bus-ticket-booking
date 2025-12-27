@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useForm, SubmitHandler } from 'react-hook-form'
 import {
@@ -21,6 +21,7 @@ import {
   Image as ImageIcon,
   ChevronLeft,
   ChevronRight,
+  Route as RouteIcon,
 } from 'lucide-react'
 import { TripDetail, TripStatus } from '@/types/trip'
 import { Card, CardContent } from '@/components/ui/card'
@@ -35,12 +36,23 @@ import {
   getSeatStatusColor,
   getSeatTypeBorderColor,
 } from '@/utils/seatLayout'
+import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import type { LatLngBoundsExpression } from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 
 type TripFormInputs = {
   departureTime: string
   arrivalTime: string
   basePrice: number
   status: TripStatus
+}
+
+function FitBounds({ bounds }: { bounds: LatLngBoundsExpression }) {
+  const map = useMap()
+  useEffect(() => {
+    map.fitBounds(bounds, { padding: [24, 24] })
+  }, [map, bounds])
+  return null
 }
 
 export default function TripDetailPage() {
@@ -159,6 +171,45 @@ export default function TripDetailPage() {
   }
 
   const [selectedFloor, setSelectedFloor] = useState(1)
+
+  // Map logic - only render map if we have stops with coordinates
+  const mapPoints = useMemo(() => {
+    if (!trip?.route?.stops || trip.route.stops.length === 0) return []
+
+    const pts = trip.route.stops
+      .map((rs) => {
+        const lat = rs.stop?.latitude
+        const lng = rs.stop?.longitude
+        if (typeof lat !== 'number' || typeof lng !== 'number') return null
+
+        const stopName = rs.stopName || rs.stop?.name || 'Stop'
+        // Determine type based on sequence or position
+        const isFirst = rs.sequence === 1 || rs.sequence === 0
+        const isLast = rs.sequence === trip.route!.stops!.length
+
+        let type: 'origin' | 'destination' | 'intermediate' = 'intermediate'
+        if (isFirst) type = 'origin'
+        else if (isLast) type = 'destination'
+
+        return {
+          id: rs.id || rs.stopId,
+          name: stopName,
+          type,
+          lat,
+          lng
+        }
+      })
+      .filter(Boolean) as Array<{ id: string; name: string; type: 'origin' | 'destination' | 'intermediate'; lat: number; lng: number }>
+
+    return pts
+  }, [trip])
+
+  const polyline = useMemo(() => mapPoints.map((p) => [p.lat, p.lng] as [number, number]), [mapPoints])
+
+  const bounds = useMemo<LatLngBoundsExpression | null>(() => {
+    if (polyline.length < 1) return null
+    return polyline as unknown as LatLngBoundsExpression
+  }, [polyline])
 
   if (loading || !trip) {
     return (
@@ -927,6 +978,57 @@ export default function TripDetailPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Route Map */}
+          {bounds && (
+            <Card className="mt-6">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <RouteIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  Route Map
+                </h3>
+                <div className="h-[360px] w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+                  <MapContainer
+                    center={polyline[0] || [10.7758, 106.7009]}
+                    zoom={11}
+                    scrollWheelZoom
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer
+                      attribution='&copy; OpenStreetMap contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+
+                    <FitBounds bounds={bounds} />
+
+                    {polyline.length >= 2 && <Polyline positions={polyline} />}
+
+                    {mapPoints.map((p) => (
+                      <CircleMarker
+                        key={p.id}
+                        center={[p.lat, p.lng]}
+                        radius={p.type === 'origin' || p.type === 'destination' ? 8 : 6}
+                        pathOptions={{
+                          color: p.type === 'origin' ? '#10B981' : p.type === 'destination' ? '#EF4444' : '#3B82F6',
+                          fillColor: p.type === 'origin' ? '#10B981' : p.type === 'destination' ? '#EF4444' : '#3B82F6',
+                          fillOpacity: 0.8,
+                        }}
+                      >
+                        <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                          <div className="text-xs">
+                            <div className="font-semibold">{p.name}</div>
+                            <div>
+                              {p.type === 'origin' ? 'Origin' : p.type === 'destination' ? 'Destination' : 'Stop'}
+                            </div>
+                          </div>
+                        </Tooltip>
+                      </CircleMarker>
+                    ))}
+                  </MapContainer>
                 </div>
               </CardContent>
             </Card>
