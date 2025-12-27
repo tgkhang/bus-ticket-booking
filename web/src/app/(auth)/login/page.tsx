@@ -44,6 +44,10 @@ function LoginContent() {
         router.push(decodeURIComponent(callbackUrl))
       } else if (user.role === 'admin') {
         router.push('/admin')
+      } else if (user.role === 'staff') {
+        router.push('/staff')
+      } else if (user.role === 'operator') {
+        router.push('/operator')
       } else {
         router.push('/')
       }

@@ -12,7 +12,7 @@ interface User {
   id: string
   email: string
   username?: string
-  role: 'admin' | 'client'
+  role: 'admin' | 'client' | 'operator' | 'staff'
   permissions?: string[]
   avatar?: string
   createdAt?: string
@@ -22,6 +22,10 @@ interface User {
   bankAccount?: string
   accountBalance?: string
   currency?: string
+  // Staff-specific fields
+  staffId?: string
+  operatorId?: string
+  operatorName?: string
 }
 
 interface AuthContextType {
