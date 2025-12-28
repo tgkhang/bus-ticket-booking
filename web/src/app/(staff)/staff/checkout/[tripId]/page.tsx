@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -19,14 +19,52 @@ import {
   ArrowRight,
   Search,
 } from 'lucide-react'
-import { getTripDetailsAPI, updateTripAPI } from '@/lib/api/tripApi'
-import { TripDetail, TripStatus, Passenger } from '@/types/trip'
+import { getTripPassengers, markPassengerBoarded, updateTripStatus } from '@/lib/api/staff'
+import { getTripDetailsAPI } from '@/lib/api/tripApi'
+import { TripDetail, TripStatus } from '@/types/trip'
 import { toast } from 'sonner'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
-interface PassengerWithCheckIn extends Passenger {
-  checkedIn: boolean
-  checkedInAt?: string
+interface PassengerDetail {
+  id: string
+  bookingId: string
+  fullName: string
+  documentId: string
+  seatCode: string
+  isBoarded: boolean
+  boardedAt: string | null
+}
+
+interface Booking {
+  id: string
+  userId: string
+  tripId: string
+  status: string
+  totalAmount: string
+  bookedAt: string
+  passengerDetails: PassengerDetail[]
+  user: {
+    displayName: string
+    phoneNumber: string
+    email: string
+  }
+}
+
+interface Passenger extends PassengerDetail {
+  bookingRef: string
+  userName: string
+  userEmail: string
+  userPhone: string
 }
 
 export default function StaffTripCheckout() {
@@ -35,69 +73,122 @@ export default function StaffTripCheckout() {
   const tripId = params.tripId as string
 
   const [trip, setTrip] = useState<TripDetail | null>(null)
-  const [passengers, setPassengers] = useState<PassengerWithCheckIn[]>([])
+  const [passengers, setPassengers] = useState<Passenger[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [updatingStatus, setUpdatingStatus] = useState(false)
 
+  // Alert dialog state
+  const [checkInDialogOpen, setCheckInDialogOpen] = useState(false)
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false)
+  const [pendingPassengerId, setPendingPassengerId] = useState<string | null>(null)
+  const [pendingStatus, setPendingStatus] = useState<TripStatus | null>(null)
+  const [pendingPassengerName, setPendingPassengerName] = useState<string>('')
+
   useEffect(() => {
     fetchTripDetails()
+    fetchPassengers()
   }, [tripId])
 
-  const fetchTripDetails = async () => {
+  const fetchTripDetails = useCallback(async () => {
     try {
       setLoading(true)
       const data = await getTripDetailsAPI(tripId)
       setTrip(data)
-
-      // Transform passengers from trip data
-      if (data.passengers) {
-        const transformedPassengers: PassengerWithCheckIn[] = data.passengers.map((p) => ({
-          ...p,
-          checkedIn: false, // Default to false, can be enhanced with actual check-in status from backend
-        }))
-        setPassengers(transformedPassengers)
-      }
     } catch (error) {
       console.error('Error fetching trip details:', error)
       toast.error('Failed to load trip details')
     } finally {
       setLoading(false)
     }
-  }
+  }, [tripId])
 
-  const handleCheckIn = (passengerId: string) => {
-    setPassengers((prev) =>
-      prev.map((p) =>
-        p.id === passengerId ? { ...p, checkedIn: true, checkedInAt: new Date().toISOString() } : p
+  const fetchPassengers = useCallback(async () => {
+    try {
+      const response = await getTripPassengers(tripId)
+      // Flatten bookings into individual passengers
+      const bookings: Booking[] = response.data || []
+      const flattenedPassengers: Passenger[] = bookings.flatMap((booking) =>
+        booking.passengerDetails.map((detail) => ({
+          ...detail,
+          bookingRef: booking.id,
+          userName: booking.user.displayName,
+          userEmail: booking.user.email,
+          userPhone: booking.user.phoneNumber,
+        }))
       )
-    )
-    toast.success('Passenger checked in')
+      setPassengers(flattenedPassengers)
+    } catch (error) {
+      console.error('Error fetching passengers:', error)
+      toast.error('Failed to load passengers')
+    }
+  }, [tripId])
+
+  const handleCheckIn = (passengerId: string, passengerName: string) => {
+    setPendingPassengerId(passengerId)
+    setPendingPassengerName(passengerName)
+    setCheckInDialogOpen(true)
   }
 
-  const handleUndoCheckIn = (passengerId: string) => {
-    setPassengers((prev) =>
-      prev.map((p) => (p.id === passengerId ? { ...p, checkedIn: false, checkedInAt: undefined } : p))
-    )
-    toast.success('Check-in undone')
+  const confirmCheckIn = async () => {
+    if (!pendingPassengerId) return
+
+    try {
+      await markPassengerBoarded(pendingPassengerId)
+      setPassengers((prev) =>
+        prev.map((p) =>
+          p.id === pendingPassengerId ? { ...p, isBoarded: true, boardedAt: new Date().toISOString() } : p
+        )
+      )
+      toast.success('Passenger checked in')
+    } catch (error) {
+      console.error('Error checking in passenger:', error)
+      toast.error('Failed to check in passenger')
+    } finally {
+      setCheckInDialogOpen(false)
+      setPendingPassengerId(null)
+      setPendingPassengerName('')
+    }
   }
 
-  const handleUpdateStatus = async (newStatus: TripStatus) => {
+  const handleUpdateStatus = (newStatus: TripStatus) => {
     if (!trip) return
+    setPendingStatus(newStatus)
+    setStatusDialogOpen(true)
+  }
 
-    const confirmed = window.confirm(`Are you sure you want to change trip status to "${newStatus}"?`)
-    if (!confirmed) return
+  const confirmStatusUpdate = async () => {
+    if (!trip || !pendingStatus) return
 
     try {
       setUpdatingStatus(true)
-      await updateTripAPI(tripId, { status: newStatus })
-      setTrip({ ...trip, status: newStatus })
-      toast.success(`Trip status updated to "${newStatus}"`)
+      // Map 'active' to 'departed' for the API call
+      const apiStatus = pendingStatus === 'active' ? 'departed' : pendingStatus
+      await updateTripStatus(tripId, apiStatus as 'scheduled' | 'completed' | 'cancelled' | 'departed' | 'arrived')
+      setTrip({ ...trip, status: pendingStatus })
+      toast.success(`Trip status updated to "${pendingStatus}"`)
     } catch (error) {
       console.error('Error updating trip status:', error)
       toast.error('Failed to update trip status')
     } finally {
       setUpdatingStatus(false)
+      setStatusDialogOpen(false)
+      setPendingStatus(null)
+    }
+  }
+
+  const getStatusLabel = (status: TripStatus) => {
+    switch (status) {
+      case 'scheduled':
+        return 'Scheduled'
+      case 'active':
+        return 'Active'
+      case 'completed':
+        return 'Completed'
+      case 'cancelled':
+        return 'Cancelled'
+      default:
+        return status
     }
   }
 
@@ -163,12 +254,16 @@ export default function StaffTripCheckout() {
     )
   }
 
-  const checkedInCount = passengers.filter((p) => p.checkedIn).length
+  const checkedInCount = passengers.filter((p) => p.isBoarded).length
   const filteredPassengers = passengers.filter(
     (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.seatNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.bookingRef.toLowerCase().includes(searchQuery.toLowerCase())
+      p.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.userEmail?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.userPhone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.seatCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.bookingRef?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.documentId?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   return (
@@ -361,7 +456,7 @@ export default function StaffTripCheckout() {
               <div
                 key={passenger.id}
                 className={`p-4 border rounded-lg transition-all ${
-                  passenger.checkedIn
+                  passenger.isBoarded
                     ? 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800'
                     : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
                 }`}
@@ -371,9 +466,9 @@ export default function StaffTripCheckout() {
                     <div className="flex items-center gap-3 mb-2">
                       <div className="flex items-center gap-2">
                         <User className="w-5 h-5 text-gray-400" />
-                        <span className="font-medium text-gray-900 dark:text-white">{passenger.name}</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{passenger.fullName}</span>
                       </div>
-                      {passenger.checkedIn && (
+                      {passenger.isBoarded && (
                         <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded text-xs font-medium">
                           <CheckCircle className="w-3 h-3" />
                           Checked In
@@ -383,31 +478,34 @@ export default function StaffTripCheckout() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-gray-600 dark:text-gray-400">
                       <div className="flex items-center gap-2">
                         <Mail className="w-4 h-4" />
-                        {passenger.email}
+                        {passenger.userEmail}
                       </div>
                       <div className="flex items-center gap-2">
                         <Phone className="w-4 h-4" />
-                        {passenger.phone}
+                        {passenger.userPhone}
                       </div>
                       <div>
-                        Seat: <span className="font-medium text-gray-900 dark:text-white">{passenger.seatNumber}</span>{' '}
-                        | Ref: <span className="font-medium text-gray-900 dark:text-white">{passenger.bookingRef}</span>
+                        Seat: <span className="font-medium text-gray-900 dark:text-white">{passenger.seatCode}</span> |
+                        ID: <span className="font-medium text-gray-900 dark:text-white">{passenger.documentId}</span>
                       </div>
                     </div>
-                    {passenger.checkedIn && passenger.checkedInAt && (
-                      <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                        Checked in at:{' '}
-                        {new Date(passenger.checkedInAt).toLocaleTimeString('en-US', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </div>
-                    )}
+                    <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                      Booking Ref: <span className="font-medium">{passenger.bookingRef.slice(0, 8)}</span>
+                      {passenger.isBoarded && passenger.boardedAt && (
+                        <span className="ml-3">
+                          • Checked in at:{' '}
+                          {new Date(passenger.boardedAt).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="ml-4">
-                    {!passenger.checkedIn ? (
+                    {!passenger.isBoarded ? (
                       <button
-                        onClick={() => handleCheckIn(passenger.id)}
+                        onClick={() => handleCheckIn(passenger.id, passenger.fullName)}
                         className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
                       >
                         <CheckCircle className="w-4 h-4" />
@@ -415,11 +513,11 @@ export default function StaffTripCheckout() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => handleUndoCheckIn(passenger.id)}
-                        className="flex items-center gap-2 px-4 py-2 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        disabled
+                        className="flex items-center gap-2 px-4 py-2 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md opacity-50 cursor-not-allowed"
                       >
-                        <XCircle className="w-4 h-4" />
-                        Undo
+                        <CheckCircle className="w-4 h-4" />
+                        Boarded
                       </button>
                     )}
                   </div>
@@ -438,6 +536,58 @@ export default function StaffTripCheckout() {
           )}
         </CardContent>
       </Card>
+
+      {/* Check-in Confirmation Dialog */}
+      <AlertDialog open={checkInDialogOpen} onOpenChange={setCheckInDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Passenger Check-In</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to check in <strong>{pendingPassengerName}</strong>? This action will mark the
+              passenger as boarded.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setCheckInDialogOpen(false)
+                setPendingPassengerId(null)
+                setPendingPassengerName('')
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCheckIn}>Confirm Check-In</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Status Update Confirmation Dialog */}
+      <AlertDialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change Trip Status</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to change the trip status to{' '}
+              <strong>{pendingStatus ? getStatusLabel(pendingStatus) : ''}</strong>? This will update the trip&apos;s
+              current state.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setStatusDialogOpen(false)
+                setPendingStatus(null)
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmStatusUpdate} disabled={updatingStatus}>
+              {updatingStatus ? 'Updating...' : 'Confirm Change'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
