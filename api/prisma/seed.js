@@ -457,12 +457,68 @@ async function main() {
     createdRoutes.push(r)
   }
 
-  // Helper function to generate 2-2 layout seats (A, B | Aisle | C, D)
-  const generate22Seats = (rows) => {
+  // Helper to generate seats using layout patterns (matching backend API logic)
+  const generateSeatsByPattern = (layoutPattern, rows, hasFloors = false) => {
     const seats = []
-    for (let row = 1; row <= rows; row++) {
-      seats.push(`A${row}`, `B${row}`, `C${row}`, `D${row}`)
+    const columns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+    
+    if (hasFloors) {
+      // Multi-floor layout (like sleeper buses)
+      const floors = layoutPattern.floors || 2
+      const rowsPerFloor = Math.ceil(rows / floors)
+      
+      for (let floor = 1; floor <= floors; floor++) {
+        for (let row = 1; row <= rowsPerFloor; row++) {
+          let colIndex = 0
+          
+          // Left seats
+          for (let i = 0; i < layoutPattern.left; i++) {
+            seats.push(`${floor}${columns[colIndex]}${row}`)
+            colIndex++
+          }
+          
+          // Middle seats (if exists)
+          if (layoutPattern.middle) {
+            for (let i = 0; i < layoutPattern.middle; i++) {
+              seats.push(`${floor}${columns[colIndex]}${row}`)
+              colIndex++
+            }
+          }
+          
+          // Right seats
+          for (let i = 0; i < layoutPattern.right; i++) {
+            seats.push(`${floor}${columns[colIndex]}${row}`)
+            colIndex++
+          }
+        }
+      }
+    } else {
+      // Single-floor layout (no floor prefix)
+      for (let row = 1; row <= rows; row++) {
+        let colIndex = 0
+        
+        // Left seats
+        for (let i = 0; i < layoutPattern.left; i++) {
+          seats.push(`${columns[colIndex]}${row}`)
+          colIndex++
+        }
+        
+        // Middle seats (if exists)
+        if (layoutPattern.middle) {
+          for (let i = 0; i < layoutPattern.middle; i++) {
+            seats.push(`${columns[colIndex]}${row}`)
+            colIndex++
+          }
+        }
+        
+        // Right seats
+        for (let i = 0; i < layoutPattern.right; i++) {
+          seats.push(`${columns[colIndex]}${row}`)
+          colIndex++
+        }
+      }
     }
+    
     return seats
   }
 
@@ -475,7 +531,7 @@ async function main() {
       layoutCode: '2-2',
       busType: 'Seater',
       operatorIdx: 0,
-      seatNumbers: generate22Seats(8), // 8 rows × 4 seats = 32 seats
+      seatNumbers: generateSeatsByPattern({ left: 2, right: 2 }, 8, false), // 8 rows × 4 seats = 32 seats
       seatType: 'regular',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600',
@@ -490,9 +546,7 @@ async function main() {
       layoutCode: 'Sleeper-32',
       busType: 'Sleeper Bus',
       operatorIdx: 0,
-      seatNumbers: Array.from({ length: 11 }, (_, row) => 
-        ['L', 'M', 'R'].map(col => `${col}${row + 1}`)
-      ).flat().slice(0, 32),
+      seatNumbers: generateSeatsByPattern({ left: 1, middle: 1, right: 1, floors: 2 }, 12, true), // 2 floors × 6 rows × 3 seats = 36, trim to 32
       seatType: 'sleeper',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&q=80',
@@ -506,9 +560,7 @@ async function main() {
       layoutCode: 'Sleeper-40',
       busType: 'Sleeper Bus',
       operatorIdx: 1,
-      seatNumbers: Array.from({ length: 14 }, (_, row) => 
-        ['L', 'M', 'R'].map(col => `${col}${row + 1}`)
-      ).flat().slice(0, 40),
+      seatNumbers: generateSeatsByPattern({ left: 1, middle: 1, right: 1, floors: 2 }, 14, true), // 2 floors × 7 rows × 3 seats = 42, trim to 40
       seatType: 'sleeper',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&q=85',
@@ -523,9 +575,7 @@ async function main() {
       layoutCode: 'Cabin-VIP',
       busType: 'VIP Cabin Sleeper',
       operatorIdx: 2,
-      seatNumbers: Array.from({ length: 11 }, (_, row) => 
-        ['L', 'R'].map(col => `${col}${row + 1}`)
-      ).flat(),
+      seatNumbers: generateSeatsByPattern({ left: 1, right: 1, floors: 2 }, 11, true), // 2 floors × 11 rows × 2 seats = 22
       seatType: 'premium',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&q=90',
@@ -539,9 +589,7 @@ async function main() {
       layoutCode: 'Limo-9',
       busType: 'Limousine',
       operatorIdx: 3,
-      seatNumbers:  Array.from({ length: 3 }, (_, row) => 
-        ['A', 'B', 'C'].map(col => `${col}${row + 1}`)
-      ).flat(),
+      seatNumbers: generateSeatsByPattern({ left: 2, right: 1 }, 3, false), // 3 rows × 3 seats = 9
       seatType: 'premium',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600&q=95',
@@ -556,9 +604,7 @@ async function main() {
       layoutCode: 'Limo-16',
       busType: 'Limousine',
       operatorIdx: 3,
-      seatNumbers: Array.from({ length: 4 }, (_, row) => 
-        ['A', 'B', 'C', 'D'].map(col => `${col}${row + 1}`)
-      ).flat(),
+      seatNumbers: generateSeatsByPattern({ left: 2, right: 1 }, 6, false), // 6 rows × 3 seats = 18, trim to 16
       seatType: 'premium',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600',
@@ -572,7 +618,7 @@ async function main() {
       layoutCode: '2-2',
       busType: 'Seater',
       operatorIdx: 4,
-      seatNumbers: generate22Seats(7), // 7 rows × 4 seats = 28 seats
+      seatNumbers: generateSeatsByPattern({ left: 2, right: 2 }, 7, false), // 7 rows × 4 seats = 28 seats
       seatType: 'regular',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600',
@@ -586,7 +632,7 @@ async function main() {
       layoutCode: '2-2',
       busType: 'Seater',
       operatorIdx: 5,
-      seatNumbers: generate22Seats(9), // 9 rows × 4 seats = 36 seats
+      seatNumbers: generateSeatsByPattern({ left: 2, right: 2 }, 9, false), // 9 rows × 4 seats = 36 seats
       seatType: 'regular',
       images: [
         'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=600',
@@ -620,8 +666,9 @@ async function main() {
       },
     })
 
-    // Create seats for the bus
-    for (const seatNumber of config.seatNumbers) {
+    // Create seats for the bus - trim to exact capacity
+    const exactSeats = config.seatNumbers.slice(0, config.seatCapacity)
+    for (const seatNumber of exactSeats) {
       await prisma.seat.upsert({
         where: {
           busId_seatNumber: {
@@ -686,10 +733,17 @@ async function main() {
         })
 
         if (!exists) {
+          // Get the operator from the bus
+          const busWithOperator = await prisma.bus.findUnique({
+            where: { id: bus.id },
+            select: { operatorId: true }
+          })
+          
           await prisma.trip.create({
             data: {
               routeId: route.id,
               busId: bus.id,
+              operatorId: busWithOperator.operatorId,
               departureTime: dep,
               arrivalTime: arr,
               basePrice: basePrice,
@@ -740,78 +794,87 @@ async function main() {
     }
   }
   console.log(`💺 Created ${seatStatusCount} seat statuses for all trips`)
-  // Seed sample bookings with payment for revenue analytics
-  const allUsers = [user1, user2]
+  // Seed sample bookings with payment - ensure every trip has passengers for checkout
+  const allUsers = [user1, user2, user3, user4, user5, user6, user7, user8]
   const allPayments = ["VNPAY", "CASH"]
   const allTripsForBooking = await prisma.trip.findMany({})
   const allSeatsForBooking = await prisma.seat.findMany({})
   const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
   let bookingSeedCount = 0
-  for (let i = 0; i < 200; i++) {
-    // Phân bổ đều ngày và giờ trong 7 ngày gần nhất
-    const day = Math.floor(i / 24) % 7; // 0-6
-    const hour = i % 24; // 0-23
-    const user = allUsers[randomInt(0, allUsers.length - 1)];
-    const trip = allTripsForBooking[(i + day + hour) % allTripsForBooking.length];
-    const seat = allSeatsForBooking.find(s => s.busId === trip.busId) || allSeatsForBooking[0];
-    const amount = randomInt(50000, 250000);
-    const bookedAt = new Date();
-    bookedAt.setDate(bookedAt.getDate() - day); // day 0 = hôm nay, day 6 = 6 ngày trước
-    bookedAt.setHours(hour, randomInt(0, 59), 0, 0);
-    // Tăng số lượng hành khách mỗi booking (2-4)
-    const numPassengers = randomInt(2, 4);
-    // Lấy các seatCode hợp lệ cho bus của trip
-    const tripSeats = allSeatsForBooking.filter(s => s.busId === trip.busId);
-    const usedSeats = new Set();
-    const passengerDetails = [];
-    for (let p = 0; p < numPassengers; p++) {
-      // Chọn seatCode chưa bị trùng
-      let seat;
-      do {
-        seat = tripSeats[randomInt(0, tripSeats.length - 1)];
-      } while (usedSeats.has(seat.seatNumber) && usedSeats.size < tripSeats.length);
-      usedSeats.add(seat.seatNumber);
-      passengerDetails.push({
-        fullName: `Passenger ${p + 1} Booking ${i + 1}`,
-        documentId: `ID${i + 1}${p + 1}${randomInt(1000,9999)}`,
-        seatCode: seat.seatNumber
-      });
-    }
-
-    // Phân phối trạng thái booking: 1/3 initiated, 1/3 confirmed, 1/3 completed
-    let status = "completed";
-    if (i % 3 === 0) status = "initiated";
-    else if (i % 3 === 1) status = "confirmed";
-
-    const booking = await prisma.booking.create({
-      data: {
-        userId: user.id,
-        tripId: trip.id,
-        totalAmount: amount,
-        status,
-        bookedAt,
-        payments: {
-          create: {
-            provider: allPayments[randomInt(0, allPayments.length - 1)],
-            amount: amount,
-            status: "success"
-          }
-        },
-        passengerDetails: {
-          create: passengerDetails
-        }
+  
+  // Create bookings for EVERY trip to ensure staff can checkout passengers
+  for (const trip of allTripsForBooking) {
+    // Each trip gets 2-5 bookings
+    const numBookingsForTrip = randomInt(2, 5)
+    const tripSeats = allSeatsForBooking.filter(s => s.busId === trip.busId)
+    const usedSeatsForTrip = new Set()
+    
+    for (let b = 0; b < numBookingsForTrip; b++) {
+      const user = allUsers[randomInt(0, allUsers.length - 1)]
+      const amount = randomInt(50000, 250000)
+      const bookedAt = new Date(trip.departureTime)
+      bookedAt.setHours(bookedAt.getHours() - randomInt(1, 48)) // Booked 1-48 hours before departure
+      
+      // Each booking has 1-3 passengers
+      const numPassengers = randomInt(1, 3)
+      const passengerDetails = []
+      
+      for (let p = 0; p < numPassengers; p++) {
+        // Avoid duplicate seats in this trip
+        let seat
+        let attempts = 0
+        do {
+          seat = tripSeats[randomInt(0, tripSeats.length - 1)]
+          attempts++
+        } while (usedSeatsForTrip.has(seat.seatNumber) && attempts < 50)
+        
+        if (attempts >= 50) break // Skip if no available seats
+        
+        usedSeatsForTrip.add(seat.seatNumber)
+        passengerDetails.push({
+          fullName: `${['Nguyen', 'Tran', 'Le', 'Pham', 'Hoang'][randomInt(0, 4)]} ${['Van', 'Thi'][randomInt(0, 1)]} ${String.fromCharCode(65 + randomInt(0, 25))}`,
+          documentId: `ID${randomInt(100000000, 999999999)}`,
+          seatCode: seat.seatNumber
+        })
       }
-    });
-    bookingSeedCount++;
-  }
-  console.log(`💵 Seeded ${bookingSeedCount} sample bookings with payment for revenue analytics`)
+      
+      if (passengerDetails.length === 0) continue
+      
+      // Most bookings are confirmed/completed
+      let status = "confirmed"
+      if (randomInt(1, 10) <= 8) status = "completed"
+      else if (randomInt(1, 10) <= 2) status = "initiated"
 
-  // Mark some passengers as boarded for trips that have departed
+      await prisma.booking.create({
+        data: {
+          userId: user.id,
+          tripId: trip.id,
+          totalAmount: amount * passengerDetails.length,
+          status,
+          bookedAt,
+          payments: {
+            create: {
+              provider: allPayments[randomInt(0, allPayments.length - 1)],
+              amount: amount * passengerDetails.length,
+              status: "success"
+            }
+          },
+          passengerDetails: {
+            create: passengerDetails
+          }
+        }
+      })
+      bookingSeedCount++
+    }
+  }
+  console.log(`💵 Seeded ${bookingSeedCount} bookings (every trip has passengers for checkout)`)
+
+  // Mark some passengers as boarded for completed/past trips
+  // Leave many unboarded so staff can practice checking them in
   const pastTrips = await prisma.trip.findMany({
     where: {
       departureTime: { lt: new Date() },
     },
-    take: 20,
     include: {
       bookings: {
         include: {
@@ -825,13 +888,13 @@ async function main() {
   for (const trip of pastTrips) {
     for (const booking of trip.bookings) {
       for (const passenger of booking.passengerDetails) {
-        // Mark 70% as boarded
-        if (Math.random() < 0.7) {
+        // Mark only 40% as boarded, leaving 60% for staff to checkout
+        if (Math.random() < 0.4) {
           await prisma.passengerDetail.update({
             where: { id: passenger.id },
             data: {
               isBoarded: true,
-              boardedAt: new Date(trip.departureTime.getTime() - 15 * 60 * 1000), // 15 mins before departure
+              boardedAt: new Date(trip.departureTime.getTime() - randomInt(5, 30) * 60 * 1000), // 5-30 mins before departure
             },
           })
           boardedCount++
@@ -839,7 +902,7 @@ async function main() {
       }
     }
   }
-  console.log(`✅ Marked ${boardedCount} passengers as boarded`)
+  console.log(`✅ Marked ${boardedCount} passengers as boarded (many left unboarded for staff checkout practice)`)
 
   console.log('✅ Database seeding completed!')
 }

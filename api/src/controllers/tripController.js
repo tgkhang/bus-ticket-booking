@@ -41,6 +41,10 @@ const listTrips = async (req, res, next) => {
     basePrice: req.query.basePrice,
     status: req.query.status,
     search: req.query.search,
+    operatorId: req.query.operatorId,
+    staffId: req.query.staffId,
+    dateFrom: req.query.dateFrom,
+    dateTo: req.query.dateTo,
   }
 
   let { page, limit } = req.query

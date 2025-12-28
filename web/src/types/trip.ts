@@ -45,6 +45,8 @@ export interface Trip {
   busId: string
   busModel?: string
   busPlateNumber?: string
+  operatorId?: string
+  staffId?: string | null
   departureTime: string
   arrivalTime: string
   basePrice: number
@@ -180,6 +182,8 @@ export interface ListTripsFilters {
   search?: string
   staffId?: string
   operatorId?: string
+  dateFrom?: string
+  dateTo?: string
 }
 
 export interface SearchTripsFilters {

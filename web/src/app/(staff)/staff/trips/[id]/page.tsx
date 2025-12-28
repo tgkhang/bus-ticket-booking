@@ -35,6 +35,7 @@ import {
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { useAuth } from '@/hooks/useAuth'
 
 function FitBounds({ bounds }: { bounds: LatLngBoundsExpression }) {
   const map = useMap()
@@ -51,6 +52,7 @@ export default function StaffTripDetailPage() {
 
   const [trip, setTrip] = useState<TripDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const { user } = useAuth()
 
   // Image slider state
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -195,10 +197,23 @@ export default function StaffTripDetailPage() {
             <p className="text-gray-600 dark:text-gray-400">{trip.bus?.model || 'Unknown Bus'}</p>
           </div>
         </div>
+        {/* button to go to checkout page */}
+
         <div className="flex items-center gap-3">
           <span className={`px-4 py-2 rounded-full text-white ${getStatusColor(trip.status)}`}>
             {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
           </span>
+          {trip.staffId === user?.staffId && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                router.push(`/staff/checkout/${trip.id}`)
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Checkout
+            </button>
+          )}
         </div>
       </div>
 

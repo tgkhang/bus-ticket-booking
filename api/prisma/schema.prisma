@@ -117,6 +117,7 @@ model Operator {
   routes Route[]
   buses  Bus[]
   staff  Staff[]
+  trips  Trip[]
 
   @@map("operators")
 }
@@ -231,6 +232,7 @@ model Trip {
   id              String    @id @default(uuid())
   routeId         String    @map("route_id")
   busId           String    @map("bus_id")
+  operatorId      String    @map("operator_id")
   staffId         String?   @map("staff_id")
   departureTime   DateTime  @map("departure_time")
   arrivalTime     DateTime  @map("arrival_time")
@@ -242,6 +244,7 @@ model Trip {
   // Relationships
   route        Route        @relation(fields: [routeId], references: [id], onDelete: Cascade)
   bus          Bus          @relation(fields: [busId], references: [id], onDelete: Cascade)
+  operator     Operator     @relation(fields: [operatorId], references: [id], onDelete: Cascade)
   staff        Staff?       @relation(fields: [staffId], references: [id], onDelete: SetNull)
   seatStatuses SeatStatus[]
   bookings     Booking[]
@@ -253,6 +256,7 @@ model Trip {
   @@index([basePrice])
   @@index([status])
   @@index([staffId])
+  @@index([operatorId])
 }
 
 model SeatStatus {
