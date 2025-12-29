@@ -1,18 +1,18 @@
-const { bookingAnalyticsModel, tripAnalyticsModel } = require('../models/bookingAnalyticsModel')
+import { bookingAnalyticsModel, tripAnalyticsModel } from '../models/bookingAnalyticsModel'
 
-const getTotalBookings = async (from, to) => {
+export const getTotalBookings = async (from, to) => {
   if (!from || !to || isNaN(new Date(from)) || isNaN(new Date(to))) return 0;
   return bookingAnalyticsModel.countBookings({ from, to });
 };
 
-const getConversionRate = async (from, to) => {
+export const getConversionRate = async (from, to) => {
   if (!from || !to || isNaN(new Date(from)) || isNaN(new Date(to))) return 0;
   const totalBookings = await bookingAnalyticsModel.countBookings({ from, to });
   const confirmedBookings = await bookingAnalyticsModel.countBookings({ from, to, status: ["confirmed", "completed"] });
   return totalBookings ? (confirmedBookings / totalBookings) * 100 : 0;
 };
 
-const getPopularRoutes = async (from, to) => {
+export const getPopularRoutes = async (from, to) => {
   if (!from || !to || isNaN(new Date(from)) || isNaN(new Date(to))) return [];
   const bookings = await bookingAnalyticsModel.findBookingsWithTrip({ from, to, status: ["confirmed", "completed"] });
   const routeCount = {};
@@ -26,7 +26,7 @@ const getPopularRoutes = async (from, to) => {
     .slice(0, 10);
 };
 
-const getPeakTimes = async (from, to) => {
+export const getPeakTimes = async (from, to) => {
   if (!from || !to || isNaN(new Date(from)) || isNaN(new Date(to))) return [];
   const bookings = await bookingAnalyticsModel.findBookings({ from, to, status: ["confirmed", "completed"], select: { bookedAt: true } });
   const timeSlots = {};
@@ -52,7 +52,7 @@ const getPeakTimes = async (from, to) => {
   return result;
 };
 
-const getBookingPatterns = async (from, to) => {
+export const getBookingPatterns = async (from, to) => {
   if (!from || !to || isNaN(new Date(from)) || isNaN(new Date(to))) return [];
   const bookings = await bookingAnalyticsModel.findBookings({ from, to, status: ["confirmed", "completed"], select: { bookedAt: true } });
   const patterns = {};
@@ -68,7 +68,7 @@ const getBookingPatterns = async (from, to) => {
   });
 };
 
-const getSeatOccupancy = async (from, to) => {
+export const getSeatOccupancy = async (from, to) => {
   if (!from || !to || isNaN(new Date(from)) || isNaN(new Date(to))) return 0;
   const trips = await tripAnalyticsModel.findTripsWithBookings({ from, to });
   let totalSeats = 0;
@@ -81,19 +81,9 @@ const getSeatOccupancy = async (from, to) => {
   return totalSeats ? (occupiedSeats / totalSeats) * 100 : 0;
 };
 
-const getConversionFunnel = async (from, to) => {
+export const getConversionFunnel = async (from, to) => {
   if (!from || !to || isNaN(new Date(from)) || isNaN(new Date(to))) {
     return { initiated: 0, confirmed: 0, completed: 0 };
   }
   return bookingAnalyticsModel.getConversionFunnelCounts({ from, to });
-};
-
-module.exports = {
-  getTotalBookings,
-  getConversionRate,
-  getPopularRoutes,
-  getPeakTimes,
-  getBookingPatterns,
-  getSeatOccupancy,
-  getConversionFunnel,
 };

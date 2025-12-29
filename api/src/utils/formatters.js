@@ -30,5 +30,6 @@ export const pickUser = (user) => {
     'phoneNumber',
     'address',
     'bankAccount',
+    'operatorId',
   ])
 }

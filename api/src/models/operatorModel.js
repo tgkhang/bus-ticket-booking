@@ -234,6 +234,34 @@ const getOperatorStatistics = async (operatorId) => {
   }
 }
 
+/**
+ * Get top rated operators for chatbot
+ * @param {number} limit - Number of operators to return
+ * @returns {Promise<Array>} Top operators
+ */
+const getTopRatedOperators = async (limit = 5) => {
+  const prisma = GET_DB()
+  
+  const operators = await prisma.operator.findMany({
+    where: {
+      rating: { not: null }
+    },
+    orderBy: {
+      rating: 'desc'
+    },
+    take: limit,
+    select: {
+      id: true,
+      name: true,
+      rating: true,
+      totalTrips: true,
+      phone: true
+    }
+  })
+  
+  return operators
+}
+
 export const operatorModel = {
   createOperator,
   findOperatorById,
@@ -244,4 +272,5 @@ export const operatorModel = {
   checkOperatorHasActiveResources,
   getOperatorWithDetails,
   getOperatorStatistics,
+  getTopRatedOperators,
 }

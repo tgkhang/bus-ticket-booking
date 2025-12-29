@@ -50,14 +50,15 @@ const START_SERVER = async () => {
     if (!token) {
       token = getCookieValue(socket.request.headers.cookie, 'accessToken')
     }
-
+    
+    console.log('Socket connected. Auth token:', token ? 'Present' : 'Missing');
     if (token) {
       try {
-        const decoded = jwt.verify(token, env.ACCESS_TOKEN_SECRET)
+        const decoded = jwt.verify(token, env.ACCESS_JWT_SECRET_KEY)
         socket.userId = decoded.id
-        // console.log('User identified:', socket.userId)
+        console.log('User identified:', socket.userId)
       } catch (err) {
-        // console.log('Socket auth failed:', err.message)
+        console.log('Socket auth failed:', err.message)
       }
     }
 
@@ -67,12 +68,67 @@ const START_SERVER = async () => {
       })
     }
 
+    // Chatbot socket logic
+    socket.on('message', async (msg) => {
+      console.log('Chat message received. userId:', socket.userId || 'Not authenticated');
+      try {
+        // Import controller here to avoid circular deps
+        const { chatController } = await import('./controllers/chatController.js');
+        
+        // Compose a fake req/res for controller
+        const fakeReq = { 
+          body: { 
+            message: msg.text, 
+            userId: socket.userId,
+            history: msg.history || [],
+            sessionId: msg.sessionId || null
+          } 
+        };
+        
+        let chatResponse = null;
+        const fakeRes = {
+          status: () => fakeRes,
+          json: (data) => {
+            chatResponse = data;
+          }
+        };
+        
+        const fakeNext = (error) => {
+          console.error('Chat socket error:', error);
+          socket.emit('message', { 
+            sender: 'AI', 
+            text: 'Sorry, an error occurred. Please try again.',
+            timestamp: new Date() 
+          });
+        };
+        
+        await chatController.handleChat(fakeReq, fakeRes, fakeNext);
+        
+        if (chatResponse) {
+          socket.emit('message', { 
+            sender: 'AI', 
+            text: chatResponse.reply,
+            intent: chatResponse.intent,
+            data: chatResponse.data,
+            timestamp: new Date() 
+          });
+        }
+      } catch (err) {
+        console.error('Chat socket error:', err);
+        socket.emit('message', { 
+          sender: 'AI', 
+          text: 'Sorry, an error occurred. Please try again.',
+          timestamp: new Date() 
+        });
+      }
+    });
+
     socket.on('disconnect', async () => {
       // console.log('Client disconnected:', socket.id)
       if (socket.userId) {
         try {
           const remainingSockets = await seatLockService.unregisterUserSocket(socket.userId, socket.id)
-
+          
           // Only unlock when the user has no other active sockets (multi-tab safe)
           if (remainingSockets === 0) {
             const unlocked = await seatLockService.unlockAllUserLocks(socket.userId)

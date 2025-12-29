@@ -1,14 +1,16 @@
 "use client";
 import { Card, CardContent } from '@/components/ui/card'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useRevenueData } from '@/hooks/useRevenueData'
-import MetricCard from '@/components/revenue/MetricCard'
+import MetricCard from '@/components/ui/MetricCard'
 import DateRangeSelector from '@/components/revenue/DateRangeSelector'
 import RevenueLineChart from '@/components/revenue/RevenueLineChart'
 import PaymentMethodPieChart from '@/components/revenue/PaymentMethodPieChart'
 import RevenueByRouteBarChart from '@/components/revenue/RevenueByRouteBarChart'
 
-export default function RevenueDashboardPage() {
+export function RevenueAnalyticsTab() {
+  const router = useRouter()
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>(() => {
     const today = new Date();
     const fromDate = new Date(today);
@@ -47,7 +49,6 @@ export default function RevenueDashboardPage() {
           <p className="text-gray-600 dark:text-gray-400">Track revenue performance and trends over time</p>
         </div>
       </div>
-
 
       {/* Date Range Filter + Selector */}
       <div className="mb-10 flex flex-wrap gap-3 items-center">
@@ -100,7 +101,7 @@ export default function RevenueDashboardPage() {
           <MetricCard title="Total Revenue" value={overview?.data?.totalRevenue || 0} icon="revenue" />
           <MetricCard title="Avg. Transaction" value={overview?.data?.avgTransaction || 0} icon="avg" />
           <MetricCard title="Total Orders" value={overview?.data?.totalOrders || 0} icon="orders" />
-          <MetricCard title="Unique Customers" value={overview?.data?.uniqueCustomers || 0} icon="customers" />
+          <MetricCard title="Unique Customers" value={overview?.data?.uniqueCustomers || 0} icon="customers" onClick={() => router.push('/admin/users')} />
         </div>
       )}
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -39,6 +40,8 @@ import {
   Search,
 } from 'lucide-react'
 import { ITEMS_PER_PAGE } from '@/utils/constants'
+import { listOperatorsAPI } from '@/lib/api'
+import type { Operator } from '@/types/operator'
 
 const ROLE_OPTIONS = [
   { value: '', label: 'All Roles' },
@@ -96,6 +99,8 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('')
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
+  const [operators, setOperators] = useState<Operator[]>([])
+  const [loadingOperators, setLoadingOperators] = useState(false)
 
   const [showAddEdit, setShowAddEdit] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
@@ -107,13 +112,22 @@ export default function UsersPage() {
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
   const currentUsers = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    displayName: string
+    username: string
+    email: string
+    password: string
+    role: 'client' | 'operator' | 'admin'
+    active: boolean
+    operatorId: string
+  }>({
     displayName: '',
     username: '',
     email: '',
     password: '',
-    role: 'client' as const,
+    role: 'client',
     active: true,
+    operatorId: '',
   })
 
   useEffect(() => {
@@ -135,6 +149,21 @@ export default function UsersPage() {
     load()
   }, [search, roleFilter])
 
+  useEffect(() => {
+    const loadOperators = async () => {
+      setLoadingOperators(true)
+      try {
+        const response = await listOperatorsAPI({ status: 'approved' }, { page: 1, limit: 100 })
+        setOperators(response.data)
+      } catch (err: any) {
+        console.error('Failed to load operators:', err)
+      } finally {
+        setLoadingOperators(false)
+      }
+    }
+    loadOperators()
+  }, [])
+
   const stats = {
     total: users.length,
     active: users.filter((u) => u.isActive).length,
@@ -144,7 +173,7 @@ export default function UsersPage() {
 
   const openAdd = () => {
     setEditingUser(null)
-    setForm({ displayName: '', username: '', email: '', password: '', role: 'client', active: true })
+    setForm({ displayName: '', username: '', email: '', password: '', role: 'client', active: true, operatorId: '' })
     setShowAddEdit(true)
   }
 
@@ -157,6 +186,7 @@ export default function UsersPage() {
       password: '',
       role: user.role as any,
       active: user.isActive,
+      operatorId: (user as any).operatorId || '',
     })
     setShowAddEdit(true)
   }
@@ -164,6 +194,11 @@ export default function UsersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingUser && !form.password) return toast.error('Password required')
+
+    // Validate operator selection for operator role
+    if (form.role === 'operator' && !form.operatorId) {
+      return toast.error('Please select an operator company for operator users')
+    }
 
     try {
       const payload: any = {
@@ -174,6 +209,11 @@ export default function UsersPage() {
         isActive: form.active,
       }
       if (form.password) payload.password = form.password
+
+      // Add operatorId only if role is operator
+      if (form.role === 'operator' && form.operatorId) {
+        payload.operatorId = form.operatorId
+      }
 
       console.log('Submitting payload:', payload)
       console.log('Edit mode:', !!editingUser, 'User ID:', editingUser?.id)
@@ -574,7 +614,9 @@ export default function UsersPage() {
             <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6">
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Email <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium mb-2">
+                    Email <span className="text-red-500">*</span>
+                  </label>
                   <input
                     required
                     type="email"
@@ -584,7 +626,9 @@ export default function UsersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Username <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium mb-2">
+                    Username <span className="text-red-500">*</span>
+                  </label>
                   <input
                     required
                     value={form.username}
@@ -605,7 +649,9 @@ export default function UsersPage() {
                 {/* Only show password field when adding a user */}
                 {!editingUser && (
                   <div className="col-span-2">
-                    <label className="block text-sm font-medium mb-2">Password <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-medium mb-2">
+                      Password <span className="text-red-500">*</span>
+                    </label>
                     <input
                       required
                       type="password"
@@ -618,11 +664,16 @@ export default function UsersPage() {
               </div>
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Role <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium mb-2">
+                    Role <span className="text-red-500">*</span>
+                  </label>
                   <select
                     required
                     value={form.role}
-                    onChange={(e) => setForm({ ...form, role: e.target.value as any })}
+                    onChange={(e) => {
+                      const newRole = e.target.value as 'client' | 'operator' | 'admin'
+                      setForm({ ...form, role: newRole, operatorId: newRole === 'operator' ? form.operatorId : '' })
+                    }}
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800"
                   >
                     <option value="client">Client</option>
@@ -642,6 +693,34 @@ export default function UsersPage() {
                   </select>
                 </div>
               </div>
+              {/* Operator Company Selection - Only visible when role is operator */}
+              {form.role === 'operator' && (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium mb-2">
+                    Operator Company <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={form.operatorId}
+                    onChange={(e) => setForm({ ...form, operatorId: e.target.value })}
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800"
+                    disabled={loadingOperators}
+                  >
+                    <option value="">Select an operator company</option>
+                    {operators.map((operator) => (
+                      <option key={operator.id} value={operator.id}>
+                        {operator.name} - {operator.contactEmail}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingOperators && <p className="text-sm text-gray-500 mt-2">Loading operators...</p>}
+                  {!loadingOperators && operators.length === 0 && (
+                    <p className="text-sm text-amber-600 mt-2">
+                      No approved operators found. Please create an approved operator first.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="flex justify-end gap-3 pt-2 border-t mt-6">
                 <Button type="button" variant="outline" onClick={() => setShowAddEdit(false)}>
                   Cancel
@@ -660,7 +739,7 @@ export default function UsersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete User</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deleteDialog?.displayName}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{deleteDialog?.displayName}&quot;? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

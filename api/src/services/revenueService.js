@@ -1,13 +1,13 @@
-const { bookingModel } = require("../models/bookingModel");
+import { bookingModel } from "../models/bookingModel";
 
-exports.getRevenueOverview = async ({ from, to }) => {
+export const getRevenueOverview = async ({ from, to }) => {
   return await bookingModel.getRevenueOverview(from, to);
 };
 
-exports.getRevenueByRoute = async ({ from, to }) => {
+export const getRevenueByRoute = async ({ from, to }) => {
   return await bookingModel.getRevenueByRoute(from, to);
 };
 
-exports.getRevenueByPaymentMethod = async ({ from, to }) => {
+export const getRevenueByPaymentMethod = async ({ from, to }) => {
   return await bookingModel.getRevenueByPaymentMethod(from, to);
 };

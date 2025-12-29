@@ -248,6 +248,24 @@ const getStops = async (filters = {}, pagination = {}) => {
   }
 }
 
+// Find stop by city name for chatbot
+const findByCityName = async (cityName) => {
+  try {
+    const prisma = GET_DB()
+    return await prisma.stop.findFirst({
+      where: {
+        active: true,
+        OR: [
+          { name: { contains: cityName, mode: 'insensitive' } },
+          { address: { contains: cityName, mode: 'insensitive' } }
+        ]
+      }
+    })
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+
 export const stopModel = {
   createStop,
   updateStop,
@@ -257,4 +275,5 @@ export const stopModel = {
   searchStops,
   fullTextSearchStops,
   getStops,
+  findByCityName,
 }

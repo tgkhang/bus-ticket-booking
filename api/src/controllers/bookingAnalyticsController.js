@@ -1,6 +1,13 @@
-const bookingAnalyticsService = require("~/services/bookingAnalyticsService");
+import {
+  getTotalBookings as getTotalBookingsService,
+  getConversionRate as getConversionRateService,
+  getSeatOccupancy as getSeatOccupancyService,
+  getPopularRoutes as getPopularRoutesService,
+  getPeakTimes as getPeakTimesService,
+  getConversionFunnel as getConversionFunnelService
+} from '~/services/bookingAnalyticsService'
 
-exports.getBookingAnalytics = async (req, res, next) => {
+export const getBookingAnalytics = async (req, res, next) => {
   try {
     const { from, to } = req.query;
     // Gather all analytics data in parallel
@@ -12,12 +19,12 @@ exports.getBookingAnalytics = async (req, res, next) => {
       peakTimes,
       funnel
     ] = await Promise.all([
-      bookingAnalyticsService.getTotalBookings(from, to),
-      bookingAnalyticsService.getConversionRate(from, to),
-      bookingAnalyticsService.getSeatOccupancy(from, to),
-      bookingAnalyticsService.getPopularRoutes(from, to),
-      bookingAnalyticsService.getPeakTimes(from, to),
-      bookingAnalyticsService.getConversionFunnel(from, to),
+      getTotalBookingsService(from, to),
+      getConversionRateService(from, to),
+      getSeatOccupancyService(from, to),
+      getPopularRoutesService(from, to),
+      getPeakTimesService(from, to),
+      getConversionFunnelService(from, to),
     ]);
 
     res.json({
