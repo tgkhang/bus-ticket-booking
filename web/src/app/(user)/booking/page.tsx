@@ -5,6 +5,7 @@ import { API_ROOT } from '@/lib/utils/constants'
 import { Ticket, Calendar, MapPin, ArrowRight, AlertCircle, X, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import LiveTripStatus from './LiveTripStatus'
 
 export const dynamic = 'force-dynamic'
 
@@ -216,6 +217,18 @@ export default async function MyBookingsPage({
                               {booking.status ? booking.status : ''}
                             </Badge>
                           </div>
+                        </div>
+
+                        {/* Trip Status (Live) */}
+                        <div className="mb-6 flex items-center gap-3">
+                          <p className="text-gray-500 font-medium text-sm">
+                            Live trip Status:
+                          </p>
+
+                          <LiveTripStatus
+                            tripId={booking.trip?.id}
+                            initialStatus={booking.trip?.status || booking.tripStatus || null}
+                          />
                         </div>
 
                         {/* Details Grid */}

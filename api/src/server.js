@@ -141,7 +141,7 @@ const START_SERVER = async () => {
   bookingAutoConfirmService.startBookingAutoConfirmJob({ intervalMs: 120_000 })
 
   // Background job: auto-update trip statuses (scheduled->active->completed)
-  tripAutoStatusService.startTripAutoStatusJob({ intervalMs: 120_000 })
+  tripAutoStatusService.startTripAutoStatusJob({ intervalMs: 120_000, io })
 
   if (env.BUILD_MODE === 'production') {
     httpServer.listen(env.PORT, () => {

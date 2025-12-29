@@ -79,6 +79,12 @@ const cancelTrip = async (req, res, next) => {
   try {
     const { id } = req.params
     const result = await tripService.cancelScheduledTrip(id)
+
+    // Live update for connected clients
+    if (req.io) {
+      req.io.emit('trip:statusUpdated', { tripId: id, status: 'cancelled' })
+    }
+
     res.status(StatusCodes.OK).json(result)
   } catch (error) {
     next(error)
