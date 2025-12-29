@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { getTripByIdAPI, getSeatStatusesAPI } from '@/lib/api'
+import { getMeAPI, getTripByIdAPI, getSeatStatusesAPI } from '@/lib/api'
 import { ArrowLeft, Check, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -26,10 +26,31 @@ function PassengerDetailsContent() {
   const [trip, setTrip] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [passengers, setPassengers] = useState<Passenger[]>([])
+  const [registeredEmail, setRegisteredEmail] = useState<string>('')
   const [contactInfo, setContactInfo] = useState({
     email: '',
     phone: '',
   })
+
+  useEffect(() => {
+    const fetchMe = async () => {
+      try {
+        const me = await getMeAPI()
+        const email = typeof me?.email === 'string' ? me.email : ''
+        if (!email) return
+
+        setRegisteredEmail(email)
+        setContactInfo((prev) => ({
+          ...prev,
+          email: prev.email || email,
+        }))
+      } catch {
+        // Not logged in (or token expired). Leave email editable.
+      }
+    }
+
+    fetchMe()
+  }, [])
 
   useEffect(() => {
     const fetchTripData = async () => {
@@ -243,7 +264,10 @@ function PassengerDetailsContent() {
                       <input
                         type="email"
                         value={contactInfo.email}
-                        onChange={(e) => setContactInfo({ ...contactInfo, email: e.target.value })}
+                        onChange={(e) =>
+                          setContactInfo({ ...contactInfo, email: e.target.value })
+                        }
+                        readOnly={Boolean(registeredEmail)}
                         placeholder="your@email.com"
                         className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white dark:bg-gray-700"
                         required
