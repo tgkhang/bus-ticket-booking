@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
+import ChatWidget from '@/components/chat/ChatWidget'
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isInitialized, user } = useAuth()
@@ -47,6 +48,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
         {children}
       </main>
       <Footer />
+      <ChatWidget />
     </div>
   )
 }

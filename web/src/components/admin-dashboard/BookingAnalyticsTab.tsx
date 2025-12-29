@@ -1,16 +1,16 @@
-'use client'
-
-import { Card, CardContent } from '@/components/ui/card'
+"use client";
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useBookingAnalyticsData } from '@/hooks/useBookingAnalyticsData'
-import BookingMetricCard from '@/components/booking-analytics/BookingMetricCard'
-import DateRangeSelector from '@/components/revenue/DateRangeSelector' // Đã nâng cấp trước đó
+import MetricCard from '@/components/ui/MetricCard'
+import DateRangeSelector from '@/components/revenue/DateRangeSelector'
 import PopularRoutesRanking from '@/components/booking-analytics/PopularRoutesRanking'
 import PeakTimesHeatmap from '@/components/booking-analytics/PeakTimesHeatmap'
 import ConversionFunnel from '@/components/booking-analytics/ConversionFunnel'
 import SeatOccupancy from '@/components/booking-analytics/SeatOccupancy'
 
-export default function BookingAnalyticsDashboardPage() {
+export function BookingAnalyticsTab() {
+  const router = useRouter()
   const today = new Date();
   const getRange = (days: number) => {
     const to = new Date();
@@ -26,20 +26,13 @@ export default function BookingAnalyticsDashboardPage() {
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>(() => getRange(7));
   const [activeRange, setActiveRange] = useState<7 | 30 | 90>(7);
 
-  const from = dateRange.from || undefined;
-  const to = dateRange.to || undefined;
+  const from = dateRange.from ?? '';
+  const to = dateRange.to ?? '';
 
   const { data, loading, error } = useBookingAnalyticsData(from, to)
 
   return (
-    <div className="px-2 py-4 md:px-8 md:py-8 bg-gray-50 dark:bg-[#10131a] min-h-screen">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-2">
-        <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Booking Analytics</h1>
-          <p className="text-gray-600 dark:text-gray-400 text-base mt-1">Track booking performance, patterns, and conversion metrics</p>
-        </div>
-      </div>
+    <div className="bg-gray-50 dark:bg-[#10131a] min-h-screen">
 
       {/* Date Range Filter + Selector */}
       <div className="mb-10 flex flex-wrap gap-3 items-center">
@@ -76,7 +69,9 @@ export default function BookingAnalyticsDashboardPage() {
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-8 text-center mb-8">
           <h3 className="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">Failed to Load Data</h3>
           <p className="text-red-700 dark:text-red-400">
-            {typeof error === 'object' && error?.message ? error.message : 'An error occurred while fetching booking analytics.'}
+            {typeof error === 'object' && (error as { message?: string })?.message
+              ? (error as { message: string }).message
+              : 'An error occurred while fetching booking analytics.'}
           </p>
         </div>
       )}
@@ -85,21 +80,21 @@ export default function BookingAnalyticsDashboardPage() {
       {!loading && !error && data && (
         <>
           {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            <BookingMetricCard title="Total Bookings" value={data.data?.totalBookings || 0} icon="bookings" />
-            <BookingMetricCard title="Conversion Rate" value={Math.round(data.data?.conversionRate || 0)} icon="conversion" />
-            <BookingMetricCard title="Seat Occupancy" value={Math.round(data.data?.seatOccupancy || 0)} icon="occupancy" />
-            <BookingMetricCard title="Popular Routes" value={data.data?.popularRoutes?.length || 0} icon="routes" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+            <MetricCard title="Total Bookings" value={data.data?.totalBookings || 0} icon="bookings" />
+            <MetricCard title="Conversion Rate" value={Math.round(data.data?.conversionRate || 0)} icon="conversion" />
+            <MetricCard title="Seat Occupancy" value={Math.round(data.data?.seatOccupancy || 0)} icon="occupancy" />
+            <MetricCard title="Popular Routes" value={data.data?.popularRoutes?.length || 0} icon="routes" onClick={() => router.push('/admin/routes')} />
           </div>
 
           {/* Charts Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
             {/* Popular Routes & Conversion Funnel */}
             <PopularRoutesRanking routes={data.data?.popularRoutes || []} />
             <ConversionFunnel funnel={data.data?.funnel || { initiated: 0, confirmed: 0, completed: 0 }} />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Peak Times Heatmap */}
             <PeakTimesHeatmap peakTimes={data.data?.peakTimes || []} />
 

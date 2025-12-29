@@ -318,6 +318,57 @@ const getRevenueByPaymentMethod = async (from, to) => {
   return Object.entries(revenueByMethod).map(([method, revenue]) => ({ method, revenue }));
 };
 
+// Get user's latest booking for chatbot
+const getUserLatestBooking = async (userId) => {
+  const prisma = GET_DB()
+  return prisma.booking.findFirst({
+    where: { userId },
+    orderBy: { bookedAt: 'desc' },
+    include: {
+      trip: {
+        include: {
+          route: {
+            include: {
+              originStop: true,
+              destinationStop: true
+            }
+          },
+          bus: {
+            include: {
+              operator: true
+            }
+          }
+        }
+      },
+      passengerDetails: true,
+      payments: true
+    }
+  })
+}
+
+// Get booking by code for chatbot
+const getBookingByCode = async (code) => {
+  const prisma = GET_DB()
+  return prisma.booking.findFirst({
+    where: { code },
+    include: {
+      trip: {
+        include: {
+          route: {
+            include: {
+              originStop: true,
+              destinationStop: true
+            }
+          },
+          bus: true
+        }
+      },
+      passengerDetails: true,
+      payments: true
+    }
+  })
+}
+
 export const bookingModel = {
   createBooking,
   getBookingById,
@@ -329,4 +380,6 @@ export const bookingModel = {
   getRevenueOverview,
   getRevenueByRoute,
   getRevenueByPaymentMethod,
+  getUserLatestBooking,
+  getBookingByCode,
 }
