@@ -484,6 +484,102 @@ const buildListWhere = (filters) => {
   return where
 }
 
+// Search trips by city names for chatbot
+const searchTripsByCityNames = async (originCity, destinationCity, date = null, filters = {}) => {
+  const prisma = GET_DB()
+  
+  const where = {
+    route: {
+      AND: []
+    },
+    status: 'scheduled'
+  }
+
+  // Match origin city (case-insensitive, partial match)
+  if (originCity) {
+    where.route.AND.push({
+      originStop: {
+        OR: [
+          { name: { contains: originCity, mode: 'insensitive' } },
+          { address: { contains: originCity, mode: 'insensitive' } }
+        ]
+      }
+    })
+  }
+
+  // Match destination city (case-insensitive, partial match)
+  if (destinationCity) {
+    where.route.AND.push({
+      destinationStop: {
+        OR: [
+          { name: { contains: destinationCity, mode: 'insensitive' } },
+          { address: { contains: destinationCity, mode: 'insensitive' } }
+        ]
+      }
+    })
+  }
+
+  // If no city filters, remove empty AND
+  if (where.route.AND.length === 0) {
+    delete where.route
+  }
+
+  // Add date filter if provided
+  if (date) {
+    const localDate = new Date(date)
+    const dayStart = new Date(localDate)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(localDate)
+    dayEnd.setHours(23, 59, 59, 999)
+    where.departureTime = { gte: dayStart, lte: dayEnd }
+  }
+
+  // Add price filter if provided
+  if (filters.maxPrice) {
+    where.basePrice = { lte: Number(filters.maxPrice) }
+  }
+
+  // Add bus type filter if provided
+  if (filters.busType) {
+    where.bus = { busType: filters.busType }
+  }
+
+  const trips = await prisma.trip.findMany({
+    where,
+    orderBy: { departureTime: 'asc' },
+    take: filters.limit || 5,
+    include: {
+      route: {
+        include: {
+          originStop: true,
+          destinationStop: true
+        }
+      },
+      bus: {
+        include: {
+          operator: true
+        }
+      },
+      seatStatuses: {
+        select: {
+          status: true
+        }
+      }
+    }
+  })
+
+  // Calculate available seats for each trip
+  const tripsWithSeats = trips.map(trip => {
+    const availableSeats = trip.seatStatuses.filter(ss => ss.status === 'available').length
+    return {
+      ...trip,
+      availableSeats
+    }
+  })
+
+  return tripsWithSeats
+}
+
 export const tripModel = {
   searchTrips,
   getTripById,
@@ -491,4 +587,5 @@ export const tripModel = {
   updateTrip,
   deleteTrip,
   listTrips,
+  searchTripsByCityNames,
 }
