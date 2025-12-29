@@ -35,6 +35,41 @@ const searchTrips = async (query) => {
   return tripModel.searchTrips(filters)
 }
 
+const searchTripsPublic = async (query) => {
+  // Public search should work for guests. If no explicit status is provided,
+  // default to bookable trips only.
+  const filters = {
+    originStopId: query.originStopId,
+    destinationStopId: query.destinationStopId,
+    date: query.date,
+    timeFrom: query.timeFrom || query.startTime,
+    timeTo: query.timeTo || query.endTime,
+    minPrice: query.minPrice ? Number(query.minPrice) : undefined,
+    maxPrice: query.maxPrice ? Number(query.maxPrice) : undefined,
+    busModel: query.busModel,
+    busType: query.busType
+      ? (Array.isArray(query.busType) ? query.busType : query.busType.split(','))
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [],
+    amenities: query.amenities
+      ? query.amenities
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [],
+    status: query.status,
+    statusIn: query.status ? undefined : ['scheduled', 'active'],
+    passengers: query.passengers ? Number(query.passengers) : 1,
+    page: Number(query.page),
+    limit: Number(query.limit),
+    sortBy: query.sortBy,
+    sortOrder: query.sortOrder,
+  }
+
+  return tripModel.searchTrips(filters)
+}
+
 const getTripById = async (id) => {
   const trip = await tripModel.getTripById(id)
   if (!trip) throw new ApiError(StatusCodes.NOT_FOUND, 'Trip not found')
@@ -200,6 +235,7 @@ const cancelScheduledTrip = async (id) => {
 
 export const tripService = {
   searchTrips,
+  searchTripsPublic,
   getTripById,
   createTrip,
   updateTrip,

@@ -1,14 +1,15 @@
 import express from 'express'
 import { seatController } from '~/controllers/seatController'
-import { authMiddleware } from '~/middlewares/authMiddleware'
+import { optionalAuthMiddleware } from '~/middlewares/optionalAuthMiddleware'
+import { guestSessionMiddleware } from '~/middlewares/guestSessionMiddleware'
 
 const Router = express.Router()
 
 Router.route('/lock')
-  .post(authMiddleware.isAuthorized, seatController.lockSeats)
+  .post(optionalAuthMiddleware.tryAuthorize, guestSessionMiddleware.ensureGuestSession, seatController.lockSeats)
 
 Router.route('/unlock')
-  .post(authMiddleware.isAuthorized, seatController.unlockSeats)
+  .post(optionalAuthMiddleware.tryAuthorize, guestSessionMiddleware.ensureGuestSession, seatController.unlockSeats)
 
 Router.route('/locked/:tripId')
   .get(seatController.getLockedSeats)

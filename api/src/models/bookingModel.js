@@ -51,6 +51,32 @@ const getBookingById = async (id) => {
   })
 }
 
+const getBookingByReferenceCode = async (referenceCode) => {
+  const prisma = GET_DB()
+  return prisma.booking.findUnique({
+    where: { referenceCode },
+    include: {
+      trip: {
+        include: {
+          route: {
+            include: {
+              originStop: true,
+              destinationStop: true,
+            },
+          },
+          bus: {
+            include: {
+              operator: true,
+            },
+          },
+        },
+      },
+      passengerDetails: true,
+      payments: true,
+    },
+  })
+}
+
 const getUserBookings = async (userId, filters = {}) => {
   const prisma = GET_DB()
   const where = { userId }
@@ -321,6 +347,7 @@ const getRevenueByPaymentMethod = async (from, to) => {
 export const bookingModel = {
   createBooking,
   getBookingById,
+  getBookingByReferenceCode,
   getBookingByIdAdmin,
   getUserBookings,
   getAdminBookings,

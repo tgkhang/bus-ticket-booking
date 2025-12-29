@@ -11,6 +11,9 @@ import { asyncHandler } from '~/helpers/asyncHandler.js'
 
 const Router = express.Router()
 
+// Public trip search (guest-friendly)
+Router.get('/search-public', tripValidation.search, tripController.searchPublic)
+
 Router.get(
   '/search',
   authMiddleware.isAuthorized,

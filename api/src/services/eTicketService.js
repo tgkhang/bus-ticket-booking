@@ -128,9 +128,15 @@ const sendETicketEmail = async (bookingId, userId) => {
   if (userId && booking.userId !== userId) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found or access denied')
   }
+
+  const toEmail = booking?.user?.email || booking?.guestEmail
+  if (!toEmail) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'No email found for this booking')
+  }
+
   const pdfBuffer = await generateETicketPDF(booking)
   await BrevoEmailProvider.sendETicket({
-    to: booking.user.email,
+    to: toEmail,
     booking,
     pdfBuffer,
   })

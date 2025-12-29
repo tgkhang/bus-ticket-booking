@@ -1,4 +1,5 @@
 import authorizedAxiosInstance from '@/lib/axios/authorizeAxios'
+import publicAxiosInstance from '@/lib/axios/publicAxios'
 import { API_ROOT } from '@/lib/utils/constants'
 import type {
   RegisterUserData,
@@ -331,7 +332,7 @@ export const searchTripsAPI = async (params: {
   page?: number
   limit?: number
 }) => {
-  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/trips/search`, { params })
+  const response = await publicAxiosInstance.get(`${API_ROOT}/v1/trips/search-public`, { params })
   return response.data
 }
 
@@ -360,6 +361,41 @@ export const createBookingAPI = async (bookingData: {
   totalAmount: number
 }) => {
   const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/bookings`, bookingData)
+  return response.data
+}
+
+export const createBookingPublicAPI = async (bookingData: {
+  tripId: string
+  seatIds: string[]
+  passengers: Array<{
+    fullName: string
+    documentId: string
+    seatCode: string
+  }>
+  totalAmount: number
+  contactInfo: {
+    email: string
+    phone: string
+    name?: string
+  }
+}) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/bookings/public`, bookingData)
+  return response.data
+}
+
+export const getBookingPublicByReferenceAPI = async (referenceCode: string, token: string) => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/bookings/public/${referenceCode}`, {
+    params: { token },
+  })
+  return response.data
+}
+
+export const cancelBookingPublicByReferenceAPI = async (referenceCode: string, token: string) => {
+  const response = await authorizedAxiosInstance.post(
+    `${API_ROOT}/v1/bookings/public/${referenceCode}/cancel`,
+    null,
+    { params: { token } }
+  )
   return response.data
 }
 

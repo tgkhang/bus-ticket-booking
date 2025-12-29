@@ -1,5 +1,7 @@
 import express from 'express'
 import { authMiddleware } from '~/middlewares/authMiddleware'
+import { optionalAuthMiddleware } from '~/middlewares/optionalAuthMiddleware'
+import { guestSessionMiddleware } from '~/middlewares/guestSessionMiddleware'
 import { rbacMiddleware } from '~/middlewares/rbacMiddleware'
 import { bookingController } from '~/controllers/bookingController'
 import { feedbackController } from '~/controllers/feedbackController'
@@ -8,6 +10,28 @@ import { feedbackValidation } from '~/validations/feedbackValidation'
 import { PERMISSIONS } from '~/utils/constants'
 
 const Router = express.Router()
+
+// Public/guest booking: create a booking without requiring login.
+Router.post(
+  '/public',
+  optionalAuthMiddleware.tryAuthorize,
+  guestSessionMiddleware.ensureGuestSession,
+  bookingValidation.createBookingPublic,
+  bookingController.createBookingPublic
+)
+
+// Public/guest booking lookup by referenceCode + token.
+Router.get(
+  '/public/:referenceCode',
+  bookingValidation.getBookingPublicByReference,
+  bookingController.getBookingPublicByReference
+)
+
+Router.post(
+  '/public/:referenceCode/cancel',
+  bookingValidation.getBookingPublicByReference,
+  bookingController.cancelBookingPublicByReference
+)
 
 // Create booking
 Router.post(

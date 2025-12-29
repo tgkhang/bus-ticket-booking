@@ -5,10 +5,30 @@ import { seatLockService } from '~/services/seatLockService'
 import ApiError from '~/utils/ApiError'
 import { StatusCodes } from 'http-status-codes'
 import { GET_DB } from '~/config/prisma'
+import crypto from 'crypto'
 
-const createBooking = async (userId, bookingData) => {
+const sanitizeBooking = (booking) => {
+  if (!booking) return booking
+  if (Object.prototype.hasOwnProperty.call(booking, 'accessTokenHash')) {
+    delete booking.accessTokenHash
+  }
+  return booking
+}
+
+const generateReferenceCode = () => `BK-${crypto.randomBytes(6).toString('hex').toUpperCase()}`
+const generateAccessToken = () => crypto.randomBytes(24).toString('base64url')
+const hashAccessToken = (token) => crypto.createHash('sha256').update(token).digest('hex')
+
+const createBooking = async (actorOrUserId, bookingData) => {
   const prisma = GET_DB()
-  
+  const actor = (typeof actorOrUserId === 'object' && actorOrUserId !== null)
+    ? actorOrUserId
+    : { userId: actorOrUserId, lockOwnerId: actorOrUserId }
+
+  const userId = actor?.userId ?? null
+  const lockOwnerId = actor?.lockOwnerId ?? userId
+  const shouldReturnGuestAccess = Boolean(actor?.returnGuestAccess)
+
   try {
     const { tripId, seatIds, passengers, totalAmount } = bookingData
 
@@ -17,8 +37,12 @@ const createBooking = async (userId, bookingData) => {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid booking data: tripId and seatIds are required')
     }
 
+    if (!lockOwnerId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid booking actor identity')
+    }
+
     // Validate Redis locks
-    const hasLock = await seatLockService.validateLock(tripId, seatIds, userId)
+    const hasLock = await seatLockService.validateLock(tripId, seatIds, lockOwnerId)
     if (!hasLock) {
       throw new ApiError(StatusCodes.CONFLICT, 'One or more seats are locked by another user')
     }
@@ -33,6 +57,20 @@ const createBooking = async (userId, bookingData) => {
 
     if (seatIds.length !== passengers.length) {
       throw new ApiError(StatusCodes.BAD_REQUEST, 'Number of seats must match number of passengers')
+    }
+
+    const contactInfo = actor?.contactInfo ?? bookingData?.contactInfo
+    if (!userId) {
+      if (!contactInfo || typeof contactInfo !== 'object') {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Contact info is required for guest booking')
+      }
+      const email = typeof contactInfo.email === 'string' ? contactInfo.email.trim() : ''
+      const phone = typeof contactInfo.phone === 'string' ? contactInfo.phone.trim() : ''
+      const name = typeof contactInfo.name === 'string' ? contactInfo.name.trim() : ''
+      if (!email && !phone) {
+        throw new ApiError(StatusCodes.BAD_REQUEST, 'Guest must provide at least email or phone')
+      }
+      bookingData.contactInfo = { email, phone, name }
     }
 
     console.log('Creating booking:', { userId, tripId, seatIds: seatIds.length, passengers: passengers.length, totalAmount })
@@ -50,6 +88,17 @@ const createBooking = async (userId, bookingData) => {
 
     // Release expired locks first
     await seatStatusModel.releaseExpiredLocks()
+
+    let guestAccess = null
+    let referenceCode = null
+    let accessTokenHash = null
+
+    if (!userId) {
+      referenceCode = generateReferenceCode()
+      const accessToken = generateAccessToken()
+      accessTokenHash = hashAccessToken(accessToken)
+      guestAccess = { referenceCode, accessToken }
+    }
 
     // Create booking with passenger details and seat updates in a single transaction
     const booking = await prisma.$transaction(async (tx) => {
@@ -74,14 +123,40 @@ const createBooking = async (userId, bookingData) => {
       }
 
       // Create booking record
-      const newBooking = await tx.booking.create({
-        data: {
-          userId,
-          tripId,
-          totalAmount: parseFloat(totalAmount.toString()), // Ensure proper number format for Decimal
-          status: 'pending',
-        },
-      })
+      const createData = {
+        userId,
+        tripId,
+        totalAmount: parseFloat(totalAmount.toString()), // Ensure proper number format for Decimal
+        status: 'pending',
+      }
+
+      if (!userId) {
+        createData.guestEmail = bookingData.contactInfo?.email || null
+        createData.guestPhone = bookingData.contactInfo?.phone || null
+        createData.guestName = bookingData.contactInfo?.name || null
+        createData.referenceCode = referenceCode
+        createData.accessTokenHash = accessTokenHash
+      }
+
+      let newBooking
+      // Handle rare referenceCode collisions
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          newBooking = await tx.booking.create({ data: createData })
+          break
+        } catch (err) {
+          if (!userId && err?.code === 'P2002') {
+            referenceCode = generateReferenceCode()
+            createData.referenceCode = referenceCode
+            continue
+          }
+          throw err
+        }
+      }
+
+      if (!newBooking) {
+        throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to generate a unique booking reference')
+      }
 
       // Map seatId to seatNumber
       const seatIdToNumber = Object.fromEntries(seatStatuses.map(s => [s.seatId, s.seat.seatNumber]))
@@ -123,14 +198,19 @@ const createBooking = async (userId, bookingData) => {
 
     // Fetch complete booking with all relations
     const completeBooking = await bookingModel.getBookingById(booking.id)
+    sanitizeBooking(completeBooking)
     
     // Release Redis locks as seats are now reserved in DB
-    await seatLockService.unlockSeats(tripId, seatIds, userId)
+    await seatLockService.unlockSeats(tripId, seatIds, lockOwnerId)
 
     if (!completeBooking) {
       throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Booking was created but could not be retrieved')
     }
     
+    if (shouldReturnGuestAccess) {
+      return { booking: completeBooking, guestAccess }
+    }
+
     return completeBooking
     
   } catch (error) {
@@ -167,6 +247,7 @@ const createBooking = async (userId, bookingData) => {
 
 const getBookingById = async (bookingId, userId) => {
   const booking = await bookingModel.getBookingById(bookingId)
+  sanitizeBooking(booking)
   
   if (!booking) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
@@ -190,6 +271,7 @@ const getAdminBookings = async (filters) => {
 
 const getBookingByIdAdmin = async (bookingId) => {
   const booking = await bookingModel.getBookingByIdAdmin(bookingId)
+  sanitizeBooking(booking)
 
   if (!booking) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
@@ -230,6 +312,7 @@ const confirmBooking = async (bookingId, userId, paymentData) => {
   const prisma = GET_DB()
 
   const booking = await bookingModel.getBookingById(bookingId)
+  sanitizeBooking(booking)
 
   if (!booking) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
@@ -319,11 +402,45 @@ const confirmBooking = async (bookingId, userId, paymentData) => {
     return resultWithMeta
   })
 
+  sanitizeBooking(result)
+
   return result
+}
+
+const getBookingPublicByReference = async (referenceCode, token) => {
+  if (!referenceCode) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'referenceCode is required')
+  }
+  if (!token) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'token is required')
+  }
+
+  const booking = await bookingModel.getBookingByReferenceCode(referenceCode)
+
+  if (!booking) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
+  }
+  if (!booking.accessTokenHash) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'This booking is not accessible via public lookup')
+  }
+
+  const tokenHash = hashAccessToken(token)
+  if (tokenHash !== booking.accessTokenHash) {
+    throw new ApiError(StatusCodes.FORBIDDEN, 'Invalid token')
+  }
+
+  delete booking.accessTokenHash
+  return booking
+}
+
+const cancelBookingPublicByReference = async (referenceCode, token) => {
+  const booking = await getBookingPublicByReference(referenceCode, token)
+  return cancelBooking(booking.id, null)
 }
 
 const cancelBooking = async (bookingId, userId) => {
   const booking = await bookingModel.getBookingById(bookingId)
+  sanitizeBooking(booking)
   
   if (!booking) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
@@ -383,6 +500,7 @@ const cancelBooking = async (bookingId, userId) => {
 
 const confirmBookingAdmin = async (bookingId) => {
   const booking = await bookingModel.getBookingByIdAdmin(bookingId)
+  sanitizeBooking(booking)
 
   if (!booking) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
@@ -405,6 +523,7 @@ const confirmBookingAdmin = async (bookingId) => {
 
 const cancelBookingAdmin = async (bookingId) => {
   const booking = await bookingModel.getBookingByIdAdmin(bookingId)
+  sanitizeBooking(booking)
 
   if (!booking) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
@@ -461,6 +580,8 @@ export const bookingService = {
   getBookingByIdAdmin,
   getSeatStatusesByTripId,
   confirmBooking,
+  getBookingPublicByReference,
+  cancelBookingPublicByReference,
   cancelBooking,
   confirmBookingAdmin,
   cancelBookingAdmin,

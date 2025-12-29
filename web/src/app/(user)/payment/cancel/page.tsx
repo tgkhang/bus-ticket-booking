@@ -4,8 +4,9 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { XCircle, Loader2, ArrowLeft, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cancelBookingAPI } from '@/lib/api'
+import { cancelBookingPublicByReferenceAPI } from '@/lib/api'
 import { toast } from 'sonner'
+import { API_ROOT } from '@/lib/utils/constants'
 
 function CancelContent() {
   const router = useRouter()
@@ -23,8 +24,27 @@ function CancelContent() {
       }
 
       try {
-        // Cancel the booking to release seats
-        await cancelBookingAPI(bookingId)
+        // If this was a guest booking, cancel via reference/token.
+        const raw = sessionStorage.getItem('guest_booking_access')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          const referenceCode = parsed?.referenceCode
+          const token = parsed?.token
+          const storedBookingId = parsed?.bookingId
+
+          if (storedBookingId === bookingId && referenceCode && token) {
+            await cancelBookingPublicByReferenceAPI(referenceCode, token)
+            setIsCancelled(true)
+            setIsProcessing(false)
+            return
+          }
+        }
+
+        // Otherwise, best-effort cancel via auth endpoint (won't redirect to login)
+        await fetch(`${API_ROOT}/v1/bookings/${bookingId}/cancel`, {
+          method: 'POST',
+          credentials: 'include',
+        })
         setIsCancelled(true)
         setIsProcessing(false)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -58,6 +58,40 @@ npm run prisma:migrate
 
 This will create all the necessary tables in your PostgreSQL database.
 
+### 5. Create search indexes (recommended)
+
+This project uses Postgres trigram + full-text indexes for fast stop/route search.
+Because these indexes rely on Postgres operator classes / expressions (e.g. `gin_trgm_ops`, `to_tsvector`), Prisma may try to generate drift migrations to drop them.
+Run the standalone script after migrations:
+
+```bash
+# from ./api
+psql "$DATABASE_URL" -f prisma/search_indexes.sql
+```
+
+If you don't have `psql` installed locally (or you're using the Docker Postgres), you can run it via the container.
+
+**Bash / Git Bash:**
+
+```bash
+cd api
+cat prisma/search_indexes.sql | docker exec -i bus-ticket-postgres psql -U demo -d bus_ticket_db
+```
+
+**Windows PowerShell:**
+
+```powershell
+cd api
+Get-Content prisma/search_indexes.sql | docker exec -i bus-ticket-postgres psql -U demo -d bus_ticket_db
+```
+
+**Windows CMD:**
+
+```bat
+cd api
+type prisma\search_indexes.sql | docker exec -i bus-ticket-postgres psql -U demo -d bus_ticket_db
+```
+
 ## Development
 
 ### Start the development server

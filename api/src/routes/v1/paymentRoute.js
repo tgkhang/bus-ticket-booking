@@ -14,6 +14,13 @@ Router.post(
   asyncHandler(paymentController.createPaymentLink)
 )
 
+// Create payment link for guest booking (referenceCode + token)
+Router.post(
+  '/create-payment-link-public',
+  paymentValidation.createPaymentLinkPublic,
+  asyncHandler(paymentController.createPaymentLinkPublic)
+)
+
 // Get payment link information
 Router.get(
   '/:orderCode',

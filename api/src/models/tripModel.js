@@ -41,7 +41,9 @@ const buildWhere = (filters) => {
     if (filters.minPrice) where.basePrice.gte = filters.minPrice
     if (filters.maxPrice) where.basePrice.lte = filters.maxPrice
   }
-  if (filters.status) {
+  if (Array.isArray(filters.statusIn) && filters.statusIn.length) {
+    where.status = { in: filters.statusIn }
+  } else if (filters.status) {
     where.status = filters.status
   }
   if (filters.busModel || filters.amenities?.length || filters.busType?.length) {

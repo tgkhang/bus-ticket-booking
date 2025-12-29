@@ -29,12 +29,6 @@ ON stops
 FOR EACH ROW
 EXECUTE FUNCTION stops_set_search_text();
 
-CREATE INDEX IF NOT EXISTS stops_search_text_trgm_idx
-  ON stops USING GIN (search_text gin_trgm_ops);
-
-CREATE INDEX IF NOT EXISTS stops_search_text_fts_idx
-  ON stops USING GIN (to_tsvector('simple', search_text));
-
 -- =====================
 -- Routes: search_text + triggers + indexes
 -- =====================
@@ -53,7 +47,7 @@ WHERE os.id = r."originStopId"
   AND ds.id = r."destinationStopId"
   AND r.search_text IS NULL;
 
-CREATE OR REPLACE FUNCTION routes_build_search_text(route_name TEXT, origin_stop_id UUID, destination_stop_id UUID)
+CREATE OR REPLACE FUNCTION routes_build_search_text(route_name TEXT, origin_stop_id TEXT, destination_stop_id TEXT)
 RETURNS TEXT
 LANGUAGE plpgsql
 AS $$
@@ -111,9 +105,3 @@ AFTER UPDATE OF name, address
 ON stops
 FOR EACH ROW
 EXECUTE FUNCTION stops_refresh_routes_search_text();
-
-CREATE INDEX IF NOT EXISTS routes_search_text_trgm_idx
-  ON routes USING GIN (search_text gin_trgm_ops);
-
-CREATE INDEX IF NOT EXISTS routes_search_text_fts_idx
-  ON routes USING GIN (to_tsvector('simple', search_text));

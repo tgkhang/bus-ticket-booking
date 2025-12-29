@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, Loader2, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { confirmBookingAPI, getBookingByIdAPI } from '@/lib/api'
+import { confirmBookingAPI, getBookingByIdAPI, getBookingPublicByReferenceAPI } from '@/lib/api'
 import { sendETicketEmailAPI } from '@/lib/api/eTicket'
 import { getPaymentLinkInfoAPI } from '@/lib/api/payment'
 
@@ -15,6 +15,7 @@ function SuccessContent() {
   const [countdown, setCountdown] = useState(5)
   const [isProcessing, setIsProcessing] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [guestAccess, setGuestAccess] = useState<{ referenceCode: string; token: string } | null>(null)
 
   useEffect(() => {
     const waitForWebhookConfirmation = async () => {
@@ -25,6 +26,49 @@ function SuccessContent() {
         setError('Missing booking or payment information')
         setIsProcessing(false)
         return
+      }
+
+      // Guest flow: rely on webhook confirmation + public booking lookup.
+      try {
+        const raw = sessionStorage.getItem('guest_booking_access')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          const referenceCode = parsed?.referenceCode
+          const token = parsed?.token
+          const storedBookingId = parsed?.bookingId
+
+          if (referenceCode && token) {
+            setGuestAccess({ referenceCode, token })
+          }
+
+          if (storedBookingId === bookingId && referenceCode && token) {
+            const maxAttempts = 6
+            let attempts = 0
+
+            while (attempts < maxAttempts) {
+              try {
+                const booking = await getBookingPublicByReferenceAPI(referenceCode, token)
+                if (booking?.status === 'confirmed') {
+                  setIsProcessing(false)
+                  toast.success('Booking confirmed! Your e-ticket will be sent via email.')
+                  return
+                }
+              } catch (err) {
+                console.error('Guest booking lookup failed:', err)
+              }
+
+              await new Promise((resolve) => setTimeout(resolve, 1500))
+              attempts++
+            }
+
+            // If not confirmed yet, still show success page.
+            setIsProcessing(false)
+            toast.success('Payment received. Booking confirmation may take a moment.')
+            return
+          }
+        }
+      } catch {
+        // ignore malformed sessionStorage
       }
 
       try {
@@ -46,7 +90,7 @@ function SuccessContent() {
           try {
             const bookingData = await getBookingByIdAPI(bookingId)
 
-            if (bookingData?.data?.booking?.status === 'confirmed') {
+            if (bookingData?.status === 'confirmed') {
               bookingConfirmed = true
               // Webhook already confirmed, just send e-ticket as backup
               await sendETicketEmailAPI(bookingId)
@@ -153,6 +197,22 @@ function SuccessContent() {
           Thank you for using PayOS! Your booking has been confirmed and you should receive an e-ticket via email
           shortly.
         </p>
+
+        {guestAccess && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 text-left">
+            <p className="text-sm text-blue-800 dark:text-blue-300 mb-2">
+              Save these to lookup your booking later:
+            </p>
+            <div className="text-sm text-gray-900 dark:text-white break-all">
+              <div>
+                <span className="font-semibold">Reference:</span> {guestAccess.referenceCode}
+              </div>
+              <div>
+                <span className="font-semibold">Token:</span> {guestAccess.token}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
           <p className="text-sm text-green-800 dark:text-green-300">

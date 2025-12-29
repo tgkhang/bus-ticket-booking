@@ -32,6 +32,36 @@ function PassengerDetailsContent() {
     phone: '',
   })
 
+  const normalizePhone = (raw: string) => {
+    const trimmed = raw.trim()
+    if (!trimmed) return ''
+
+    const hasPlus = trimmed.startsWith('+')
+    const digits = trimmed.replace(/[^\d]/g, '')
+    if (!digits) return ''
+
+    return `${hasPlus ? '+' : ''}${digits}`
+  }
+
+  const isValidEmail = (raw: string) => {
+    const email = raw.trim()
+    // Stricter (and more explicit) email rule:
+    // - no spaces
+    // - must include a domain with at least one dot
+    // - allows common local-part characters like + . _ -
+    // Note: intentionally does not support quoted local-parts.
+    return /^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)+$/i.test(email)
+  }
+
+  const isValidPhone = (raw: string) => {
+    const phone = normalizePhone(raw)
+    // Enforced phone rule:
+    // - allow optional leading +
+    // - digits only after normalization
+    // - 8 to 15 digits (E.164-like length constraint, but allows local leading 0)
+    return /^\+?\d{8,15}$/.test(phone)
+  }
+
   useEffect(() => {
     const fetchMe = async () => {
       try {
@@ -112,13 +142,29 @@ function PassengerDetailsContent() {
       return
     }
 
+    if (!isValidEmail(contactInfo.email)) {
+      toast.error('Please enter a valid email address (e.g. name@example.com)')
+      return
+    }
+
+    if (!isValidPhone(contactInfo.phone)) {
+      toast.error('Please enter a valid phone number (8–15 digits, optional +)')
+      return
+    }
+
+    const normalizedContactInfo = {
+      ...contactInfo,
+      email: contactInfo.email.trim(),
+      phone: normalizePhone(contactInfo.phone),
+    }
+
     // Encode data and navigate to checkout
     const bookingData = {
       tripId,
       seats: seatsParam,
       totalPrice,
       passengers,
-      contactInfo,
+      contactInfo: normalizedContactInfo,
     }
 
     router.push(
@@ -267,8 +313,16 @@ function PassengerDetailsContent() {
                         onChange={(e) =>
                           setContactInfo({ ...contactInfo, email: e.target.value })
                         }
+                        onBlur={(e) => {
+                          const next = e.target.value.trim()
+                          if (next !== e.target.value) {
+                            setContactInfo((prev) => ({ ...prev, email: next }))
+                          }
+                        }}
                         readOnly={Boolean(registeredEmail)}
                         placeholder="your@email.com"
+                        inputMode="email"
+                        autoComplete="email"
                         className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white dark:bg-gray-700"
                         required
                       />
@@ -281,7 +335,15 @@ function PassengerDetailsContent() {
                         type="tel"
                         value={contactInfo.phone}
                         onChange={(e) => setContactInfo({ ...contactInfo, phone: e.target.value })}
+                        onBlur={(e) => {
+                          const next = normalizePhone(e.target.value)
+                          if (next !== e.target.value) {
+                            setContactInfo((prev) => ({ ...prev, phone: next }))
+                          }
+                        }}
                         placeholder="+84 123 456 789"
+                        inputMode="tel"
+                        autoComplete="tel"
                         className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white dark:bg-gray-700"
                         required
                       />

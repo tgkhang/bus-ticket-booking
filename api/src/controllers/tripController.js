@@ -12,6 +12,16 @@ const search = async (req, res, next) => {
   }
 }
 
+const searchPublic = async (req, res, next) => {
+  try {
+    const filters = res.locals.filters || req.query || {}
+    const result = await tripService.searchTripsPublic(filters)
+    res.status(StatusCodes.OK).json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
 const getTripById = async (req, res, next) => {
   try {
     const { id } = req.params
@@ -94,6 +104,7 @@ const cancelTrip = async (req, res, next) => {
 export const tripController = {
   createTrip,
   search,
+  searchPublic,
   getTripById,
   updateTrip,
   deleteTrip,
