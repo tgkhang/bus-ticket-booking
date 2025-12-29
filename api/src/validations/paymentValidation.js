@@ -15,7 +15,32 @@ const createPaymentLink = async (req, res, next) => {
         })
       )
       .optional(),
-    bookingId: Joi.string().uuid().optional(),
+    bookingId: Joi.string().uuid().required(),
+  })
+
+  try {
+    await schema.validateAsync(req.body, { abortEarly: false })
+    next()
+  } catch (error) {
+    next(new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, error.message))
+  }
+}
+
+const createPaymentLinkPublic = async (req, res, next) => {
+  const schema = Joi.object({
+    bookingId: Joi.string().uuid().required(),
+    referenceCode: Joi.string().trim().min(3).required(),
+    token: Joi.string().trim().min(8).required(),
+    description: Joi.string().max(25).optional(),
+    items: Joi.array()
+      .items(
+        Joi.object({
+          name: Joi.string().required(),
+          quantity: Joi.number().integer().positive().required(),
+          price: Joi.number().positive().required(),
+        })
+      )
+      .optional(),
   })
 
   try {
@@ -41,5 +66,6 @@ const getPaymentLinkInformation = async (req, res, next) => {
 
 export const paymentValidation = {
   createPaymentLink,
+  createPaymentLinkPublic,
   getPaymentLinkInformation,
 }

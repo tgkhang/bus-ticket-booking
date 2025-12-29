@@ -2,23 +2,26 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { getBookingByIdAPI } from '@/lib/api'
+import { getBookingByIdAPI, getBookingPublicByReferenceAPI } from '@/lib/api'
 import { downloadETicketAPI, sendETicketEmailAPI } from '@/lib/api/eTicket'
 import QRCode from 'react-qr-code'
 import { CheckCircle, Ticket, ArrowRight, Printer, Download, QrCode, Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { useAuth } from '@/hooks/useAuth'
 
 function ConfirmationContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { isAuthenticated } = useAuth()
 
   const bookingId = searchParams.get('bookingId')
   const bookingRef = searchParams.get('bookingRef')
 
   const [booking, setBooking] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [guestAccess, setGuestAccess] = useState<{ referenceCode: string; token: string } | null>(null)
 
   useEffect(() => {
     const fetchBooking = async () => {
@@ -29,8 +32,33 @@ function ConfirmationContent() {
       }
 
       try {
+        // Guest flow: if we have reference/token saved in sessionStorage, use the public lookup endpoint.
+        try {
+          const raw = sessionStorage.getItem('guest_booking_access')
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            const referenceCode = parsed?.referenceCode
+            const token = parsed?.token
+            const storedBookingId = parsed?.bookingId
+
+            if (storedBookingId === bookingId && referenceCode && token) {
+              setGuestAccess({ referenceCode, token })
+              const publicBooking = await getBookingPublicByReferenceAPI(referenceCode, token)
+              setBooking(publicBooking)
+              return
+            }
+          }
+        } catch {
+          // ignore malformed sessionStorage
+        }
+
+        if (!isAuthenticated) {
+          toast.error('Please sign in or lookup your booking using reference/token.')
+          setBooking(null)
+          return
+        }
+
         const response = await getBookingByIdAPI(bookingId)
-        // Backend returns booking directly (not wrapped in { data: ... })
         setBooking(response)
       } catch (err) {
         console.error('Failed to fetch booking:', err)
@@ -41,7 +69,7 @@ function ConfirmationContent() {
     }
 
     fetchBooking()
-  }, [bookingId])
+  }, [bookingId, isAuthenticated])
 
   const handlePrint = () => {
     window.print()
@@ -50,6 +78,10 @@ function ConfirmationContent() {
   const handleDownload = async () => {
     if (!bookingId) return
     try {
+      if (guestAccess) {
+        toast.error('PDF download is available for signed-in users. Please use your e-ticket email or sign in.')
+        return
+      }
       const blob = await downloadETicketAPI(bookingId)
       const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
       const link = document.createElement('a')
@@ -106,11 +138,38 @@ function ConfirmationContent() {
         <div className="bg-linear-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-6 mb-8 text-center">
           <p className="text-blue-100 mb-2">Booking Reference Number</p>
           <h2 className="text-3xl font-bold text-white tracking-wider">
-            {bookingRef || booking.bookingReference || booking.bookingRef || booking.id}
+            {guestAccess?.referenceCode || bookingRef || booking.referenceCode || booking.bookingReference || booking.bookingRef || booking.id}
           </h2>
-          <p className="text-blue-100 mt-4">
-            A confirmation email has been sent to your email address
-          </p>
+
+          {guestAccess ? (
+            <div className="mt-4 text-left bg-white/10 rounded-lg p-4">
+              <p className="text-blue-100 text-sm mb-3">
+                Save these details to lookup your booking later.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <p className="text-blue-100 text-xs mb-1">Reference Code</p>
+                  <input
+                    readOnly
+                    value={guestAccess.referenceCode}
+                    className="w-full rounded-md px-3 py-2 bg-white text-gray-900 text-sm"
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                </div>
+                <div>
+                  <p className="text-blue-100 text-xs mb-1">Access Token</p>
+                  <input
+                    readOnly
+                    value={guestAccess.token}
+                    className="w-full rounded-md px-3 py-2 bg-white text-gray-900 text-sm"
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-blue-100 mt-4">A confirmation email has been sent to your email address</p>
+          )}
         </div>
 
         {/* E-Ticket Card */}
@@ -249,9 +308,9 @@ function ConfirmationContent() {
             <Download className="w-5 h-5" />
             Download PDF
           </Button>
-          <Link href="/booking">
+          <Link href={guestAccess ? '/booking/lookup' : '/booking'}>
             <Button className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700">
-              View My Bookings
+              {guestAccess ? 'Booking Lookup' : 'View My Bookings'}
             </Button>
           </Link>
         </div>

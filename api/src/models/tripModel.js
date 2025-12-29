@@ -41,7 +41,9 @@ const buildWhere = (filters) => {
     if (filters.minPrice) where.basePrice.gte = filters.minPrice
     if (filters.maxPrice) where.basePrice.lte = filters.maxPrice
   }
-  if (filters.status) {
+  if (Array.isArray(filters.statusIn) && filters.statusIn.length) {
+    where.status = { in: filters.statusIn }
+  } else if (filters.status) {
     where.status = filters.status
   }
   if (filters.busModel || filters.amenities?.length || filters.busType?.length) {
@@ -298,20 +300,75 @@ const listTrips = async (filters = {}, pagination = {}) => {
   const { page, limit } = pagination
   const skip = (page - 1) * limit
 
+  const sortBy = String(filters.sortBy || 'departureTime')
+  const sortOrderRaw = String(filters.sortOrder || 'desc').toLowerCase()
+  const sortOrder = sortOrderRaw === 'asc' ? 'asc' : 'desc'
+
   // Build where clause using helper
   const where = buildListWhere(filters)
 
   // Get total count for pagination
   const total = await prisma.trip.count({ where })
 
-  // Fetch trips with all relations (including operator for admin)
-  const trips = await prisma.trip.findMany({
-    where,
-    skip,
-    take: limit,
-    orderBy: { departureTime: 'desc' },
-    include: getTripInclude(true),
-  })
+  let trips = []
+
+  if (sortBy === 'booking') {
+    // Sort by number of booked seats (derived from seatStatuses) across ALL matching trips,
+    // then apply pagination on the ordered trip IDs.
+    const all = await prisma.trip.findMany({
+      where,
+      select: {
+        id: true,
+        departureTime: true,
+      },
+    })
+
+    const ids = all.map((t) => t.id)
+
+    const bookedCounts = ids.length
+      ? await prisma.seatStatus.groupBy({
+          by: ['tripId'],
+          where: {
+            tripId: { in: ids },
+            status: 'booked',
+          },
+          _count: { _all: true },
+        })
+      : []
+
+    const bookedCountByTripId = new Map(bookedCounts.map((r) => [r.tripId, r._count._all]))
+    const departureByTripId = new Map(all.map((t) => [t.id, t.departureTime.getTime()]))
+
+    ids.sort((a, b) => {
+      const aCount = bookedCountByTripId.get(a) || 0
+      const bCount = bookedCountByTripId.get(b) || 0
+      if (aCount !== bCount) return aCount - bCount
+      // Tie-breaker: departure time
+      return (departureByTripId.get(a) || 0) - (departureByTripId.get(b) || 0)
+    })
+
+    if (sortOrder === 'desc') ids.reverse()
+
+    const pageIds = ids.slice(skip, skip + limit)
+    if (pageIds.length) {
+      const fetched = await prisma.trip.findMany({
+        where: { id: { in: pageIds } },
+        include: getTripInclude(true),
+      })
+      const byId = new Map(fetched.map((t) => [t.id, t]))
+      trips = pageIds.map((id) => byId.get(id)).filter(Boolean)
+    }
+  } else {
+    const sortField = sortBy === 'arrivalTime' ? 'arrivalTime' : 'departureTime'
+
+    trips = await prisma.trip.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: [{ [sortField]: sortOrder }, { id: 'desc' }],
+      include: getTripInclude(true),
+    })
+  }
 
   // Transform trips using helper (include operator info)
   const data = trips.map((trip) => {

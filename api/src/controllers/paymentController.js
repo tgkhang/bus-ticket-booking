@@ -6,7 +6,34 @@ import { bookingService } from '~/services/bookingService'
 import { eTicketService } from '~/services/eTicketService'
 
 const createPaymentLink = async (req, res, next) => {
-  const { amount, description, items, bookingId } = req.body
+  const { description, items, bookingId } = req.body
+
+  const prisma = GET_DB()
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId } })
+
+  if (!booking) {
+    return res.status(StatusCodes.NOT_FOUND).json({
+      success: false,
+      message: 'Booking not found',
+    })
+  }
+
+  // Enforce ownership for authenticated users
+  if (booking.userId !== req.jwtDecoded?.id) {
+    return res.status(StatusCodes.FORBIDDEN).json({
+      success: false,
+      message: 'You do not have permission to pay for this booking',
+    })
+  }
+
+  if (booking.status !== 'pending') {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      success: false,
+      message: `Booking is not payable (status: ${booking.status})`,
+    })
+  }
+
+  const amount = Number(booking.totalAmount)
 
   // Determine the domain based on build mode
   const YOUR_DOMAIN = env.BUILD_MODE === 'production' ? env.WEBSITE_DOMAIN_PRODUCTION : env.WEBSITE_DOMAIN_DEVELOPMENT
@@ -33,6 +60,56 @@ const createPaymentLink = async (req, res, next) => {
   }
 
   // Use paymentRequests.create() method from PayOS SDK
+  const paymentLinkResponse = await payOS.paymentRequests.create(body)
+
+  res.status(StatusCodes.CREATED).json({
+    success: true,
+    checkoutUrl: paymentLinkResponse.checkoutUrl,
+    orderCode: paymentLinkResponse.orderCode,
+    paymentLinkId: paymentLinkResponse.paymentLinkId,
+  })
+}
+
+const createPaymentLinkPublic = async (req, res, next) => {
+  const { description, items, bookingId, referenceCode, token } = req.body
+
+  // Validate guest access
+  const booking = await bookingService.getBookingPublicByReference(referenceCode, token)
+  if (booking.id !== bookingId) {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      success: false,
+      message: 'Booking reference does not match bookingId',
+    })
+  }
+
+  if (booking.status !== 'pending') {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      success: false,
+      message: `Booking is not payable (status: ${booking.status})`,
+    })
+  }
+
+  // Determine the domain based on build mode
+  const YOUR_DOMAIN = env.BUILD_MODE === 'production' ? env.WEBSITE_DOMAIN_PRODUCTION : env.WEBSITE_DOMAIN_DEVELOPMENT
+  const orderCode = Number(String(Date.now()).slice(-6))
+  const truncatedDescription = (description || 'Thanh toan ve xe').substring(0, 25)
+  const amount = Number(booking.totalAmount)
+
+  const body = {
+    orderCode,
+    amount,
+    description: truncatedDescription,
+    items: items || [
+      {
+        name: 'Ve xe',
+        quantity: 1,
+        price: amount,
+      },
+    ],
+    returnUrl: `${YOUR_DOMAIN}/payment/success?bookingId=${bookingId || ''}&orderCode=${orderCode}`,
+    cancelUrl: `${YOUR_DOMAIN}/payment/cancel?bookingId=${bookingId || ''}&orderCode=${orderCode}`,
+  }
+
   const paymentLinkResponse = await payOS.paymentRequests.create(body)
 
   res.status(StatusCodes.CREATED).json({
@@ -139,6 +216,7 @@ const confirmWebhook = async (req, res, next) => {
 
 export const paymentController = {
   createPaymentLink,
+  createPaymentLinkPublic,
   getPaymentLinkInformation,
   confirmWebhook,
 }

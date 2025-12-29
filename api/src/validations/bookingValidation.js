@@ -2,6 +2,18 @@ import Joi from 'joi'
 import ApiError from '~/utils/ApiError'
 import { StatusCodes } from 'http-status-codes'
 
+const normalizePhone = (raw) => {
+  if (typeof raw !== 'string') return ''
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+
+  const hasPlus = trimmed.startsWith('+')
+  const digits = trimmed.replace(/[^\d]/g, '')
+  if (!digits) return ''
+
+  return `${hasPlus ? '+' : ''}${digits}`
+}
+
 const createBooking = async (req, res, next) => {
   const schema = Joi.object({
     tripId: Joi.string().uuid().required(),
@@ -21,6 +33,65 @@ const createBooking = async (req, res, next) => {
 
   try {
     await schema.validateAsync(req.body, { abortEarly: false })
+    next()
+  } catch (error) {
+    next(new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, error.message))
+  }
+}
+
+const createBookingPublic = async (req, res, next) => {
+  const schema = Joi.object({
+    tripId: Joi.string().uuid().required(),
+    seatIds: Joi.array().items(Joi.string().uuid()).min(1).required(),
+    passengers: Joi.array()
+      .items(
+        Joi.object({
+          fullName: Joi.string().required(),
+          documentId: Joi.string().required(),
+          seatCode: Joi.string().required(),
+        })
+      )
+      .min(1)
+      .required(),
+    totalAmount: Joi.number().positive().required(),
+    contactInfo: Joi.object({
+      email: Joi.string().trim().lowercase().email({ tlds: { allow: false }, minDomainSegments: 2 }).required(),
+      phone: Joi.string().trim().custom((value, helpers) => {
+        const normalized = normalizePhone(value)
+        if (!normalized) {
+          return helpers.error('any.invalid')
+        }
+
+        if (!/^\+?\d{8,15}$/.test(normalized)) {
+          return helpers.error('string.pattern.base')
+        }
+
+        return normalized
+      }, 'phone normalization').required(),
+      name: Joi.string().allow('', null).optional(),
+    }).required(),
+  })
+
+  try {
+    req.body = await schema.validateAsync(req.body, { abortEarly: false })
+    next()
+  } catch (error) {
+    next(new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, error.message))
+  }
+}
+
+const getBookingPublicByReference = async (req, res, next) => {
+  const paramSchema = Joi.object({
+    referenceCode: Joi.string().trim().min(3).required(),
+  })
+
+  const querySchema = Joi.object({
+    token: Joi.string().trim().min(8).required(),
+  })
+
+  try {
+    await paramSchema.validateAsync(req.params, { abortEarly: false })
+    await querySchema.validateAsync(req.query, { abortEarly: false })
     next()
   } catch (error) {
     next(new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, error.message))
@@ -76,7 +147,9 @@ const confirmBooking = async (req, res, next) => {
 
 export const bookingValidation = {
   createBooking,
+  createBookingPublic,
   getBookingById,
   lockSeats,
   confirmBooking,
+  getBookingPublicByReference,
 }

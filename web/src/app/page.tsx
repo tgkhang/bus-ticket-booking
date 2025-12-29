@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { PublicLayout } from '@/components/layout'
 import Link from 'next/link'
 import Image from 'next/image'
-import TripSearchForm from '@/components/common/TripSearchForm'
+import SearchBusTicketsCard from '@/components/common/SearchBusTicketsCard'
 import { toast } from 'sonner'
 import {
   ArrowRight,
@@ -117,13 +117,22 @@ export default function Home() {
               </button>
             </Link>
           </div>
+
+          <div className="text-center">
+            <Link
+              href="/booking/lookup"
+              className="text-sm text-blue-100 hover:text-white underline underline-offset-4"
+            >
+              Already booked as a guest? Lookup your booking
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* Search Form Section */}
       <section className="py-12 -mt-24 relative z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <TripSearchForm />
+          <SearchBusTicketsCard />
         </div>
       </section>
 

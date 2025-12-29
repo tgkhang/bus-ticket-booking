@@ -40,6 +40,12 @@ authorizedAxiosInstance.interceptors.response.use(
     const isRefreshEndpoint = error.config?.url?.includes('/refresh_token')
     const isMeEndpoint = error.config?.url?.includes('/me')
 
+    // Important: /me is used to *detect* auth state.
+    // If the user is not logged in, /me will return 401 and we should NOT try to refresh or force-login.
+    if (isMeEndpoint && error.response?.status === 401) {
+      return Promise.reject(error)
+    }
+
     // Handle 403 from refresh endpoint - means refresh token is missing/invalid
     if (error.response?.status === 403 && isRefreshEndpoint) {
       isRefreshing = false

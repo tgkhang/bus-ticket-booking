@@ -9,9 +9,24 @@ export const createPaymentLinkAPI = async (paymentData: {
     quantity: number
     price: number
   }>
-  bookingId?: string
+  bookingId: string
 }) => {
   const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/payments/create-payment-link`, paymentData)
+  return response.data
+}
+
+export const createPaymentLinkPublicAPI = async (paymentData: {
+  bookingId: string
+  referenceCode: string
+  token: string
+  description?: string
+  items?: Array<{
+    name: string
+    quantity: number
+    price: number
+  }>
+}) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/payments/create-payment-link-public`, paymentData)
   return response.data
 }
 

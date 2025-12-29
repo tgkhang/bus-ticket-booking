@@ -3,9 +3,9 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { createBookingAPI, getTripByIdAPI } from '@/lib/api'
+import { createBookingPublicAPI, getTripByIdAPI } from '@/lib/api'
 import { sendETicketEmailAPI } from '@/lib/api/eTicket'
-import { createPaymentLinkAPI } from '@/lib/api/payment'
+import { createPaymentLinkAPI, createPaymentLinkPublicAPI } from '@/lib/api/payment'
 import {
   ArrowLeft,
   Check,
@@ -103,15 +103,30 @@ function CheckoutContent() {
         passengers: bookingData.passengers.map((p: any, index: number) => ({
           fullName: p.fullName,
           documentId: p.documentId,
-          seatCode: seatIds[index],
+          seatCode: p.seatCode || seatIds[index],
         })),
         totalAmount: Number(bookingData.totalPrice),
+        contactInfo: bookingData.contactInfo,
       }
 
       // console.log('Creating booking with payload:', bookingPayload)
 
-      // Create booking first
-      const booking = await createBookingAPI(bookingPayload)
+      // Create booking first (works for both logged-in users and guests)
+      const bookingResult = await createBookingPublicAPI(bookingPayload)
+
+      const booking = bookingResult?.booking ? bookingResult.booking : bookingResult
+      const guestAccess = bookingResult?.guestAccess
+
+      if (guestAccess?.referenceCode && guestAccess?.accessToken && booking?.id) {
+        sessionStorage.setItem(
+          'guest_booking_access',
+          JSON.stringify({
+            bookingId: booking.id,
+            referenceCode: guestAccess.referenceCode,
+            token: guestAccess.accessToken,
+          })
+        )
+      }
 
       // Prepare payment items
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -131,7 +146,15 @@ function CheckoutContent() {
 
       // console.log('Creating payment link with data:', paymentData)
 
-      const paymentResponse = await createPaymentLinkAPI(paymentData)
+      const paymentResponse = guestAccess?.referenceCode
+        ? await createPaymentLinkPublicAPI({
+            bookingId: booking.id,
+            referenceCode: guestAccess.referenceCode,
+            token: guestAccess.accessToken,
+            description: paymentData.description,
+            items: paymentData.items,
+          })
+        : await createPaymentLinkAPI(paymentData)
 
       // Redirect to PayOS checkout page
       if (paymentResponse.success && paymentResponse.checkoutUrl) {
@@ -166,18 +189,33 @@ function CheckoutContent() {
         passengers: bookingData.passengers.map((p: any, index: number) => ({
           fullName: p.fullName,
           documentId: p.documentId,
-          seatCode: seatIds[index],
+          seatCode: p.seatCode || seatIds[index],
         })),
         totalAmount: Number(bookingData.totalPrice),
+        contactInfo: bookingData.contactInfo,
       }
 
       console.log('Creating booking with payload:', bookingPayload)
 
       // Create booking
-      const booking = await createBookingAPI(bookingPayload)
+      const bookingResult = await createBookingPublicAPI(bookingPayload)
+      const booking = bookingResult?.booking ? bookingResult.booking : bookingResult
+      const guestAccess = bookingResult?.guestAccess
 
-      // Send e-ticket email
-      await sendETicketEmailAPI(booking.id)
+      if (guestAccess?.referenceCode && guestAccess?.accessToken && booking?.id) {
+        sessionStorage.setItem(
+          'guest_booking_access',
+          JSON.stringify({
+            bookingId: booking.id,
+            referenceCode: guestAccess.referenceCode,
+            token: guestAccess.accessToken,
+          })
+        )
+        toast.info('Guest booking created. Save your reference/token for lookup.')
+      } else if (booking?.id) {
+        // Send e-ticket email for logged-in users only (auth required)
+        await sendETicketEmailAPI(booking.id)
+      }
 
       // Simulate payment processing
       await new Promise((resolve) => setTimeout(resolve, 1000))
@@ -215,15 +253,29 @@ function CheckoutContent() {
         passengers: bookingData.passengers.map((p: any, index: number) => ({
           fullName: p.fullName,
           documentId: p.documentId,
-          seatCode: seatIds[index],
+          seatCode: p.seatCode || seatIds[index],
         })),
         totalAmount: Number(bookingData.totalPrice),
+        contactInfo: bookingData.contactInfo,
       }
 
       console.log('Creating booking with payload:', bookingPayload)
 
       // Create booking
-      const booking = await createBookingAPI(bookingPayload)
+      const bookingResult = await createBookingPublicAPI(bookingPayload)
+      const booking = bookingResult?.booking ? bookingResult.booking : bookingResult
+      const guestAccess = bookingResult?.guestAccess
+
+      if (guestAccess?.referenceCode && guestAccess?.accessToken && booking?.id) {
+        sessionStorage.setItem(
+          'guest_booking_access',
+          JSON.stringify({
+            bookingId: booking.id,
+            referenceCode: guestAccess.referenceCode,
+            token: guestAccess.accessToken,
+          })
+        )
+      }
 
       // Simulate payment processing delay
       await new Promise((resolve) => setTimeout(resolve, 1000))

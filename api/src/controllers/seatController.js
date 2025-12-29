@@ -4,9 +4,13 @@ import { seatLockService } from '~/services/seatLockService'
 const lockSeats = async (req, res, next) => {
   try {
     const { tripId, seatIds } = req.body
-    const userId = req.jwtDecoded.id 
+    const lockOwnerId = req.jwtDecoded?.id || req.guestSid
 
-    await seatLockService.lockSeats(tripId, seatIds, userId)
+    if (!lockOwnerId) {
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Missing lock owner context' })
+    }
+
+    await seatLockService.lockSeats(tripId, seatIds, lockOwnerId)
     
     // Notify others
     req.io.emit('seats:locked', { tripId, seatIds })
@@ -20,9 +24,13 @@ const lockSeats = async (req, res, next) => {
 const unlockSeats = async (req, res, next) => {
   try {
     const { tripId, seatIds } = req.body
-    const userId = req.jwtDecoded.id
+    const lockOwnerId = req.jwtDecoded?.id || req.guestSid
 
-    await seatLockService.unlockSeats(tripId, seatIds, userId)
+    if (!lockOwnerId) {
+      return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Missing lock owner context' })
+    }
+
+    await seatLockService.unlockSeats(tripId, seatIds, lockOwnerId)
     
     // Notify others
     req.io.emit('seats:unlocked', { tripId, seatIds })

@@ -17,6 +17,19 @@ npm run prisma:generate
 # Run all pending migrations
 npm run prisma:migrate
 
+# (Recommended) Create trigram/FTS search indexes
+# These live in a standalone SQL script because Prisma can't fully represent
+# operator-class/expression indexes like `gin_trgm_ops` / `to_tsvector`.
+psql "$DATABASE_URL" -f prisma/search_indexes.sql
+
+# If you are using the Docker Postgres container (and don't have psql locally):
+# Bash / Git Bash:
+#   cat prisma/search_indexes.sql | docker exec -i bus-ticket-postgres psql -U demo -d bus_ticket_db
+# Windows PowerShell:
+#   Get-Content prisma/search_indexes.sql | docker exec -i bus-ticket-postgres psql -U demo -d bus_ticket_db
+# Windows CMD:
+#   type prisma\search_indexes.sql | docker exec -i bus-ticket-postgres psql -U demo -d bus_ticket_db
+
 # Seed the database with sample data
 npm run prisma:seed
 ```

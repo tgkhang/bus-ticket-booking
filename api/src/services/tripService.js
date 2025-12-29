@@ -35,6 +35,41 @@ const searchTrips = async (query) => {
   return tripModel.searchTrips(filters)
 }
 
+const searchTripsPublic = async (query) => {
+  // Public search should work for guests. If no explicit status is provided,
+  // default to bookable trips only.
+  const filters = {
+    originStopId: query.originStopId,
+    destinationStopId: query.destinationStopId,
+    date: query.date,
+    timeFrom: query.timeFrom || query.startTime,
+    timeTo: query.timeTo || query.endTime,
+    minPrice: query.minPrice ? Number(query.minPrice) : undefined,
+    maxPrice: query.maxPrice ? Number(query.maxPrice) : undefined,
+    busModel: query.busModel,
+    busType: query.busType
+      ? (Array.isArray(query.busType) ? query.busType : query.busType.split(','))
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [],
+    amenities: query.amenities
+      ? query.amenities
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [],
+    status: query.status,
+    statusIn: query.status ? undefined : ['scheduled', 'active'],
+    passengers: query.passengers ? Number(query.passengers) : 1,
+    page: Number(query.page),
+    limit: Number(query.limit),
+    sortBy: query.sortBy,
+    sortOrder: query.sortOrder,
+  }
+
+  return tripModel.searchTrips(filters)
+}
+
 const getTripById = async (id) => {
   const trip = await tripModel.getTripById(id)
   if (!trip) throw new ApiError(StatusCodes.NOT_FOUND, 'Trip not found')
@@ -141,11 +176,70 @@ const deleteTrip = async (id) => {
   return await tripModel.deleteTrip(id)
 }
 
+const cancelScheduledTrip = async (id) => {
+  const prisma = GET_DB()
+
+  const trip = await prisma.trip.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      status: true,
+      departureTime: true,
+    },
+  })
+
+  if (!trip) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Trip not found')
+  }
+
+  if (String(trip.status).toLowerCase() !== 'scheduled') {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Only scheduled trips can be cancelled')
+  }
+
+  // Prevent cancelling trips that have already started
+  if (trip.departureTime && new Date() >= new Date(trip.departureTime)) {
+    throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot cancel a trip after its departure time')
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // 1) Cancel the trip
+    await tx.trip.update({
+      where: { id },
+      data: { status: 'cancelled' },
+    })
+
+    // 2) Cancel all bookings for the trip (pending/confirmed)
+    await tx.booking.updateMany({
+      where: {
+        tripId: id,
+        status: { in: ['pending', 'confirmed'] },
+      },
+      data: { status: 'cancelled' },
+    })
+
+    // 3) Release all seats for this trip
+    await tx.seatStatus.updateMany({
+      where: {
+        tripId: id,
+        status: { in: ['locked', 'booked'] },
+      },
+      data: {
+        status: 'available',
+        lockedUntil: null,
+      },
+    })
+  })
+
+  return { success: true, message: 'Trip cancelled and all bookings were cancelled' }
+}
+
 export const tripService = {
   searchTrips,
+  searchTripsPublic,
   getTripById,
   createTrip,
   updateTrip,
   deleteTrip,
   listTrips,
+  cancelScheduledTrip,
 }

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import {
   Plus,
@@ -10,15 +10,20 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Search,
+  Filter,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { Trip, TripStatus, CreateTripData } from '@/types/trip'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { listTripsAPI, deleteTripAPI, createTripAPI, listRoutesAPI, listBusesAPI } from '@/lib/api'
+import { listTripsAPI, deleteTripAPI, createTripAPI, listRoutesAPI, listBusesAPI, listOperatorsAPI } from '@/lib/api'
 import { toast } from 'sonner'
 import { ITEMS_PER_PAGE } from '@/utils/constants'
+import { datetimeLocalGmt7ToIso, formatDateOnlyGmt7, formatDateTimeGmt7 } from '@/lib/utils/datetime'
 import type { Route } from '@/types/routeAndStop'
 import type { Bus } from '@/types/api'
+import type { Operator } from '@/types/operator'
 
 interface TripFormData {
   routeId: string
@@ -31,19 +36,39 @@ interface TripFormData {
 
 export default function TripManagementPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  
   const [trips, setTrips] = useState<Trip[]>([])
   const [routes, setRoutes] = useState<Route[]>([])
   const [buses, setBuses] = useState<Bus[]>([])
+  const [operators, setOperators] = useState<Operator[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingRoutes, setLoadingRoutes] = useState(false)
   const [loadingBuses, setLoadingBuses] = useState(false)
+  const [loadingOperators, setLoadingOperators] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
   const [deletingTrip, setDeletingTrip] = useState<Trip | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [totalItems, setTotalItems] = useState(0)
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1)
+  // Get params from URL
+  const searchQuery = searchParams.get('search') || ''
+  const routeFilter = searchParams.get('routeId') || ''
+  const statusFilter = searchParams.get('status') || ''
+  const dateFrom = searchParams.get('dateFrom') || ''
+  const dateTo = searchParams.get('dateTo') || ''
+  const sortBy = searchParams.get('sortBy') || 'departureTime'
+  const sortOrder = searchParams.get('sortOrder') || 'desc'
+  const currentPage = parseInt(searchParams.get('page') || '1', 10)
+
+  // Local state for form inputs
+  const [searchInput, setSearchInput] = useState(searchQuery)
+  const [routeInput, setRouteInput] = useState(routeFilter)
+  const [statusInput, setStatusInput] = useState(statusFilter)
+  const [dateFromInput, setDateFromInput] = useState(dateFrom)
+  const [dateToInput, setDateToInput] = useState(dateTo)
 
   const {
     register,
@@ -61,25 +86,69 @@ export default function TripManagementPage() {
     },
   })
 
-  // Fetch trips and reference data on component mount
-  useEffect(() => {
-    fetchTrips()
-    fetchRoutes()
-    fetchBuses()
-  }, [])
+  // Update URL when filters/search/sort change
+  const updateURL = useCallback(
+    (params: Record<string, string>) => {
+      const newParams = new URLSearchParams(searchParams.toString())
+      
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) {
+          newParams.set(key, value)
+        } else {
+          newParams.delete(key)
+        }
+      })
+      
+      // Reset to page 1 when filters change (unless page is being set)
+      if (!params.page) {
+        newParams.set('page', '1')
+      }
+      
+      router.push(`?${newParams.toString()}`, { scroll: false })
+    },
+    [searchParams, router]
+  )
 
-  const fetchTrips = async () => {
+  // Fetch trips with filters and pagination
+  const fetchTrips = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await listTripsAPI({}, { page: 1, limit: 100 })
+      const filters: Record<string, string> = {}
+      
+      if (searchQuery) filters.search = searchQuery
+      if (routeFilter) filters.routeId = routeFilter
+      if (statusFilter) filters.status = statusFilter
+      if (dateFrom) filters.dateFrom = dateFrom
+      if (dateTo) filters.dateTo = dateTo
+      if (sortBy) filters.sortBy = sortBy
+      if (sortOrder) filters.sortOrder = sortOrder
+
+      const response = await listTripsAPI(filters, { 
+        page: currentPage, 
+        limit: ITEMS_PER_PAGE,
+      })
+      
       setTrips(response.data)
+      const total = response.pagination?.total ?? (response as any)?.total ?? 0
+      setTotalItems(total)
     } catch (error) {
       toast.error('Failed to fetch trips')
       console.error('Error fetching trips:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [searchQuery, routeFilter, statusFilter, dateFrom, dateTo, sortBy, sortOrder, currentPage])
+
+  // Fetch trips and reference data on component mount and when filters change
+  useEffect(() => {
+    fetchTrips()
+  }, [fetchTrips])
+
+  useEffect(() => {
+    fetchRoutes()
+    fetchBuses()
+    fetchOperators()
+  }, [])
 
   const fetchRoutes = async () => {
     try {
@@ -107,6 +176,19 @@ export default function TripManagementPage() {
     }
   }
 
+  const fetchOperators = async () => {
+    try {
+      setLoadingOperators(true)
+      const response = await listOperatorsAPI({ status: 'approved' }, { page: 1, limit: 100 })
+      setOperators(response.data)
+    } catch (error) {
+      toast.error('Failed to fetch operators')
+      console.error('Error fetching operators:', error)
+    } finally {
+      setLoadingOperators(false)
+    }
+  }
+
   const handleOpenModal = () => {
     reset({
       routeId: '',
@@ -124,13 +206,55 @@ export default function TripManagementPage() {
     reset()
   }
 
+  // Handle search
+  const handleSearch = () => {
+    updateURL({
+      search: searchInput,
+      routeId: routeInput,
+      status: statusInput,
+      dateFrom: dateFromInput,
+      dateTo: dateToInput,
+    })
+  }
+
+  // Handle clear filters
+  const handleClearFilters = () => {
+    setSearchInput('')
+    setRouteInput('')
+    setStatusInput('')
+    setDateFromInput('')
+    setDateToInput('')
+    updateURL({
+      search: '',
+      routeId: '',
+      status: '',
+      dateFrom: '',
+      dateTo: '',
+    })
+  }
+
+  // Handle sort change
+  const handleSortChange = (newSortBy: string) => {
+    const newSortOrder = sortBy === newSortBy && sortOrder === 'asc' ? 'desc' : 'asc'
+    updateURL({
+      sortBy: newSortBy,
+      sortOrder: newSortOrder,
+    })
+  }
+
+  // Handle pagination
+  const handlePageChange = (page: number) => {
+    updateURL({ page: page.toString() })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const onSubmit = async (data: TripFormData) => {
     try {
       const createData: CreateTripData = {
         routeId: data.routeId,
         busId: data.busId,
-        departureTime: data.departureTime,
-        arrivalTime: data.arrivalTime,
+        departureTime: datetimeLocalGmt7ToIso(data.departureTime),
+        arrivalTime: datetimeLocalGmt7ToIso(data.arrivalTime),
         basePrice: data.basePrice,
         status: data.status,
       }
@@ -139,8 +263,10 @@ export default function TripManagementPage() {
       // Refresh the trip list
       await fetchTrips()
       handleCloseModal()
+      toast.success('Trip created successfully')
     } catch (error) {
       console.error('Error creating trip:', error)
+      toast.error('Failed to create trip')
     }
   }
 
@@ -186,14 +312,7 @@ export default function TripManagementPage() {
   }
 
   const formatDateTime = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    return formatDateTimeGmt7(dateStr)
   }
 
   const formatCurrency = (amount: number) => {
@@ -215,16 +334,44 @@ export default function TripManagementPage() {
     return bus ? { model: bus.model, plateNumber: bus.plateNumber } : { model: 'Unknown', plateNumber: busId }
   }
 
-  // Pagination calculations
-  const totalPages = Math.ceil(trips.length / ITEMS_PER_PAGE)
-  const indexOfLastItem = currentPage * ITEMS_PER_PAGE
-  const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE
-  const currentTrips = trips.slice(indexOfFirstItem, indexOfLastItem)
+  // Trips are sorted server-side based on sortBy/sortOrder.
+  const displayTrips = trips
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE))
+
+  // Generate pagination range
+  const getPaginationRange = () => {
+    const delta = 2
+    const range: (number | string)[] = []
+    const rangeWithDots: (number | string)[] = []
+
+    for (
+      let i = Math.max(2, currentPage - delta);
+      i <= Math.min(totalPages - 1, currentPage + delta);
+      i++
+    ) {
+      range.push(i)
+    }
+
+    if (currentPage - delta > 2) {
+      rangeWithDots.push(1, '...')
+    } else {
+      rangeWithDots.push(1)
+    }
+
+    rangeWithDots.push(...range)
+
+    if (currentPage + delta < totalPages - 1) {
+      rangeWithDots.push('...', totalPages)
+    } else if (totalPages > 1) {
+      rangeWithDots.push(totalPages)
+    }
+
+    return rangeWithDots
   }
+
+  const hasActiveFilters = searchQuery || routeFilter || statusFilter || dateFrom || dateTo
 
   return (
     <div>
@@ -243,6 +390,159 @@ export default function TripManagementPage() {
         </Button>
       </div>
 
+      {/* Search and Filters */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="flex flex-col gap-4">
+            {/* Search Bar and Filter Toggle */}
+            <div className="flex gap-3">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Search by route, bus, or operator..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                />
+              </div>
+              <Button
+                onClick={handleSearch}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-700"
+              >
+                Search
+              </Button>
+              <Button
+                onClick={() => setShowFilters(!showFilters)}
+                variant="outline"
+                className="px-6 py-3 flex items-center gap-2"
+              >
+                <SlidersHorizontal className="w-5 h-5" />
+                Filters
+              </Button>
+            </div>
+
+            {/* Advanced Filters */}
+            {showFilters && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Route
+                    </label>
+                    <select
+                      value={routeInput}
+                      onChange={(e) => setRouteInput(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      disabled={loadingRoutes}
+                    >
+                      <option value="">All Routes</option>
+                      {routes.map((route) => (
+                        <option key={route.id} value={route.id}>
+                          {route.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Status
+                    </label>
+                    <select
+                      value={statusInput}
+                      onChange={(e) => setStatusInput(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="scheduled">Scheduled</option>
+                      <option value="active">Active</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Date From
+                    </label>
+                    <input
+                      type="date"
+                      value={dateFromInput}
+                      onChange={(e) => setDateFromInput(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Date To
+                    </label>
+                    <input
+                      type="date"
+                      value={dateToInput}
+                      onChange={(e) => setDateToInput(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-4">
+                  <Button
+                    onClick={handleSearch}
+                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700"
+                  >
+                    Apply Filters
+                  </Button>
+                  {hasActiveFilters && (
+                    <Button
+                      onClick={handleClearFilters}
+                      variant="outline"
+                      className="px-6 py-2"
+                    >
+                      Clear All
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Active Filters Display */}
+            {hasActiveFilters && (
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Active filters:</span>
+                {searchQuery && (
+                  <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm">
+                    Search: {searchQuery}
+                  </span>
+                )}
+                {routeFilter && (
+                  <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm">
+                    Route: {getRouteName(routeFilter)}
+                  </span>
+                )}
+                {statusFilter && (
+                  <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm">
+                    Status: {statusFilter}
+                  </span>
+                )}
+                {dateFrom && (
+                  <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm">
+                    From: {formatDateOnlyGmt7(dateFrom)}
+                  </span>
+                )}
+                {dateTo && (
+                  <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm">
+                    To: {formatDateOnlyGmt7(dateTo)}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Trips Table */}
       <Card>
         <CardContent className="p-0">
@@ -250,9 +550,16 @@ export default function TripManagementPage() {
             <div className="flex items-center justify-center py-12">
               <div className="text-gray-500 dark:text-gray-400">Loading trips...</div>
             </div>
-          ) : trips.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-gray-500 dark:text-gray-400">No trips found. Add one to get started!</div>
+          ) : displayTrips.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="text-gray-500 dark:text-gray-400 text-center">
+                {hasActiveFilters ? 'No trips found matching your filters.' : 'No trips found. Add one to get started!'}
+              </div>
+              {hasActiveFilters && (
+                <button onClick={handleClearFilters} className="mt-4 text-blue-600 dark:text-blue-400 hover:underline">
+                  Clear filters
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -268,14 +575,33 @@ export default function TripManagementPage() {
                     <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
                       Bus
                     </th>
-                    <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
-                      Departure
+                    <th 
+                      className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      onClick={() => handleSortChange('departureTime')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Departure
+                        {sortBy === 'departureTime' && (
+                          <span className="text-blue-600">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
                     </th>
                     <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
                       Arrival
                     </th>
                     <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
                       Price
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      onClick={() => handleSortChange('booking')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Bookings
+                        {sortBy === 'booking' && (
+                          <span className="text-blue-600">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
                     </th>
                     <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
                       Status
@@ -286,12 +612,12 @@ export default function TripManagementPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {currentTrips.map((trip) => {
+                  {displayTrips.map((trip) => {
                     const busInfo = getBusInfo(trip.busId)
                     return (
                       <tr
                         key={trip.id}
-                        className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                         onClick={() => router.push(`/admin/trips/${trip.id}`)}
                       >
                         <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">
@@ -310,6 +636,9 @@ export default function TripManagementPage() {
                         </td>
                         <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">
                           {formatCurrency(trip.basePrice)}
+                        </td>
+                        <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">
+                          {trip.seatsBooked || 0} / {trip.totalSeats || 0}
                         </td>
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(trip.status)}`}>
@@ -349,10 +678,10 @@ export default function TripManagementPage() {
           )}
 
           {/* Pagination */}
-          {!loading && trips.length > 0 && totalPages > 1 && (
+          {!loading && displayTrips.length > 0 && totalPages > 1 && (
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, trips.length)} of {trips.length} trips
+                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems} trips
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -362,18 +691,24 @@ export default function TripManagementPage() {
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => handlePageChange(page)}
-                    className={`px-4 py-2 rounded-lg transition-colors ${
-                      currentPage === page
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                    }`}
-                  >
-                    {page}
-                  </button>
+                {getPaginationRange().map((page, index) => (
+                  page === '...' ? (
+                    <span key={`ellipsis-${index}`} className="px-4 py-2 text-gray-600 dark:text-gray-400">
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => handlePageChange(page as number)}
+                      className={`px-4 py-2 rounded-lg transition-colors ${
+                        currentPage === page
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
                 ))}
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}

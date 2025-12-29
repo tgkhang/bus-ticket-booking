@@ -11,6 +11,9 @@ import { asyncHandler } from '~/helpers/asyncHandler.js'
 
 const Router = express.Router()
 
+// Public trip search (guest-friendly)
+Router.get('/search-public', tripValidation.search, tripController.searchPublic)
+
 Router.get(
   '/search',
   authMiddleware.isAuthorized,
@@ -68,6 +71,14 @@ Router.put(
   rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_TRIPS]),
   tripValidation.updateTrip,
   asyncHandler(tripController.updateTrip)
+)
+
+// Cancel a scheduled trip (admin only). This will also cancel all bookings for the trip.
+Router.post(
+  '/:id/cancel',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_TRIPS]),
+  asyncHandler(tripController.cancelTrip)
 )
 
 Router.delete(

@@ -134,7 +134,8 @@ model Stop {
   latitude  Float
   longitude Float
   address   String?
-  active    Boolean @default(true)
+  active    Boolean  @default(true)
+  searchText String? @db.Text @map("search_text")
 
   // Relations
   originRoutes      Route[]     @relation("OriginStop")
@@ -158,6 +159,7 @@ model Route {
   distanceKm        Float?  @map("distance_km")
   estimatedMinutes  Int?    @map("estimated_minutes")
   active            Boolean @default(true)
+  searchText         String? @db.Text @map("search_text")
 
   // Relationships
   operator        Operator    @relation(fields: [operatorId], references: [id], onDelete: Cascade)
@@ -280,18 +282,25 @@ model SeatStatus {
 }
 
 model Booking {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  tripId      String   @map("trip_id")
-  status      String   @default("pending") // pending, confirmed, cancelled, completed
-  totalAmount Decimal  @map("total_amount") @db.Decimal(10, 2)
-  bookedAt    DateTime @default(now()) @map("booked_at")
+  id              String   @id @default(uuid())
+  userId          String?  @map("user_id")
+  tripId          String   @map("trip_id")
+  status          String   @default("pending") // pending, confirmed, cancelled, completed
+  totalAmount     Decimal  @db.Decimal(10, 2) @map("total_amount")
+  bookedAt        DateTime @default(now()) @map("booked_at")
+
+  // Guest booking fields (userId is null)
+  guestEmail      String?  @db.Text @map("guest_email")
+  guestPhone      String?  @db.Text @map("guest_phone")
+  guestName       String?  @db.Text @map("guest_name")
+  referenceCode   String?  @unique @db.Text @map("reference_code")
+  accessTokenHash String?  @db.Text @map("access_token_hash")
 
   // Relationships
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trip             Trip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  payments         Payment[]
-  notifications    Notification[]
+  user            User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trip            Trip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  payments        Payment[]
+  notifications   Notification[]
   passengerDetails PassengerDetail[]
   feedback         Feedback?
 
