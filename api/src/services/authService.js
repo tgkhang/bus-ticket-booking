@@ -74,18 +74,23 @@ const generateOAuthTokens = async (user, familyId = 'web') => {
       staffId = staff?.id || null
     }
 
+    let operatorId = null
+    if (user.role === 'operator') {
+      const operator = await GET_DB().operator.findUnique({
+        where: { userId: user.id },
+      })
+      operatorId = operator?.id || null
+    }
+
     const userInfo = {
       id: user.id,
       email: user.email,
       role: user.role,
       ...(staffId && { staffId }),
+      ...(operatorId && { operatorId }),
     }
 
-    const accessToken = await JwtProvider.generateToken(
-      userInfo,
-      env.ACCESS_JWT_SECRET_KEY,
-      env.ACCESS_JWT_EXPIRES_IN
-    )
+    const accessToken = await JwtProvider.generateToken(userInfo, env.ACCESS_JWT_SECRET_KEY, env.ACCESS_JWT_EXPIRES_IN)
     const refreshToken = await JwtProvider.generateToken(
       userInfo,
       env.REFRESH_JWT_SECRET_KEY,
@@ -126,10 +131,7 @@ const handleOAuthLogin = async (oauthProfile, provider) => {
 
     return tokens
   } catch (error) {
-    throw new ApiError(
-      error.statusCode || StatusCodes.INTERNAL_SERVER_ERROR,
-      error.message || 'OAuth login failed'
-    )
+    throw new ApiError(error.statusCode || StatusCodes.INTERNAL_SERVER_ERROR, error.message || 'OAuth login failed')
   }
 }
 

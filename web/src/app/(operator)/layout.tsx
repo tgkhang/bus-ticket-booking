@@ -10,7 +10,6 @@ import {
   Bus,
   Route,
   Calendar,
-  Users,
   Menu,
   X,
   LogOut,
@@ -38,7 +37,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function OperatorLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isInitialized, user, logout } = useAuth()
   const { themeName, toggleTheme } = useTheme()
   const router = useRouter()
@@ -52,15 +51,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       const currentPath = pathname
       const callbackUrl = encodeURIComponent(currentPath)
       router.push(`/login?callbackUrl=${callbackUrl}`)
-    } else if (isInitialized && isAuthenticated && user?.role !== 'admin') {
-      // Only redirect non-admin users away from admin pages
+    } else if (isInitialized && isAuthenticated && user?.role !== 'operator') {
+      // Only redirect non-operator users away from operator pages
       router.push('/')
     }
   }, [isAuthenticated, isInitialized, user?.role, router, pathname])
 
   // Load sidebar state from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('adminSidebarCollapsed')
+    const saved = localStorage.getItem('operatorSidebarCollapsed')
     if (saved !== null) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSidebarCollapsed(saved === 'true')
@@ -70,20 +69,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const toggleSidebarCollapse = () => {
     const newState = !sidebarCollapsed
     setSidebarCollapsed(newState)
-    localStorage.setItem('adminSidebarCollapsed', String(newState))
+    localStorage.setItem('operatorSidebarCollapsed', String(newState))
   }
 
   const navigation = [
-    { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-    { name: 'Operators', href: '/admin/operators', icon: Users },
-    { name: 'Buses', href: '/admin/busses', icon: Bus },
-    { name: 'Stop', href: '/admin/stops', icon: Users },
-    { name: 'Routes', href: '/admin/routes', icon: Route },
-    { name: 'Trips', href: '/admin/trips', icon: Calendar },
-    { name: 'Bookings', href: '/admin/bookings', icon: Ticket },
-    { name: 'Revenue Analytics', href: '/admin/revenue', icon: BarChart },
-    { name: 'Booking Analytics', href: '/admin/booking-analytics', icon: TrendingUp },
-    { name: 'Users', href: '/admin/users', icon: Users },
+    { name: 'Dashboard', href: '/operator', icon: LayoutDashboard },
+    { name: 'Buses', href: '/operator/busses', icon: Bus },
+    { name: 'Routes', href: '/operator/routes', icon: Route },
+    { name: 'Trips', href: '/operator/trips', icon: Calendar },
+    { name: 'Bookings', href: '/operator/bookings', icon: Ticket },
+    // { name: 'Revenue Analytics', href: '/operator/revenue', icon: BarChart },
+    // { name: 'Booking Analytics', href: '/operator/booking-analytics', icon: TrendingUp },
   ]
 
   const isActive = (path: string) => pathname === path
@@ -100,7 +96,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (user?.email) {
       return user.email.substring(0, 2).toUpperCase()
     }
-    return 'AD'
+    return 'OP'
   }
 
   if (!isInitialized) {
@@ -111,7 +107,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     )
   }
 
-  if (!isAuthenticated || user?.role !== 'admin') {
+  if (!isAuthenticated || user?.role !== 'operator') {
     return null
   }
 
@@ -146,9 +142,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </button>
           </div>
           {!sidebarCollapsed && (
-            <div className="bg-purple-50 dark:bg-purple-900/20 px-3 py-2 rounded-lg">
-              <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">
-                Super Admin Dashboard
+            <div className="bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
+              <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                Operator Dashboard
               </p>
             </div>
           )}
@@ -200,7 +196,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {user?.username || 'Admin User'}
+                        {user?.username || 'Operator'}
                       </p>
                       <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{user?.email}</p>
                     </div>
@@ -208,19 +204,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align={sidebarCollapsed ? "center" : "end"} className="w-56">
+            <DropdownMenuContent align={sidebarCollapsed ? 'center' : 'end'} className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">{user?.username || 'Admin User'}</p>
+                  <p className="text-sm font-medium">{user?.username || 'Operator'}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push('/admin/profile')}>
+              <DropdownMenuItem onClick={() => router.push('/operator/profile')}>
                 <User className="mr-2 h-4 w-4" />
                 <span>Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push('/admin/settings')}>
+              <DropdownMenuItem onClick={() => router.push('/operator/settings')}>
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Settings</span>
               </DropdownMenuItem>
@@ -236,7 +232,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Collapse Button - Desktop Only - Sticks out from sidebar */}
         <button
           onClick={toggleSidebarCollapse}
-          className={`hidden lg:flex absolute ${sidebarCollapsed ? 'left-[72px]' : 'left-[248px]'} top-1/2 -translate-y-1/2 items-center justify-center w-6 h-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-r-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300 shadow-md`}
+          className={`hidden lg:flex absolute ${
+            sidebarCollapsed ? 'left-[72px]' : 'left-[248px]'
+          } top-1/2 -translate-y-1/2 items-center justify-center w-6 h-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-r-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300 shadow-md`}
           title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -258,14 +256,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </button>
 
               {/* Search Bar */}
-              <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg min-w-[300px]">
+              {/* <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg min-w-[300px]">
                 <Search className="w-5 h-5 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search..."
                   className="bg-transparent border-none outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400 w-full"
                 />
-              </div>
+              </div> */}
             </div>
 
             {/* Right Section */}
@@ -300,10 +298,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </Avatar>
                     <div className="hidden md:block text-left">
                       <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {user?.username || 'Admin User'}
+                        {user?.username || 'Operator'}
                       </p>
-                      <Badge variant="error" className="text-xs">
-                        Super Admin
+                      <Badge variant="info" className="text-xs">
+                        Operator
                       </Badge>
                     </div>
                   </Button>
@@ -311,16 +309,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">{user?.username || 'Admin User'}</p>
+                      <p className="text-sm font-medium">{user?.username || 'Operator'}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push('/admin/profile')}>
+                  <DropdownMenuItem onClick={() => router.push('/operator/profile')}>
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push('/admin/settings')}>
+                  <DropdownMenuItem onClick={() => router.push('/operator/settings')}>
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>
