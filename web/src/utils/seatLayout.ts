@@ -41,16 +41,25 @@ export const detectLayoutAndGroupSeats = <T extends SeatItem>(
       return
     }
 
-    // Match seat code pattern: Letter(s) + Number (e.g., A1, L1, R1)
-    const match = seat.code.match(/^([A-Z]+)(\d+)$/)
-    if (match) {
-      const column = match[1]
-      const row = parseInt(match[2])
+    // Match seat code patterns:
+    // - Single floor: Column + Row (e.g., A1, L1, R1)
+    // - Multi-floor: Floor + Column + Row (e.g., 1A1, 2B3)
+    const singleFloorMatch = seat.code.match(/^([A-Z]+)(\d+)$/)
+    const multiFloorMatch = seat.code.match(/^(\d+)([A-Z]+)(\d+)$/)
+
+    if (singleFloorMatch || multiFloorMatch) {
+      const floor = multiFloorMatch ? parseInt(multiFloorMatch[1]) : 1
+      const column = multiFloorMatch ? multiFloorMatch[2] : singleFloorMatch![1]
+      const row = multiFloorMatch ? parseInt(multiFloorMatch[3]) : parseInt(singleFloorMatch![2])
+
+      // Keep floors separated in the visual grid by using a composite row key.
+      // 1xx = floor 1, 2xx = floor 2, etc.
+      const rowKey = floor * 100 + row
 
       columnSet.add(column)
 
-      if (!rows[row]) rows[row] = []
-      rows[row].push(seat)
+      if (!rows[rowKey]) rows[rowKey] = []
+      rows[rowKey].push(seat)
     }
   })
 
