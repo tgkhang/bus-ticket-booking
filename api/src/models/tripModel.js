@@ -1,4 +1,5 @@
 import { GET_DB } from '~/config/prisma'
+import { busModel } from './busModel'
 
 // Build Prisma where clause from filters
 const buildWhere = (filters) => {
@@ -243,11 +244,18 @@ const getTripById = async (id) => {
 const createTrip = async (tripData) => {
   const prisma = GET_DB()
 
+  const bus = await busModel.findBusById(tripData.busId)
+
+  if (!bus) {
+    throw new Error('Bus not found')
+  }
+
   // Create trip and initialize seat statuses
   const trip = await prisma.trip.create({
     data: {
       routeId: tripData.routeId,
       busId: tripData.busId,
+      operatorId: bus.operatorId,
       departureTime: new Date(tripData.departureTime),
       arrivalTime: new Date(tripData.arrivalTime),
       basePrice: tripData.basePrice,
@@ -330,7 +338,16 @@ const updateTrip = async (id, updateData) => {
 
   const data = {}
   if (updateData.routeId !== undefined) data.routeId = updateData.routeId
-  if (updateData.busId !== undefined) data.busId = updateData.busId
+  if (updateData.busId !== undefined) {
+    data.busId = updateData.busId
+
+    const bus = busModel.findBusById(updateData.busId)
+    if (!bus) {
+      throw new Error('Bus not found')
+    }
+
+    data.operatorId = bus.operatorId
+  }
   if (updateData.departureTime !== undefined) data.departureTime = new Date(updateData.departureTime)
   if (updateData.arrivalTime !== undefined) data.arrivalTime = new Date(updateData.arrivalTime)
   if (updateData.basePrice !== undefined) data.basePrice = updateData.basePrice
@@ -395,6 +412,7 @@ const transformTripData = (trip, includeOperator = false) => {
     departureTime: trip.departureTime,
     arrivalTime: trip.arrivalTime,
     basePrice: trip.basePrice,
+    staffId: trip.staffId,
     status: trip.status,
     durationMinutes,
     availableSeats,
@@ -455,8 +473,24 @@ const buildListWhere = (filters) => {
     where.NOT = { staffId: null }
   }
 
-  if (filters.departureTime) {
-    where.departureTime = new Date(filters.departureTime)
+  // Date range filter for departure time
+  if (filters.dateFrom || filters.dateTo) {
+    where.departureTime = {}
+    if (filters.dateFrom) {
+      const fromDate = new Date(filters.dateFrom)
+      fromDate.setHours(0, 0, 0, 0)
+      where.departureTime.gte = fromDate
+    }
+    if (filters.dateTo) {
+      const toDate = new Date(filters.dateTo)
+      toDate.setHours(23, 59, 59, 999)
+      where.departureTime.lte = toDate
+    }
+  } else {
+    // Single departure time filter (exact match)
+    if (filters.departureTime) {
+      where.departureTime = new Date(filters.departureTime)
+    }
   }
 
   if (filters.arrivalTime) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Filter, X, ChevronLeft, ChevronRight, ClipboardCheck } from 'lucide-react'
 import { Trip, TripStatus } from '@/types/trip'
 import { Card, CardContent } from '@/components/ui/card'
 import { listTripsAPI } from '@/lib/api'
@@ -20,6 +20,8 @@ export default function StaffTripsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<TripStatus | ''>('')
   const [assignedToMe, setAssignedToMe] = useState(false)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
   // Pagination state
@@ -38,9 +40,12 @@ export default function StaffTripsPage() {
       if (searchQuery) filters.search = searchQuery
       if (statusFilter) filters.status = statusFilter
       if (assignedToMe && user.staffId) filters.staffId = user.staffId
+      if (dateFrom) filters.dateFrom = dateFrom
+      if (dateTo) filters.dateTo = dateTo
 
       const response = await listTripsAPI(filters, { page: 1, limit: 100 })
       setTrips(response.data)
+      console.log('response data', response.data)
       setCurrentPage(1) // Reset to first page when filters change
     } catch (error) {
       toast.error('Failed to fetch trips')
@@ -48,7 +53,7 @@ export default function StaffTripsPage() {
     } finally {
       setLoading(false)
     }
-  }, [user?.operatorId, user?.staffId, searchQuery, statusFilter, assignedToMe])
+  }, [user?.operatorId, user?.staffId, searchQuery, statusFilter, assignedToMe, dateFrom, dateTo])
 
   useEffect(() => {
     if (user?.operatorId) {
@@ -60,6 +65,8 @@ export default function StaffTripsPage() {
     setSearchQuery('')
     setStatusFilter('')
     setAssignedToMe(false)
+    setDateFrom('')
+    setDateTo('')
   }
 
   const getStatusColor = (status: TripStatus) => {
@@ -106,7 +113,7 @@ export default function StaffTripsPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const hasActiveFilters = searchQuery || statusFilter || assignedToMe
+  const hasActiveFilters = searchQuery || statusFilter || assignedToMe || dateFrom || dateTo
 
   return (
     <div>
@@ -146,7 +153,7 @@ export default function StaffTripsPage() {
               <span>Filters</span>
               {hasActiveFilters && (
                 <span className="ml-1 px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full">
-                  {[searchQuery, statusFilter, assignedToMe].filter(Boolean).length}
+                  {[searchQuery, statusFilter, assignedToMe, dateFrom, dateTo].filter(Boolean).length}
                 </span>
               )}
             </button>
@@ -166,7 +173,7 @@ export default function StaffTripsPage() {
           {/* Expandable Filters */}
           {showFilters && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Status Filter */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
@@ -181,6 +188,29 @@ export default function StaffTripsPage() {
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
+                </div>
+
+                {/* Date From Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">From Date</label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                {/* Date To Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">To Date</label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    min={dateFrom}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
                 </div>
 
                 {/* Assigned to Me Filter */}
@@ -238,43 +268,77 @@ export default function StaffTripsPage() {
                     </th>
                     <th className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Price</th>
                     <th className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Status</th>
+                    <th className="px-6 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {currentTrips.map((trip) => (
-                    <tr
-                      key={trip.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
-                      onClick={() => router.push(`/staff/trips/${trip.id}`)}
-                    >
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                        <span className="font-mono">{trip.id.substring(0, 8)}...</span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                        {trip.routeName || trip.routeId}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 dark:text-gray-100">{trip.busModel || 'Unknown'}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {trip.busPlateNumber || trip.busId}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                        {formatDateTime(trip.departureTime)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                        {formatDateTime(trip.arrivalTime)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                        {formatCurrency(trip.basePrice)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(trip.status)}`}>
-                          {trip.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {currentTrips.map((trip) => {
+                    const isAssignedToMe = trip.staffId === user?.staffId
+                    return (
+                      <tr
+                        key={trip.id}
+                        className={`transition-colors ${
+                          isAssignedToMe
+                            ? 'bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/40'
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          router.push(`/staff/trips/${trip.id}`)
+                        }}
+                      >
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono">{trip.id.substring(0, 8)}...</span>
+                            {isAssignedToMe && (
+                              <span className="px-2 py-0.5 bg-blue-600 text-white text-xs rounded-full font-medium">
+                                Assigned to you
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                          {trip.routeName || trip.routeId}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900 dark:text-gray-100">{trip.busModel || 'Unknown'}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {trip.busPlateNumber || trip.busId}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                          {formatDateTime(trip.departureTime)}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                          {formatDateTime(trip.arrivalTime)}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                          {formatCurrency(trip.basePrice)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(trip.status)}`}>
+                            {trip.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {isAssignedToMe && trip.status !== 'completed' && trip.status !== 'cancelled' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                router.push(`/staff/checkout/${trip.id}`)
+                              }}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors"
+                            >
+                              <ClipboardCheck className="w-4 h-4" />
+                              Checkout
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

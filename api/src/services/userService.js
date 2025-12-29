@@ -160,6 +160,11 @@ const login = async (reqBody, req) => {
       operatorName = staff?.operator?.name || null
     }
 
+    // Get operator info if user is operator
+    if (existingUser.role === 'operator' && existingUser.operatorId) {
+      operatorId = existingUser.operatorId
+    }
+
     // Create tokens
     const userInfo = {
       id: existingUser.id,
@@ -250,6 +255,15 @@ const refreshToken = async (clientRefreshToken, req) => {
       staffId = staff?.id || null
       operatorId = staff?.operatorId || null
       operatorName = staff?.operator?.name || null
+    }
+
+    // Get operator info if user is operator
+    if (refreshTokenDecoded.role === 'operator' && !operatorId) {
+      const user = await GET_DB().user.findUnique({
+        where: { id: refreshTokenDecoded.id },
+        select: { operatorId: true },
+      })
+      operatorId = user?.operatorId || null
     }
 
     // Generate new tokens
@@ -462,6 +476,11 @@ const getMe = async (userId) => {
       }
     }
 
+    // If user is operator, include operator information
+    if (user.role === 'operator' && user.operatorId) {
+      userData.operatorId = user.operatorId
+    }
+
     return userData
   } catch (error) {
     throw error
@@ -523,6 +542,11 @@ const oauthGoogleLogin = async (reqBody, req) => {
       staffId = staff?.id || null
       operatorId = staff?.operatorId || null
       operatorName = staff?.operator?.name || null
+    }
+
+    // Get operator info if user is operator
+    if (user.role === 'operator' && user.operatorId) {
+      operatorId = user.operatorId
     }
 
     // Create tokens (same as regular login)
