@@ -14,6 +14,7 @@ import { authRoute } from './authRoute'
 import revenueRoute from './revenueRoute'
 import bookingAnalyticsRoute from './bookingAnalyticsRoute'
 import { staffRoute } from './staffRoute'
+import chatRoute from './chatRoute.js'
 
 const Router = express.Router()
 
@@ -58,6 +59,9 @@ Router.use('/revenue', revenueRoute)
 Router.use('/analytics', bookingAnalyticsRoute)
 
 Router.use('/seats', seatRoute)
+
+// Chatbot route
+Router.use('/chat', chatRoute)
 
 // Staff routes
 Router.use('/staff', staffRoute)
