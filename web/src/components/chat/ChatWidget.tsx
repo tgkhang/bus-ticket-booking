@@ -1,14 +1,18 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import ChatButton from './ChatButton'
 import { Send, Loader2, X, MapPin, Clock, DollarSign } from 'lucide-react'
 import { useChatSocket } from '@/hooks/useChatSocket'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false)
   const [inputMessage, setInputMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const router = useRouter()
   
   const quickReplies = [
     'Search trips',
@@ -106,13 +110,28 @@ export default function ChatWidget() {
                       ${msg.sender === 'User' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-tl-none'}
                     `}
                   >
-                    <p className={msg.sender === 'User' ? 'font-medium' : 'whitespace-pre-wrap'}>{msg.text}</p>
+                    {msg.sender === 'User' ? (
+                      <p className="font-medium">{msg.text}</p>
+                    ) : (
+                      <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-strong:text-blue-600 dark:prose-strong:text-blue-400">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {msg.text}
+                        </ReactMarkdown>
+                      </div>
+                    )}
                     
                     {/* Show trip results if available */}
                     {msg.data?.trips && msg.data.trips.length > 0 && (
                       <div className="mt-3 space-y-2">
                         {msg.data.trips.map((trip: any, tripIdx: number) => (
-                          <div key={tripIdx} className="p-3 bg-blue-50 dark:bg-gray-700 rounded-lg border border-blue-200 dark:border-gray-600">
+                          <div 
+                            key={tripIdx} 
+                            onClick={() => {
+                              router.push(`/trips/${trip.id}`)
+                              setOpen(false) // Close chat after navigation
+                            }}
+                            className="p-3 bg-blue-50 dark:bg-gray-700 rounded-lg border border-blue-200 dark:border-gray-600 cursor-pointer hover:bg-blue-100 dark:hover:bg-gray-600 transition-colors"
+                          >
                             <div className="flex items-center gap-2 mb-2">
                               <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                               <span className="font-semibold text-xs text-gray-800 dark:text-gray-200">{trip.route}</span>
