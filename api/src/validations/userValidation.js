@@ -105,6 +105,7 @@ const createByAdmin = async (req, _res, next) => {
     displayName: Joi.string().trim().optional(),
     role: Joi.string().valid('client', 'operator', 'admin').optional(),
     isActive: Joi.boolean().optional(),
+    operatorId: Joi.string().trim().optional(),
   })
 
   try {
@@ -125,6 +126,7 @@ const updateByAdmin = async (req, _res, next) => {
     role: Joi.string().valid('client', 'operator', 'admin').optional(),
     active: Joi.boolean().optional(),
     isActive: Joi.boolean().optional(),
+    operatorId: Joi.string().trim().optional(),
   })
 
   try {

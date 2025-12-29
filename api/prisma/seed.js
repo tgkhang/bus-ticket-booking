@@ -292,6 +292,17 @@ async function main() {
   }
   console.log(`🏢 Created ${operators.length} operators`)
 
+  // Link operator users to their operator records
+  await prisma.user.update({
+    where: { id: operatorUser1.id },
+    data: { operatorId: operators[0].id },
+  })
+  await prisma.user.update({
+    where: { id: operatorUser2.id },
+    data: { operatorId: operators[1].id },
+  })
+  console.log('🔗 Linked operator users to their operators')
+
   // Create staff users and staff records
   const staffUsers = []
   const staffConfigs = [
