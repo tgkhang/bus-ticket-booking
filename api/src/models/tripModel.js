@@ -532,6 +532,9 @@ const searchTripsByCityNames = async (originCity, destinationCity, date = null, 
     const dayEnd = new Date(localDate)
     dayEnd.setHours(23, 59, 59, 999)
     where.departureTime = { gte: dayStart, lte: dayEnd }
+  } else {
+    // If no specific date, only get future trips
+    where.departureTime = { gte: new Date() }
   }
 
   // Add price filter if provided

@@ -2,6 +2,8 @@ import { geminiService } from './geminiService.js';
 import { tripModel } from '~/models/tripModel';
 import { bookingModel } from '~/models/bookingModel';
 import { stopModel } from '~/models/stopModel';
+import { routeModel } from '~/models/routeModel';
+import { operatorModel } from '~/models/operatorModel';
 import ApiError from '~/utils/ApiError';
 import { StatusCodes } from 'http-status-codes';
 
@@ -39,12 +41,12 @@ const detectIntent = (message) => {
     return 'booking_status';
   }
 
-  // Trip search
-  if (/search|find|trip|tìm.*chuyến|xe.*đi|chuyến.*xe|từ.*đến|muốn.*đi/i.test(message)) {
+  // Trip search - match many patterns (including "đặt chuyến", "muốn đặt")
+  if (/search|find|trip|tìm.*chuyến|xe.*đi|chuyến.*xe|từ.*đến|muốn.*đi|muốn.*đến|đi.*đâu|tìm.*xe|xe.*buýt|đặt.*chuyến|muốn.*đặt.*chuyến/i.test(message)) {
     return 'trip_search';
   }
 
-  // Booking assistance
+  // Booking assistance (only for booking existing trip)
   if (/book|đặt.*vé|mua.*vé|reserve/i.test(message)) {
     return 'booking_assistance';
   }
@@ -59,13 +61,61 @@ const detectIntent = (message) => {
     return 'support';
   }
 
-  // Routes/popular destinations
-  if (/route|popular|tuyến.*đường|tuyến.*phổ.*biến/i.test(message)) {
+  // Routes/destinations - CHECK THIS FIRST before popular
+  if (/route|destination|tuyến.*đường|tuyến.*nào|tuyến.*phổ.*biến|tuyến.*xe|đi.*được.*đâu|các.*tuyến/i.test(message)) {
     return 'routes';
+  }
+
+  // Popular operators/buses (NOT routes)
+  if (/top.*operator|nhà.*xe.*phổ.*biến|nhà.*xe.*tốt|rating.*cao|đánh.*giá.*cao|xe.*nào.*tốt|nhà.*xe.*nào/i.test(message)) {
+    return 'popular';
   }
 
   // General question - use AI
   return 'general';
+};
+
+/**
+ * Simple regex-based extraction (fallback when AI quota exceeded)
+ */
+const extractParamsWithRegex = (message) => {
+  // Match patterns like "từ X đến Y", "đi X", "BX 06", etc.
+  const fromToMatch = message.match(/từ\s+([^đến]+?)\s+đến\s+(.+)/i);
+  if (fromToMatch) {
+    return {
+      origin: fromToMatch[1].trim(),
+      destination: fromToMatch[2].trim(),
+      date: null,
+      time: null,
+      passengers: null,
+      busType: null,
+      maxPrice: null
+    };
+  }
+
+  // Match "đi [location]" or "đến [location]" or just a stop code
+  const destMatch = message.match(/(?:đi|đến|đặt.*chuyến)\s+([A-Z0-9\s\[\]]+)/i);
+  if (destMatch) {
+    return {
+      origin: null,
+      destination: destMatch[1].trim(),
+      date: null,
+      time: null,
+      passengers: null,
+      busType: null,
+      maxPrice: null
+    };
+  }
+
+  return {
+    origin: null,
+    destination: null,
+    date: null,
+    time: null,
+    passengers: null,
+    busType: null,
+    maxPrice: null
+  };
 };
 
 /**
@@ -78,24 +128,43 @@ const handleTripSearch = async (message, context = {}) => {
   try {
     const lang = detectLanguage(message);
     
-    // Use AI to extract trip search parameters
-    const extractedParams = await geminiService.extractTripSearchIntent(message, lang);
+    let extractedParams;
+    try {
+      // Try AI extraction first
+      extractedParams = await geminiService.extractTripSearchIntent(message, lang);
+      console.log('AI Extraction result:', JSON.stringify(extractedParams, null, 2));
+    } catch (error) {
+      // Fallback to regex if AI fails (quota exceeded, etc.)
+      console.log('AI extraction failed, using regex fallback:', error.message);
+      extractedParams = extractParamsWithRegex(message);
+      console.log('Regex Extraction result:', JSON.stringify(extractedParams, null, 2));
+    }
     
     let trips = [];
     let responseText = '';
 
     // If we have origin and/or destination, search trips
     if (extractedParams.origin || extractedParams.destination) {
+      console.log(`Searching trips: origin=${extractedParams.origin}, dest=${extractedParams.destination}, date=${extractedParams.date || 'ANY FUTURE'}`);
+      
+      // Smart date handling:
+      // - If user specified date: search that specific date
+      // - If no date: pass null to search all future dates
+      const searchDate = extractedParams.date || null;
+      
       trips = await tripModel.searchTripsByCityNames(
         extractedParams.origin,
         extractedParams.destination,
-        extractedParams.date,
+        searchDate,
         {
           maxPrice: extractedParams.maxPrice,
           busType: extractedParams.busType,
-          limit: 5
+          limit: 10 
         }
       );
+      
+      // database query filters future trips
+      console.log(`Found ${trips.length} future trips from database`);
 
       if (trips.length > 0) {
         // Format trip results based on language
@@ -116,29 +185,45 @@ const handleTripSearch = async (message, context = {}) => {
           }
         }).join('\n\n');
 
-        responseText = lang === 'vi' 
-          ? `Tôi tìm thấy ${trips.length} chuyến xe phù hợp:\n\n${tripList}\n\nBạn muốn đặt vé chuyến nào? Hoặc cần tìm kiếm thêm không?`
-          : `I found ${trips.length} available trips:\n\n${tripList}\n\nWhich trip would you like to book? Or would you like to search more?`;
+        let header = '';
+        if (extractedParams.origin && extractedParams.destination) {
+          header = lang === 'vi' 
+            ? `Tôi tìm thấy ${trips.length} chuyến xe từ ${extractedParams.origin} đến ${extractedParams.destination}:`
+            : `I found ${trips.length} trips from ${extractedParams.origin} to ${extractedParams.destination}:`;
+        } else if (extractedParams.destination) {
+          header = lang === 'vi' 
+            ? `Tôi tìm thấy ${trips.length} chuyến xe đến ${extractedParams.destination}:`
+            : `I found ${trips.length} trips to ${extractedParams.destination}:`;
+        } else if (extractedParams.origin) {
+          header = lang === 'vi' 
+            ? `Tôi tìm thấy ${trips.length} chuyến xe từ ${extractedParams.origin}:`
+            : `I found ${trips.length} trips from ${extractedParams.origin}:`;
+        }
+
+        responseText = `${header}\n\n${tripList}\n\n${lang === 'vi' ? 'Bạn muốn đặt vé chuyến nào?' : 'Which trip would you like to book?'}`;
+        console.log('Response text generated from database trips (first 200 chars):', responseText.substring(0, 200));
       } else {
+        // No trips found - provide smart suggestions with specific details
+        const searchInfo = extractedParams.date 
+          ? `vào ${new Date(extractedParams.date).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US')}`
+          : 'trong tương lai';
+        
         responseText = lang === 'vi'
-          ? `Xin lỗi, tôi không tìm thấy chuyến xe nào phù hợp với yêu cầu của bạn.\n\nBạn có thể thử:\n- Thay đổi ngày đi\n- Kiểm tra lại tên thành phố\n- Bỏ bớt điều kiện lọc`
-          : `Sorry, I couldn't find any trips matching your request.\n\nYou could try:\n- Changing the travel date\n- Checking the city names\n- Removing some filters`;
+          ? `Hiện không có chuyến xe ${extractedParams.origin ? 'từ ' + extractedParams.origin : ''} ${extractedParams.destination ? 'đến ' + extractedParams.destination : ''} ${searchInfo}.\n\nBạn có thể:\n- Chọn ngày khác\n- Thử điểm xuất phát/đến gần đó\n- Xem các tuyến phổ biến`
+          : `No trips found ${extractedParams.origin ? 'from ' + extractedParams.origin : ''} ${extractedParams.destination ? 'to ' + extractedParams.destination : ''} ${extractedParams.date ? 'on ' + new Date(extractedParams.date).toLocaleDateString('en-US') : 'in the future'}.\n\nYou can:\n- Try a different date\n- Search nearby locations\n- View popular routes`;
       }
     } else {
-      // Not enough info - ask AI to help
-      const aiResponse = await geminiService.generateResponse(message, {
-        systemPrompt: lang === 'vi'
-          ? `Bạn là trợ lý đặt vé xe. Người dùng muốn tìm chuyến xe nhưng chưa cung cấp đủ thông tin. Hỏi họ: thành phố xuất phát, thành phố đến, và ngày đi. Hãy thân thiện và lịch sự.`
-          : `You are a bus booking assistant. The user wants to search for trips but hasn't provided complete information. Ask them for: origin city, destination city, and travel date. Be friendly and helpful.`
-      });
-      responseText = aiResponse;
+      // No location info - ask for it directly
+      responseText = lang === 'vi'
+        ? 'Bạn muốn tìm chuyến xe đi đâu? Vui lòng cho biết điểm đến hoặc cả điểm đi và điểm đến.'
+        : 'Where would you like to go? Please provide your destination or both origin and destination.';
     }
 
     return {
       intent: 'trip_search',
       reply: responseText,
       data: {
-        trips: trips.slice(0, 3).map(t => ({
+        trips: trips.map(t => ({
           id: t.id,
           route: `${t.route.originStop.name} - ${t.route.destinationStop.name}`,
           departureTime: t.departureTime,
@@ -305,14 +390,29 @@ Be friendly and clear. Respond in Vietnamese. Keep responses concise.`
 const handleGeneralQuery = async (message, context = {}) => {
   try {
     const lang = detectLanguage(message);
-    const aiResponse = await geminiService.generateResponse(message, {
-      ...context,
-      systemPrompt: context.systemPrompt || geminiService.getDefaultSystemPrompt(lang)
-    });
+    
+    // DO NOT use AI for responses - only provide menu options
+    const reply = lang === 'vi'
+      ? `Xin chào! Tôi có thể giúp bạn:
+
+🔍 Tìm chuyến xe
+📋 Kiểm tra vé đã đặt
+💰 Chính sách hoàn tiền
+📞 Liên hệ hỗ trợ
+
+Bạn cần giúp gì?`
+      : `Hello! I can help you with:
+
+🔍 Search trips
+📋 Check bookings
+💰 Refund policy
+📞 Contact support
+
+What do you need?`;
 
     return {
       intent: 'general',
-      reply: aiResponse,
+      reply: reply,
       data: null
     };
   } catch (error) {
@@ -339,6 +439,7 @@ const handleGeneralQuery = async (message, context = {}) => {
 const processMessage = async (message, userId = null, context = {}) => {
   try {
     const intent = detectIntent(message);
+    console.log(`Message: "${message}" → Intent: ${intent}`);
 
     switch (intent) {
       case 'trip_search':
@@ -374,11 +475,72 @@ const processMessage = async (message, userId = null, context = {}) => {
 
       case 'routes': {
         const lang = detectLanguage(message);
+        try {
+          const popularRoutes = await routeModel.getPopularRoutes(5);
+          
+          if (popularRoutes && popularRoutes.length > 0) {
+            const routeList = popularRoutes.map((route, idx) => {
+              const origin = route.from || 'N/A';
+              const dest = route.to || 'N/A';
+              const bookings = route.bookings || 0;
+              return lang === 'vi'
+                ? `${idx + 1}. ${origin} \u2192 ${dest} (${bookings} l\u01b0\u1ee3t \u0111\u1eb7t)`
+                : `${idx + 1}. ${origin} \u2192 ${dest} (${bookings} bookings)`;
+            }).join('\n');
+            
+            return {
+              intent: 'routes',
+              reply: lang === 'vi'
+                ? `🚌 Tuyến phổ biến\n\n${routeList}\n\nBạn muốn tìm chuyến nào?`
+                : `🚌 Popular Routes\n\n${routeList}\n\nWhich route would you like?`,
+              data: { routes: popularRoutes }
+            };
+          }
+        } catch (error) {
+          console.error('Error fetching popular routes:', error);
+        }
+        
+        // Fallback - encourage search
         return {
           intent: 'routes',
           reply: lang === 'vi'
-            ? '🚌 Tuyến phổ biến\n\n1. TP.HCM → Đà Nẵng\n2. TP.HCM → Nha Trang\n3. TP.HCM → Đà Lạt\n4. Hà Nội → Hải Phòng\n5. Hà Nội → Sapa\n\nBạn muốn tìm tuyến nào?'
-            : '🚌 Popular Routes\n\n1. Ho Chi Minh City → Da Nang\n2. Ho Chi Minh City → Nha Trang\n3. Ho Chi Minh City → Da Lat\n4. Hanoi → Hai Phong\n5. Hanoi → Sapa\n\nWhich route would you like?',
+            ? '🚌 Tuyến xe có sẵn\n\nHiện tại chúng tôi có nhiều tuyến xe nội thành TP.HCM.\n\nBạn muốn đi đâu? Hãy nói với tôi điểm đến!'
+            : '🚌 Available Routes\n\nWe have many routes within Ho Chi Minh City.\n\nWhere would you like to go? Tell me your destination!',
+          data: null
+        };
+      }
+
+      case 'popular': {
+        const lang = detectLanguage(message);
+        try {
+          const topOperators = await operatorModel.getTopRatedOperators(5);
+          
+          if (topOperators && topOperators.length > 0) {
+            const operatorList = topOperators.map((op, idx) => {
+              const rating = op.rating ? `⭐ ${op.rating.toFixed(1)}` : 'Chưa có đánh giá';
+              return lang === 'vi'
+                ? `${idx + 1}. ${op.name}\n   ${rating} • ${op.totalTrips || 0} chuyến\n   📞 ${op.phone || 'N/A'}`
+                : `${idx + 1}. ${op.name}\n   ${rating} • ${op.totalTrips || 0} trips\n   📞 ${op.phone || 'N/A'}`;
+            }).join('\n\n');
+            
+            return {
+              intent: 'popular',
+              reply: lang === 'vi'
+                ? `⭐ Nhà xe được đánh giá cao\n\n${operatorList}\n\nBạn muốn đặt vé nhà xe nào?`
+                : `⭐ Top Rated Operators\n\n${operatorList}\n\nWhich operator would you like to book?`,
+              data: { operators: topOperators }
+            };
+          }
+        } catch (error) {
+          console.error('Error fetching top operators:', error);
+        }
+        
+        // Fallback
+        return {
+          intent: 'popular',
+          reply: lang === 'vi'
+            ? '⭐ Thông tin về nhà xe phổ biến đang được cập nhật. Bạn có thể tìm chuyến xe theo tuyến đường hoặc liên hệ hotline để được tư vấn!'
+            : '⭐ Popular operator information is being updated. You can search for trips by route or contact our hotline for assistance!',
           data: null
         };
       }
