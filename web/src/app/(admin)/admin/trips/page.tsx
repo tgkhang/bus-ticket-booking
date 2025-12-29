@@ -20,6 +20,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { listTripsAPI, deleteTripAPI, createTripAPI, listRoutesAPI, listBusesAPI, listOperatorsAPI } from '@/lib/api'
 import { toast } from 'sonner'
 import { ITEMS_PER_PAGE } from '@/utils/constants'
+import { datetimeLocalGmt7ToIso, formatDateOnlyGmt7, formatDateTimeGmt7 } from '@/lib/utils/datetime'
 import type { Route } from '@/types/routeAndStop'
 import type { Bus } from '@/types/api'
 import type { Operator } from '@/types/operator'
@@ -119,6 +120,8 @@ export default function TripManagementPage() {
       if (statusFilter) filters.status = statusFilter
       if (dateFrom) filters.dateFrom = dateFrom
       if (dateTo) filters.dateTo = dateTo
+      if (sortBy) filters.sortBy = sortBy
+      if (sortOrder) filters.sortOrder = sortOrder
 
       const response = await listTripsAPI(filters, { 
         page: currentPage, 
@@ -134,7 +137,7 @@ export default function TripManagementPage() {
     } finally {
       setLoading(false)
     }
-  }, [searchQuery, routeFilter, statusFilter, dateFrom, dateTo, currentPage])
+  }, [searchQuery, routeFilter, statusFilter, dateFrom, dateTo, sortBy, sortOrder, currentPage])
 
   // Fetch trips and reference data on component mount and when filters change
   useEffect(() => {
@@ -250,8 +253,8 @@ export default function TripManagementPage() {
       const createData: CreateTripData = {
         routeId: data.routeId,
         busId: data.busId,
-        departureTime: data.departureTime,
-        arrivalTime: data.arrivalTime,
+        departureTime: datetimeLocalGmt7ToIso(data.departureTime),
+        arrivalTime: datetimeLocalGmt7ToIso(data.arrivalTime),
         basePrice: data.basePrice,
         status: data.status,
       }
@@ -309,14 +312,7 @@ export default function TripManagementPage() {
   }
 
   const formatDateTime = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    return formatDateTimeGmt7(dateStr)
   }
 
   const formatCurrency = (amount: number) => {
@@ -338,21 +334,8 @@ export default function TripManagementPage() {
     return bus ? { model: bus.model, plateNumber: bus.plateNumber } : { model: 'Unknown', plateNumber: busId }
   }
 
-  // Sort trips based on sortBy and sortOrder
-  const sortedTrips = [...trips].sort((a, b) => {
-    let comparison = 0
-    
-    if (sortBy === 'departureTime') {
-      comparison = new Date(a.departureTime).getTime() - new Date(b.departureTime).getTime()
-    } else if (sortBy === 'booking') {
-      // Sort by number of bookings (seatsBooked field)
-      const aBookings = a.seatsBooked || 0
-      const bBookings = b.seatsBooked || 0
-      comparison = aBookings - bBookings
-    }
-    
-    return sortOrder === 'asc' ? comparison : -comparison
-  })
+  // Trips are sorted server-side based on sortBy/sortOrder.
+  const displayTrips = trips
 
   // Pagination calculations
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE))
@@ -546,12 +529,12 @@ export default function TripManagementPage() {
                 )}
                 {dateFrom && (
                   <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm">
-                    From: {new Date(dateFrom).toLocaleDateString()}
+                    From: {formatDateOnlyGmt7(dateFrom)}
                   </span>
                 )}
                 {dateTo && (
                   <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm">
-                    To: {new Date(dateTo).toLocaleDateString()}
+                    To: {formatDateOnlyGmt7(dateTo)}
                   </span>
                 )}
               </div>
@@ -567,7 +550,7 @@ export default function TripManagementPage() {
             <div className="flex items-center justify-center py-12">
               <div className="text-gray-500 dark:text-gray-400">Loading trips...</div>
             </div>
-          ) : sortedTrips.length === 0 ? (
+          ) : displayTrips.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="text-gray-500 dark:text-gray-400 text-center">
                 {hasActiveFilters ? 'No trips found matching your filters.' : 'No trips found. Add one to get started!'}
@@ -629,7 +612,7 @@ export default function TripManagementPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {sortedTrips.map((trip) => {
+                  {displayTrips.map((trip) => {
                     const busInfo = getBusInfo(trip.busId)
                     return (
                       <tr
@@ -695,7 +678,7 @@ export default function TripManagementPage() {
           )}
 
           {/* Pagination */}
-          {!loading && sortedTrips.length > 0 && totalPages > 1 && (
+          {!loading && displayTrips.length > 0 && totalPages > 1 && (
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalItems)} of {totalItems} trips

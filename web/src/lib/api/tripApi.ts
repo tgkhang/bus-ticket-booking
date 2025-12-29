@@ -38,3 +38,9 @@ export const deleteTripAPI = async (tripId: string) => {
   toast.success('Trip deleted successfully')
   return response.data
 }
+
+export const cancelTripAPI = async (tripId: string) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/trips/${tripId}/cancel`)
+  toast.success('Trip cancelled successfully')
+  return response.data
+}

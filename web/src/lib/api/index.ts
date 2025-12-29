@@ -311,7 +311,7 @@ export const getPopularRoutesAPI = async (limit: number = 4): Promise<PopularRou
 //=================================
 
 // Re-export trip APIs from tripApi.ts
-export { listTripsAPI, getTripDetailsAPI, createTripAPI, updateTripAPI, deleteTripAPI } from './tripApi'
+export { listTripsAPI, getTripDetailsAPI, createTripAPI, updateTripAPI, deleteTripAPI, cancelTripAPI } from './tripApi'
 
 export const searchTripsAPI = async (params: {
   originStopId?: string

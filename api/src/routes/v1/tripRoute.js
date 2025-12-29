@@ -70,6 +70,14 @@ Router.put(
   asyncHandler(tripController.updateTrip)
 )
 
+// Cancel a scheduled trip (admin only). This will also cancel all bookings for the trip.
+Router.post(
+  '/:id/cancel',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_TRIPS]),
+  asyncHandler(tripController.cancelTrip)
+)
+
 Router.delete(
   '/:id',
   authMiddleware.isAuthorized,

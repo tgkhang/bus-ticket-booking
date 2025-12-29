@@ -45,6 +45,8 @@ const listTrips = async (req, res, next) => {
     staffId: req.query.staffId,
     dateFrom: req.query.dateFrom,
     dateTo: req.query.dateTo,
+    sortBy: req.query.sortBy,
+    sortOrder: req.query.sortOrder,
   }
 
   let { page, limit } = req.query
@@ -73,6 +75,16 @@ const deleteTrip = async (req, res, next) => {
   res.status(StatusCodes.OK).json(result)
 }
 
+const cancelTrip = async (req, res, next) => {
+  try {
+    const { id } = req.params
+    const result = await tripService.cancelScheduledTrip(id)
+    res.status(StatusCodes.OK).json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const tripController = {
   createTrip,
   search,
@@ -80,4 +92,5 @@ export const tripController = {
   updateTrip,
   deleteTrip,
   listTrips,
+  cancelTrip,
 }

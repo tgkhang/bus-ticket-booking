@@ -24,10 +24,22 @@ import {
 import { TripDetail, TripStatus } from '@/types/trip'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { getTripDetailsAPI, updateTripAPI, getStaffByOperatorAPI } from '@/lib/api'
+import { Button } from '@/components/ui/button'
+import { getTripDetailsAPI, updateTripAPI, getStaffByOperatorAPI, cancelTripAPI } from '@/lib/api'
 import { toast } from 'sonner'
+import { datetimeLocalGmt7ToIso, isoToDatetimeLocalGmt7 } from '@/lib/utils/datetime'
 import { amenityOptions } from '@/utils/constants'
 import Image from 'next/image'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   organizeSeatsByFloor,
   organizeSeatsByRows,
@@ -67,6 +79,8 @@ export default function TripDetailPage() {
   const [loadingStaff, setLoadingStaff] = useState(false)
   const [savingStaff, setSavingStaff] = useState(false)
   const [savingTrip, setSavingTrip] = useState(false)
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [cancellingTrip, setCancellingTrip] = useState(false)
 
   // Image slider state
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -124,8 +138,8 @@ export default function TripDetailPage() {
         setSelectedStaffId(response.staffId || null)
         setOriginalStaffId(response.staffId || null)
         reset({
-          departureTime: response.departureTime.slice(0, 16), // Format for datetime-local
-          arrivalTime: response.arrivalTime.slice(0, 16),
+          departureTime: isoToDatetimeLocalGmt7(response.departureTime),
+          arrivalTime: isoToDatetimeLocalGmt7(response.arrivalTime),
           basePrice: response.basePrice,
           status: response.status,
         })
@@ -153,6 +167,31 @@ export default function TripDetailPage() {
     fetchTripDetails()
   }, [tripId, reset])
 
+  const refreshTrip = async (id: string) => {
+    const refreshedTrip = await getTripDetailsAPI(id)
+
+    // Keep the bus images parsing consistent
+    if (refreshedTrip.bus && refreshedTrip.bus.images && typeof refreshedTrip.bus.images === 'string') {
+      try {
+        refreshedTrip.bus.images = JSON.parse(refreshedTrip.bus.images)
+      } catch {
+        refreshedTrip.bus.images = []
+      }
+    }
+
+    setTrip(refreshedTrip)
+    setSelectedStaffId(refreshedTrip.staffId || null)
+    setOriginalStaffId(refreshedTrip.staffId || null)
+    reset({
+      departureTime: isoToDatetimeLocalGmt7(refreshedTrip.departureTime),
+      arrivalTime: isoToDatetimeLocalGmt7(refreshedTrip.arrivalTime),
+      basePrice: refreshedTrip.basePrice,
+      status: refreshedTrip.status,
+    })
+
+    return refreshedTrip
+  }
+
   const onSubmit: SubmitHandler<TripFormInputs> = async (data) => {
     if (!trip) return
 
@@ -165,8 +204,8 @@ export default function TripDetailPage() {
     try {
       setSavingTrip(true)
       await updateTripAPI(trip.id, {
-        departureTime: data.departureTime,
-        arrivalTime: data.arrivalTime,
+        departureTime: datetimeLocalGmt7ToIso(data.departureTime),
+        arrivalTime: datetimeLocalGmt7ToIso(data.arrivalTime),
         basePrice: data.basePrice,
         status: data.status,
       })
@@ -175,8 +214,8 @@ export default function TripDetailPage() {
       const refreshedTrip = await getTripDetailsAPI(trip.id)
       setTrip(refreshedTrip)
       reset({
-        departureTime: refreshedTrip.departureTime.slice(0, 16),
-        arrivalTime: refreshedTrip.arrivalTime.slice(0, 16),
+        departureTime: isoToDatetimeLocalGmt7(refreshedTrip.departureTime),
+        arrivalTime: isoToDatetimeLocalGmt7(refreshedTrip.arrivalTime),
         basePrice: refreshedTrip.basePrice,
         status: refreshedTrip.status,
       })
@@ -208,6 +247,22 @@ export default function TripDetailPage() {
       toast.error('Failed to update staff assignment')
     } finally {
       setSavingStaff(false)
+    }
+  }
+
+  const handleConfirmCancelTrip = async () => {
+    if (!trip) return
+
+    try {
+      setCancellingTrip(true)
+      await cancelTripAPI(trip.id)
+      toast.success('Trip cancelled. All bookings were cancelled.')
+      await refreshTrip(trip.id)
+      setCancelDialogOpen(false)
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to cancel trip')
+    } finally {
+      setCancellingTrip(false)
     }
   }
 
@@ -309,11 +364,43 @@ export default function TripDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {trip.status === 'scheduled' && (
+            <Button
+              type="button"
+              variant="outline"
+              className="border-red-300 text-red-700 hover:bg-red-50"
+              onClick={() => setCancelDialogOpen(true)}
+              disabled={cancellingTrip}
+            >
+              Cancel trip
+            </Button>
+          )}
           <span className={`px-4 py-2 rounded-full text-white ${getStatusColor(trip.status)}`}>
             {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
           </span>
         </div>
       </div>
+
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this trip?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will cancel the trip and cancel all bookings for it. Seats will be released. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancellingTrip}>Keep trip</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmCancelTrip}
+              disabled={cancellingTrip}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {cancellingTrip ? 'Cancelling...' : 'Cancel trip'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Trip Information */}
