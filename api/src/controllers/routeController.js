@@ -150,6 +150,27 @@ const getPopularRoutes = async (req, res, next) => {
   }
 }
 
+// Public search endpoints (no auth)
+const searchStopsPublic = async (req, res, next) => {
+  try {
+    const { q, limit, page } = req.query
+    const result = await routeService.searchStopsPublic(q, limit ? parseInt(limit, 10) : 10, page ? parseInt(page, 10) : 1)
+    res.status(StatusCodes.OK).json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
+const searchRoutesPublic = async (req, res, next) => {
+  try {
+    const { q, limit, page } = req.query
+    const result = await routeService.searchRoutesPublic(q, limit ? parseInt(limit, 10) : 10, page ? parseInt(page, 10) : 1)
+    res.status(StatusCodes.OK).json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const routeController = {
   // Routes
   createRoute,
@@ -165,4 +186,6 @@ export const routeController = {
   deleteStop,
   autocompleteStops,
   getPopularRoutes,
+  searchStopsPublic,
+  searchRoutesPublic,
 }

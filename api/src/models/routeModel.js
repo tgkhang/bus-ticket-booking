@@ -194,15 +194,113 @@ const getRoutes = async (filters = {}, pagination = {}) => {
   }
 }
 
-export const routeModel = {
-  createRoute,
-  updateRoute,
-  deleteRoute,
-  findById,
-  findMany,
-  findUsedStopIds,
-  getRoutes,
-  getPopularRoutes,
+async function fullTextSearchRoutes(query, limit = 10, page = 1) {
+  const prisma = GET_DB()
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 10, 50))
+  const safePage = Math.max(1, Number(page) || 1)
+  const skip = (safePage - 1) * safeLimit
+
+  const q = (query || '').trim()
+
+  // Empty query -> browse active routes (paginated)
+  if (!q) {
+    const [total, routes] = await Promise.all([
+      prisma.route.count({ where: { active: true } }),
+      prisma.route.findMany({
+        where: { active: true },
+        include: includeRelation,
+        orderBy: { name: 'asc' },
+        take: safeLimit,
+        skip,
+      }),
+    ])
+
+    const data = (routes || []).map((r) => ({
+      id: r.id,
+      name: r.name,
+      active: r.active,
+      operatorId: r.operatorId,
+      originStopId: r.originStopId,
+      destinationStopId: r.destinationStopId,
+      originStopName: r.originStop?.name || null,
+      destinationStopName: r.destinationStop?.name || null,
+    }))
+
+    return {
+      data,
+      pagination: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+      },
+    }
+  }
+
+  const [countRows, rows] = await Promise.all([
+    prisma.$queryRaw(
+      Prisma.sql`
+        WITH q AS (
+          SELECT
+            lower(unaccent(${q})) AS raw,
+            websearch_to_tsquery('simple', lower(unaccent(${q}))) AS tsq
+        )
+        SELECT COUNT(*)::int AS total
+        FROM routes r, q
+        WHERE r.active = TRUE
+          AND (
+            to_tsvector('simple', coalesce(r.search_text, '')) @@ q.tsq
+            OR coalesce(r.search_text, '') % q.raw
+          );
+      `
+    ),
+    prisma.$queryRaw(
+      Prisma.sql`
+        WITH q AS (
+          SELECT
+            lower(unaccent(${q})) AS raw,
+            websearch_to_tsquery('simple', lower(unaccent(${q}))) AS tsq
+        )
+        SELECT
+          r.id,
+          r.name,
+          r.active,
+          r."operator_id" AS "operatorId",
+          r."originStopId" AS "originStopId",
+          r."destinationStopId" AS "destinationStopId",
+          os.name AS "originStopName",
+          ds.name AS "destinationStopName"
+        FROM routes r
+        JOIN stops os ON os.id = r."originStopId"
+        JOIN stops ds ON ds.id = r."destinationStopId"
+        , q
+        WHERE r.active = TRUE
+          AND (
+            to_tsvector('simple', coalesce(r.search_text, '')) @@ q.tsq
+            OR coalesce(r.search_text, '') % q.raw
+          )
+        ORDER BY
+          (to_tsvector('simple', coalesce(r.search_text, '')) @@ q.tsq) DESC,
+          ts_rank_cd(to_tsvector('simple', coalesce(r.search_text, '')), q.tsq) DESC,
+          similarity(coalesce(r.search_text, ''), q.raw) DESC,
+          r.name ASC
+        LIMIT ${safeLimit}
+        OFFSET ${skip};
+      `
+    ),
+  ])
+
+  const total = Number(countRows?.[0]?.total || 0)
+
+  return {
+    data: rows || [],
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+    },
+  }
 }
 
 async function getPopularRoutes(limit = 4) {
@@ -242,4 +340,16 @@ async function getPopularRoutes(limit = 4) {
     minPrice: Number(r.minPrice || 0),
     avgDurationMinutes: Number(r.avgDurationMinutes || 0),
   }))
+}
+
+export const routeModel = {
+  createRoute,
+  updateRoute,
+  deleteRoute,
+  findById,
+  findMany,
+  findUsedStopIds,
+  getRoutes,
+  fullTextSearchRoutes,
+  getPopularRoutes,
 }

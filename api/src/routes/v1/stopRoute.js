@@ -7,6 +7,9 @@ import { PERMISSIONS } from '~/utils/constants'
 
 const Router = express.Router()
 
+// Public fulltext stop search (no auth)
+Router.get('/search', routeController.searchStopsPublic)
+
 Router.get(
   '/autocomplete',
   routeController.autocompleteStops

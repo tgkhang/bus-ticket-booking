@@ -130,6 +130,7 @@ model Stop {
   longitude Float
   address   String?
   active    Boolean  @default(true)
+  searchText String? @db.Text @map("search_text")
 
   // Relations
   originRoutes      Route[] @relation("OriginStop")
@@ -153,6 +154,7 @@ model Route {
   distanceKm        Float? @map("distance_km")
   estimatedMinutes  Int?   @map("estimated_minutes")
   active            Boolean @default(true)
+  searchText         String? @db.Text @map("search_text")
 
   // Relationships
   operator          Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)

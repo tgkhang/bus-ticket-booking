@@ -14,6 +14,9 @@ Router.get('/stops/autocomplete', routeController.autocompleteStops)
 // Popular routes for homepage (public)
 Router.get('/popular', routeController.getPopularRoutes)
 
+// Public fulltext route search (no auth)
+Router.get('/search', routeController.searchRoutesPublic)
+
 Router.post(
   '/',
   authMiddleware.isAuthorized,
