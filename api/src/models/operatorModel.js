@@ -242,24 +242,37 @@ const getOperatorStatistics = async (operatorId) => {
 const getTopRatedOperators = async (limit = 5) => {
   const prisma = GET_DB()
   
+  // Get all approved operators with their trip count
   const operators = await prisma.operator.findMany({
     where: {
-      rating: { not: null }
+      status: 'approved'
     },
-    orderBy: {
-      rating: 'desc'
-    },
-    take: limit,
     select: {
       id: true,
       name: true,
-      rating: true,
-      totalTrips: true,
-      phone: true
-    }
+      contactPhone: true,
+      _count: {
+        select: {
+          trips: true
+        }
+      }
+    },
+    orderBy: {
+      trips: {
+        _count: 'desc'
+      }
+    },
+    take: limit
   })
-  
-  return operators
+
+  // Format response
+  return operators.map(op => ({
+    id: op.id,
+    name: op.name,
+    totalTrips: op._count.trips,
+    phone: op.contactPhone,
+    rating: null 
+  }))
 }
 
 export const operatorModel = {
