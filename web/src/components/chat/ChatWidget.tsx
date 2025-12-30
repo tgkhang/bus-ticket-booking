@@ -7,6 +7,7 @@ import { Send, Loader2, X, MapPin, Clock, DollarSign } from 'lucide-react'
 import { useChatSocket } from '@/hooks/useChatSocket'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import type { Components } from 'react-markdown'
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false)
@@ -15,7 +16,6 @@ export default function ChatWidget() {
   const router = useRouter()
   
   const quickReplies = [
-    'Search trips',
     'Check my booking',
     'Refund policy',
     'Contact support',
@@ -25,6 +25,30 @@ export default function ChatWidget() {
 
   // Use custom hook for socket management
   const { sendMessage, messages, isTyping, isConnected } = useChatSocket(open)
+
+  // Custom markdown components for better styling
+  const markdownComponents: Components = {
+    p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+    ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+    ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+    li: ({ children }) => <li className="ml-2">{children}</li>,
+    h1: ({ children }) => <h1 className="text-base font-semibold mb-2 mt-3 first:mt-0">{children}</h1>,
+    h2: ({ children }) => <h2 className="text-sm font-semibold mb-2 mt-3 first:mt-0">{children}</h2>,
+    h3: ({ children }) => <h3 className="text-sm font-semibold mb-2 mt-2 first:mt-0">{children}</h3>,
+    strong: ({ children }) => <strong className="font-semibold text-blue-600 dark:text-blue-400">{children}</strong>,
+    em: ({ children }) => <em className="italic">{children}</em>,
+    code: ({ children, className }) => {
+      const isInline = !className
+      return isInline ? (
+        <code className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
+      ) : (
+        <code className={className}>{children}</code>
+      )
+    },
+    pre: ({ children }) => <pre className="bg-gray-100 dark:bg-gray-700 p-3 rounded my-2 overflow-x-auto text-xs">{children}</pre>,
+    a: ({ children, href }) => <a href={href} className="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">{children}</a>,
+    blockquote: ({ children }) => <blockquote className="border-l-4 border-blue-500 pl-3 italic my-2">{children}</blockquote>,
+  }
 
   // Scroll to bottom
   useEffect(() => {
@@ -113,8 +137,11 @@ export default function ChatWidget() {
                     {msg.sender === 'User' ? (
                       <p className="font-medium">{msg.text}</p>
                     ) : (
-                      <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-strong:text-blue-600 dark:prose-strong:text-blue-400">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={markdownComponents}
+                        >
                           {msg.text}
                         </ReactMarkdown>
                       </div>
@@ -181,13 +208,13 @@ export default function ChatWidget() {
           </main>
 
           {/* Quick replies */}
-          <div className="px-4 pt-2 pb-1 flex flex-wrap gap-2">
+          <div className="px-4 pt-2 pb-1 flex flex-wrap gap-1.5">
             {quickReplies.map((text, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={() => handleQuickReply(text)}
-                className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs text-gray-700 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 transition"
+                className="px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-xs text-gray-700 dark:text-gray-200 hover:bg-blue-100 dark:hover:bg-blue-900 transition whitespace-nowrap"
               >
                 {text}
               </button>

@@ -662,8 +662,47 @@ const searchTripsByCityNames = async (originCity, destinationCity, date = null, 
     }
   })
 
+  // Normalize string for diacritic-insensitive matching
+  const normalizeString = (str) => {
+    if (!str) return '';
+    return str
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'd');
+  };
+
+  // Post-filter: Match without diacritics if needed
+  let filteredTrips = trips;
+  if (originCity || destinationCity) {
+    const normalizedOrigin = normalizeString(originCity);
+    const normalizedDest = normalizeString(destinationCity);
+    
+    filteredTrips = trips.filter(trip => {
+      let originMatch = !originCity; // Default true if no origin filter
+      let destMatch = !destinationCity; // Default true if no dest filter
+      
+      if (originCity) {
+        const normalizedStopName = normalizeString(trip.route.originStop.name);
+        const normalizedStopAddr = normalizeString(trip.route.originStop.address);
+        originMatch = normalizedStopName.includes(normalizedOrigin) || 
+                     normalizedStopAddr.includes(normalizedOrigin);
+      }
+      
+      if (destinationCity) {
+        const normalizedStopName = normalizeString(trip.route.destinationStop.name);
+        const normalizedStopAddr = normalizeString(trip.route.destinationStop.address);
+        destMatch = normalizedStopName.includes(normalizedDest) || 
+                   normalizedStopAddr.includes(normalizedDest);
+      }
+      
+      return originMatch && destMatch;
+    });
+  }
+
   // Calculate available seats for each trip
-  const tripsWithSeats = trips.map(trip => {
+  const tripsWithSeats = filteredTrips.map(trip => {
     const availableSeats = trip.seatStatuses.filter(ss => ss.status === 'available').length
     return {
       ...trip,

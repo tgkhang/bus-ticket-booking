@@ -1,4 +1,5 @@
-import { geminiService } from './geminiService.js';
+import { groqService } from './groqService.js'; // Using Groq 
+// import { geminiService } from './geminiService.js'; // Backup: Gemini
 import { tripModel } from '~/models/tripModel';
 import { bookingModel } from '~/models/bookingModel';
 import { stopModel } from '~/models/stopModel';
@@ -6,6 +7,10 @@ import { routeModel } from '~/models/routeModel';
 import { operatorModel } from '~/models/operatorModel';
 import ApiError from '~/utils/ApiError';
 import { StatusCodes } from 'http-status-codes';
+
+// Active AI service 
+const aiService = groqService; // 14,400 req/day, 30 req/min
+// const aiService = geminiService; // 20 req/day, 5 req/min
 
 /**
  * Detect user language from message
@@ -76,15 +81,62 @@ const detectIntent = (message) => {
 };
 
 /**
+ * Detect intent using regex patterns (fallback when AI quota exceeded)
+ */
+const detectIntentWithRegex = (message) => {
+  const messageLower = message.toLowerCase();
+
+  // Trip search patterns (Vietnamese + English)
+  if (
+    /search|find|trip|book/i.test(message) ||
+    /tìm.*chuyến|từ.*đến|muốn.*đi|đặt.*chuyến|xe.*đi|đi.*đến/i.test(message) ||
+    /from\s+\w+\s+to\s+\w+/i.test(message) || // English: "from X to Y"
+    /\b(đi|đến)\s+[a-zA-ZÀ-ỹ]+/i.test(message) // "đi X", "đến Y" - match Vietnamese letters
+  ) {
+    return 'trip_search';
+  }
+
+  // Booking status
+  if (/booking|mã.*đặt|check.*booking|kiểm.*tra.*vé/i.test(message)) {
+    return 'booking_status';
+  }
+
+  // Refund
+  if (/refund|hoàn.*tiền|hủy.*vé|cancel/i.test(message)) {
+    return 'refund';
+  }
+
+  // Support
+  if (/support|hotline|liên.*hệ|contact|help/i.test(message)) {
+    return 'support';
+  }
+
+  // Popular - CHECK FIRST (more specific)
+  // Match: "chuyến/tuyến/xe + phổ biến/popular/top/best"
+  if (/(?:chuyến|tuyến|xe|nhà.*xe).*(?:phổ.*biến|popular|top|best|tốt|rated)/i.test(message) ||
+      /(?:phổ.*biến|popular|top|best|rated).*(?:chuyến|tuyến|xe|nhà.*xe)/i.test(message)) {
+    return 'popular';
+  }
+
+  // Routes - CHECK AFTER popular (less specific)
+  // Match: "tuyến/route" WITHOUT "phổ biến/popular"
+  if (/(?:tuyến|route)(?!.*(?:phổ.*biến|popular|top|best|tốt|rated))/i.test(message)) {
+    return 'routes';
+  }
+
+  return 'general';
+};
+
+/**
  * Simple regex-based extraction (fallback when AI quota exceeded)
  */
 const extractParamsWithRegex = (message) => {
-  // Match patterns like "từ X đến Y", "đi X", "BX 06", etc.
-  const fromToMatch = message.match(/từ\s+([^đến]+?)\s+đến\s+(.+)/i);
-  if (fromToMatch) {
+  // Match Vietnamese patterns: "từ X đến Y"
+  const viFromToMatch = message.match(/từ\s+([^đến]+?)\s+đến\s+(.+)/i);
+  if (viFromToMatch) {
     return {
-      origin: fromToMatch[1].trim(),
-      destination: fromToMatch[2].trim(),
+      origin: viFromToMatch[1].trim(),
+      destination: viFromToMatch[2].trim(),
       date: null,
       time: null,
       passengers: null,
@@ -93,18 +145,37 @@ const extractParamsWithRegex = (message) => {
     };
   }
 
-  // Match "đi [location]" or "đến [location]" or just a stop code
-  const destMatch = message.match(/(?:đi|đến|đặt.*chuyến)\s+([A-Z0-9\s\[\]]+)/i);
-  if (destMatch) {
+  // Match English patterns: "from X to Y"
+  const enFromToMatch = message.match(/from\s+([^to]+?)\s+to\s+(.+)/i);
+  if (enFromToMatch) {
     return {
-      origin: null,
-      destination: destMatch[1].trim(),
+      origin: enFromToMatch[1].trim(),
+      destination: enFromToMatch[2].trim(),
       date: null,
       time: null,
       passengers: null,
       busType: null,
       maxPrice: null
     };
+  }
+
+  // Match "đi [location]" or "đến [location]" or "đặt vé đi [location]"
+  // Pattern matches: letters (with Vietnamese diacritics), numbers, spaces, brackets
+  const destMatch = message.match(/(?:đi|đến|đặt.*(?:vé|chuyến)).*?([a-zA-ZÀ-ỹ0-9\s\[\]]+?)(?:\s+vào|\s+ngày|\s+lúc|$)/i);
+  if (destMatch) {
+    const location = destMatch[1].trim();
+    // Ignore common words like "vào", "ngày", "lúc"
+    if (location && !/^(vào|ngày|lúc|mốt|mai|nay)$/i.test(location)) {
+      return {
+        origin: null,
+        destination: location,
+        date: null,
+        time: null,
+        passengers: null,
+        busType: null,
+        maxPrice: null
+      };
+    }
   }
 
   return {
@@ -130,14 +201,33 @@ const handleTripSearch = async (message, context = {}) => {
     
     let extractedParams;
     try {
-      // Try AI extraction first
-      extractedParams = await geminiService.extractTripSearchIntent(message, lang);
-      console.log('AI Extraction result:', JSON.stringify(extractedParams, null, 2));
+      // AI extraction first
+      extractedParams = await aiService.extractTripSearchIntent(message, lang);
+      console.log('🤖AI Extraction:', JSON.stringify(extractedParams, null, 2));
+      console.log(`Locations: origin="${extractedParams.origin}" | dest="${extractedParams.destination}"`);
+      console.log(`Date extracted: "${extractedParams.date}" (${extractedParams.date ? 'SPECIFIC DATE' : 'NO DATE - will search all future'})`);
     } catch (error) {
       // Fallback to regex if AI fails (quota exceeded, etc.)
-      console.log('AI extraction failed, using regex fallback:', error.message);
+      console.warn('⚠️AI extraction FAILED, using regex fallback:', error.message);
       extractedParams = extractParamsWithRegex(message);
-      console.log('Regex Extraction result:', JSON.stringify(extractedParams, null, 2));
+      console.log('📝Regex fallback result:', JSON.stringify(extractedParams, null, 2));
+    }
+    
+    // Validate date if provided
+    if (extractedParams.date) {
+      // Use local date string comparison to avoid timezone issues
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      
+      if (extractedParams.date < todayStr) {
+        return {
+          intent: 'trip_search',
+          reply: lang === 'vi'
+            ? `⚠️ Ngày ${extractedParams.date} đã qua rồi! Vui lòng chọn ngày từ hôm nay (${todayStr}) trở đi.`
+            : `⚠️ The date ${extractedParams.date} is in the past! Please choose a date from today (${todayStr}) onwards.`,
+          data: { trips: [], extractedParams }
+        };
+      }
     }
     
     let trips = [];
@@ -152,6 +242,11 @@ const handleTripSearch = async (message, context = {}) => {
       // - If no date: pass null to search all future dates
       const searchDate = extractedParams.date || null;
       
+      // Smart limit handling based on user intent
+      // "best" / "cheapest" → 1 trip, "top 3" → 3 trips, default → 10 trips
+      const limit = extractedParams.limitResults !== undefined ? extractedParams.limitResults : 10;
+      const actualLimit = limit === null ? 20 : limit; // null means "all" (max 20)
+      
       trips = await tripModel.searchTripsByCityNames(
         extractedParams.origin,
         extractedParams.destination,
@@ -159,7 +254,7 @@ const handleTripSearch = async (message, context = {}) => {
         {
           maxPrice: extractedParams.maxPrice,
           busType: extractedParams.busType,
-          limit: 10 
+          limit: actualLimit
         }
       );
       
@@ -167,41 +262,46 @@ const handleTripSearch = async (message, context = {}) => {
       console.log(`Found ${trips.length} future trips from database`);
 
       if (trips.length > 0) {
-        // Format trip results based on language
-        const tripList = trips.map((trip, index) => {
-          const route = `${trip.route.originStop.name} → ${trip.route.destinationStop.name}`;
-          const time = new Date(trip.departureTime).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            day: '2-digit',
-            month: '2-digit'
-          });
-          const price = trip.basePrice.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US');
-          
-          if (lang === 'vi') {
-            return `${index + 1}. ${route}\n   Khởi hành: ${time}\n   Giá: ${price}đ\n   Chỗ trống: ${trip.availableSeats} ghế\n   Nhà xe: ${trip.bus.operator.name}`;
-          } else {
-            return `${index + 1}. ${route}\n   Departure: ${time}\n   Price: ${price} VND\n   Available: ${trip.availableSeats} seats\n   Operator: ${trip.bus.operator.name}`;
-          }
-        }).join('\n\n');
-
+        // Only show header message
         let header = '';
-        if (extractedParams.origin && extractedParams.destination) {
-          header = lang === 'vi' 
-            ? `Tôi tìm thấy ${trips.length} chuyến xe từ ${extractedParams.origin} đến ${extractedParams.destination}:`
-            : `I found ${trips.length} trips from ${extractedParams.origin} to ${extractedParams.destination}:`;
-        } else if (extractedParams.destination) {
-          header = lang === 'vi' 
-            ? `Tôi tìm thấy ${trips.length} chuyến xe đến ${extractedParams.destination}:`
-            : `I found ${trips.length} trips to ${extractedParams.destination}:`;
-        } else if (extractedParams.origin) {
-          header = lang === 'vi' 
-            ? `Tôi tìm thấy ${trips.length} chuyến xe từ ${extractedParams.origin}:`
-            : `I found ${trips.length} trips from ${extractedParams.origin}:`;
+        const destName = extractedParams.destination || '';
+        const originName = extractedParams.origin || '';
+        const isSingleResult = extractedParams.limitResults === 1;
+        
+        if (originName && destName) {
+          if (isSingleResult && trips.length === 1) {
+            header = lang === 'vi' 
+              ? `Đây là chuyến xe tốt nhất từ ${originName} đến ${destName}:`
+              : `Here is the best trip from ${originName} to ${destName}:`;
+          } else {
+            header = lang === 'vi' 
+              ? `Tôi tìm thấy ${trips.length} chuyến xe từ ${originName} đến ${destName}:`
+              : `I found ${trips.length} trips from ${originName} to ${destName}:`;
+          }
+        } else if (destName) {
+          if (isSingleResult && trips.length === 1) {
+            header = lang === 'vi' 
+              ? `Đây là chuyến xe tốt nhất đến ${destName}:`
+              : `Here is the best trip to ${destName}:`;
+          } else {
+            header = lang === 'vi' 
+              ? `Tôi tìm thấy ${trips.length} chuyến xe đến ${destName}:`
+              : `I found ${trips.length} trips to ${destName}:`;
+          }
+        } else if (originName) {
+          if (isSingleResult && trips.length === 1) {
+            header = lang === 'vi' 
+              ? `Đây là chuyến xe tốt nhất từ ${originName}:`
+              : `Here is the best trip from ${originName}:`;
+          } else {
+            header = lang === 'vi' 
+              ? `Tôi tìm thấy ${trips.length} chuyến xe từ ${originName}:`
+              : `I found ${trips.length} trips from ${originName}:`;
+          }
         }
 
-        responseText = `${header}\n\n${tripList}\n\n${lang === 'vi' ? 'Bạn muốn đặt vé chuyến nào?' : 'Which trip would you like to book?'}`;
-        console.log('Response text generated from database trips (first 200 chars):', responseText.substring(0, 200));
+        responseText = header;
+        console.log('Header message generated:', header);
       } else {
         // No trips found - provide smart suggestions with specific details
         const searchInfo = extractedParams.date 
@@ -319,8 +419,8 @@ const handleBookingStatus = async (message, userId) => {
       }
 
       const replyText = lang === 'vi'
-        ? `🎟️ Thông tin vé của bạn\n\nTuyến: ${route}\nKhởi hành: ${departureTime}\nMã: ${booking.code}\nTrạng thái: ${statusText}\nTổng tiền: ${booking.totalAmount.toLocaleString('vi-VN')}đ\nHành khách: ${booking.passengerDetails.length} người\n${booking.status === 'pending' ? '\n⚠️ Vui lòng hoàn tất thanh toán để xác nhận vé.' : ''}`
-        : `🎟️ Your Booking Details\n\nRoute: ${route}\nDeparture: ${departureTime}\nCode: ${booking.code}\nStatus: ${statusText}\nTotal: ${booking.totalAmount.toLocaleString('en-US')} VND\nPassengers: ${booking.passengerDetails.length}\n${booking.status === 'pending' ? '\n⚠️ Please complete payment to confirm your booking.' : ''}`;
+        ? `🎟️ **Thông tin vé của bạn**\n\n**Tuyến:** ${route}  \n**Khởi hành:** ${departureTime}  \n**Mã:** ${booking.code}  \n**Trạng thái:** ${statusText}  \n**Tổng tiền:** ${booking.totalAmount.toLocaleString('vi-VN')}đ  \n**Hành khách:** ${booking.passengerDetails.length} người${booking.status === 'pending' ? '\n\n⚠️ Vui lòng hoàn tất thanh toán để xác nhận vé.' : ''}`
+        : `🎟️ **Your Booking Details**\n\n**Route:** ${route}  \n**Departure:** ${departureTime}  \n**Code:** ${booking.code}  \n**Status:** ${statusText}  \n**Total:** ${booking.totalAmount.toLocaleString('en-US')} VND  \n**Passengers:** ${booking.passengerDetails.length}${booking.status === 'pending' ? '\n\n⚠️ Please complete payment to confirm your booking.' : ''}`;
 
       return {
         intent: 'booking_status',
@@ -422,8 +522,8 @@ What do you need?`;
     return {
       intent: 'general',
       reply: lang === 'vi'
-        ? 'Xin lỗi, tôi đang gặp sự cố. Bạn có thể:\n- Tìm chuyến xe\n- Kiểm tra vé đã đặt\n- Liên hệ hotline: 1900-123-456'
-        : 'Sorry, I\'m having some issues. You can:\n- Search for trips\n- Check your bookings\n- Contact hotline: 1900-123-456',
+        ? 'Xin lỗi, tôi đang gặp sự cố. Bạn có thể:  \n- Tìm chuyến xe  \n- Kiểm tra vé đã đặt  \n- Liên hệ hotline: 1900-123-456'
+        : 'Sorry, I\'m having some issues. You can:  \n- Search for trips  \n- Check your bookings  \n- Contact hotline: 1900-123-456',
       data: null
     };
   }
@@ -438,8 +538,21 @@ What do you need?`;
  */
 const processMessage = async (message, userId = null, context = {}) => {
   try {
-    const intent = detectIntent(message);
-    console.log(`Message: "${message}" → Intent: ${intent}`);
+    // Strategy: Try AI first (smart), fallback to regex if quota exceeded
+    const lang = detectLanguage(message);
+    let intent;
+    let usingAI = false;
+    
+    try {
+      intent = await aiService.detectIntent(message, lang);
+      usingAI = true;
+      console.log(`🤖AI detected intent: ${intent} for "${message}"`);
+    } catch (aiError) {
+      // Fallback to regex when AI quota exceeded
+      console.warn('⚠️AI quota exceeded, using regex fallback');
+      intent = detectIntentWithRegex(message);
+      console.log(`📝Regex detected intent: ${intent} for "${message}"`);
+    }
 
     switch (intent) {
       case 'trip_search':
@@ -456,8 +569,8 @@ const processMessage = async (message, userId = null, context = {}) => {
         return {
           intent: 'refund',
           reply: lang === 'vi'
-            ? '🔄 Chính sách hoàn tiền\n\n• Hủy trước 24h: Hoàn 80%\n• Hủy trước 12h: Hoàn 50%\n• Hủy trong 12h: Không hoàn tiền\n\nCách yêu cầu hủy vé:\n1. Vào "Vé của tôi"\n2. Chọn vé cần hủy\n3. Nhấn "Yêu cầu hủy vé"\n\nLiên hệ: 1900-123-456'
-            : '🔄 Refund Policy\n\n• Cancel before 24h: 80% refund\n• Cancel before 12h: 50% refund\n• Cancel within 12h: No refund\n\nHow to cancel:\n1. Go to "My Tickets"\n2. Select ticket to cancel\n3. Click "Request Cancellation"\n\nContact: 1900-123-456',
+            ? '� **Chính sách hoàn tiền**\n\n• **Hủy trước 24h:** Hoàn 80% refund  \n• **Hủy trước 12h:** Hoàn 50% refund  \n• **Hủy trong 12h:** No refund\n\n**Cách yêu cầu hủy vé:**  \n1. Vào "Vé của tôi"  \n2. Chọn vé cần hủy  \n3. Nhấn "Yêu cầu hủy vé"\n\n**Liên hệ:** 1900-123-456'
+            : '📋 **Refund Policy**\n\n• **Cancel before 24h:** 80% refund  \n• **Cancel before 12h:** 50% refund  \n• **Cancel within 12h:** No refund\n\n**How to cancel:**  \n1. Go to "My Tickets"  \n2. Select ticket to cancel  \n3. Click "Request Cancellation"\n\n**Contact:** 1900-123-456',
           data: null
         };
       }
@@ -467,8 +580,8 @@ const processMessage = async (message, userId = null, context = {}) => {
         return {
           intent: 'support',
           reply: lang === 'vi'
-            ? '📞 Hỗ trợ khách hàng\n\nHotline: +84 123 456 789\nEmail: support@busbooking.com\nĐịa chỉ: 123 Main Street, District 1, Ho Chi Minh City, Vietnam\nGiờ làm việc: 24/7\n\nBạn cần hỗ trợ về vấn đề gì?'
-            : '📞 Customer Support\n\nHotline: +84 123 456 789\nEmail: support@busbooking.com\nAddress: 123 Main Street, District 1, Ho Chi Minh City, Vietnam\nHours: 24/7\n\nWhat can I help you with?',
+            ? '📞 **Hỗ trợ khách hàng**\n\n**Hotline:** +84 123 456 789  \n**Email:** support@busbooking.com  \n**Địa chỉ:** 123 Main Street, District 1, Ho Chi Minh City, Vietnam  \n**Giờ làm việc:** 24/7\n\nBạn cần hỗ trợ về vấn đề gì?'
+            : '📞 **Customer Support**\n\n**Hotline:** +84 123 456 789  \n**Email:** support@busbooking.com  \n**Address:** 123 Main Street, District 1, Ho Chi Minh City, Vietnam  \n**Hours:** 24/7\n\nWhat can I help you with?',
           data: null
         };
       }
@@ -484,15 +597,15 @@ const processMessage = async (message, userId = null, context = {}) => {
               const dest = route.to || 'N/A';
               const bookings = route.bookings || 0;
               return lang === 'vi'
-                ? `${idx + 1}. ${origin} \u2192 ${dest} (${bookings} l\u01b0\u1ee3t \u0111\u1eb7t)`
-                : `${idx + 1}. ${origin} \u2192 ${dest} (${bookings} bookings)`;
-            }).join('\n');
+                ? `${idx + 1}. **${origin}** \u2192 **${dest}** (${bookings} l\u01b0\u1ee3t \u0111\u1eb7t)`
+                : `${idx + 1}. **${origin}** \u2192 **${dest}** (${bookings} bookings)`;
+            }).join('  \n');
             
             return {
               intent: 'routes',
               reply: lang === 'vi'
-                ? `🚌 Tuyến phổ biến\n\n${routeList}\n\nBạn muốn tìm chuyến nào?`
-                : `🚌 Popular Routes\n\n${routeList}\n\nWhich route would you like?`,
+                ? `🚌 **Tuyến phổ biến**\n\n${routeList}\n\nBạn muốn tìm chuyến nào?`
+                : `🚌 **Popular Routes**\n\n${routeList}\n\nWhich route would you like?`,
               data: { routes: popularRoutes }
             };
           }
@@ -519,15 +632,15 @@ const processMessage = async (message, userId = null, context = {}) => {
             const operatorList = topOperators.map((op, idx) => {
               const rating = op.rating ? `⭐ ${op.rating.toFixed(1)}` : 'Chưa có đánh giá';
               return lang === 'vi'
-                ? `${idx + 1}. ${op.name}\n   ${rating} • ${op.totalTrips || 0} chuyến\n   📞 ${op.phone || 'N/A'}`
-                : `${idx + 1}. ${op.name}\n   ${rating} • ${op.totalTrips || 0} trips\n   📞 ${op.phone || 'N/A'}`;
+                ? `${idx + 1}. **${op.name}**  \n   ${rating} • ${op.totalTrips || 0} chuyến  \n   📞 ${op.phone || 'N/A'}`
+                : `${idx + 1}. **${op.name}**  \n   ${rating} • ${op.totalTrips || 0} trips  \n   📞 ${op.phone || 'N/A'}`;
             }).join('\n\n');
             
             return {
               intent: 'popular',
               reply: lang === 'vi'
-                ? `⭐ Nhà xe được đánh giá cao\n\n${operatorList}\n\nBạn muốn đặt vé nhà xe nào?`
-                : `⭐ Top Rated Operators\n\n${operatorList}\n\nWhich operator would you like to book?`,
+                ? `⭐ **Nhà xe được đánh giá cao**\n\n${operatorList}\n\nBạn muốn đặt vé nhà xe nào?`
+                : `⭐ **Top Rated Operators**\n\n${operatorList}\n\nWhich operator would you like to book?`,
               data: { operators: topOperators }
             };
           }
