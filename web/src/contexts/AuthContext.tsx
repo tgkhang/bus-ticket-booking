@@ -12,10 +12,20 @@ interface User {
   id: string
   email: string
   username?: string
-  role: 'admin' | 'client'
+  role: 'admin' | 'client' | 'operator' | 'staff'
   permissions?: string[]
   avatar?: string
   createdAt?: string
+  displayName?: string
+  phoneNumber?: string
+  address?: string
+  bankAccount?: string
+  accountBalance?: string
+  currency?: string
+  // Staff-specific fields
+  staffId?: string
+  operatorId?: string
+  operatorName?: string
 }
 
 interface AuthContextType {
@@ -25,6 +35,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<User>
   logout: (showSuccessMessage?: boolean) => Promise<void>
   updateUser: (data: Partial<User>) => Promise<User>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -137,6 +148,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return updatedUser
   }, [])
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const response = await getMeAPI()
+      setUser(response)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        localStorage.removeItem(AUTH_STORAGE_KEY)
+        setUser(null)
+      }
+    }
+  }, [])
+
   const value = useMemo(
     () => ({
       user,
@@ -145,8 +169,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       updateUser,
+      refreshUser,
     }),
-    [user, isInitialized, login, logout, updateUser]
+    [user, isInitialized, login, logout, updateUser, refreshUser]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

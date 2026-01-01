@@ -41,11 +41,23 @@ export interface TripBooking {
 export interface Trip {
   id: string
   routeId: string
+  routeName?: string
   busId: string
+  busModel?: string
+  busPlateNumber?: string
+  operatorId?: string
+  staffId?: string | null
   departureTime: string
   arrivalTime: string
   basePrice: number
   status: TripStatus
+  durationMinutes?: number
+  availableSeats?: number
+  seatsBooked?: number
+  totalSeats?: number
+  originStop?: string
+  destinationStop?: string
+  operatorName?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -59,8 +71,21 @@ export interface TripDetail {
   arrivalTime: string
   basePrice: number
   status: TripStatus
+  staffId?: string | null
   createdAt?: string
   updatedAt?: string
+
+  // Staff information
+  staff?: {
+    id: string
+    user?: {
+      id: string
+      displayName?: string
+      email?: string
+      phoneNumber?: string
+      avatar?: string
+    }
+  }
 
   // Nested route information
   route?: {
@@ -70,13 +95,24 @@ export interface TripDetail {
     destinationStopId?: string
     distanceKm?: number
     stops?: Array<{
+      id?: string
       stopId: string
-      stopName: string
-      stopAddress: string
-      distanceFromOrigin: number
-      estimatedMinutes: number
-      isPickup: boolean
-      isDropoff: boolean
+      stopName?: string
+      stopAddress?: string
+      sequence?: number
+      distanceFromOrigin?: number
+      estimatedMinutes?: number
+      isPickup?: boolean
+      isDropoff?: boolean
+      note?: string | null
+      // Nested stop object from API
+      stop?: {
+        id: string
+        name: string
+        address: string
+        latitude?: number
+        longitude?: number
+      }
     }>
   }
 
@@ -86,8 +122,17 @@ export interface TripDetail {
     model: string
     plateNumber: string
     capacity?: number
-    amenities?: string[]
+    seatCapacity?: number
+    busType?: string
+    amenities?: string[] | Record<string, boolean>
+    images?: string[] // Array of image URLs
     operatorId?: string
+    operator?: {
+      id: string
+      name: string
+      contactEmail?: string
+      contactPhone?: string
+    }
   }
 
   // Nested operator information
@@ -124,6 +169,7 @@ export interface UpdateTripData {
   arrivalTime?: string
   basePrice?: number
   status?: TripStatus
+  staffId?: string | null
 }
 
 export interface ListTripsFilters {
@@ -134,6 +180,10 @@ export interface ListTripsFilters {
   arrivalTime?: string
   basePrice?: number
   search?: string
+  staffId?: string
+  operatorId?: string
+  dateFrom?: string
+  dateTo?: string
 }
 
 export interface SearchTripsFilters {

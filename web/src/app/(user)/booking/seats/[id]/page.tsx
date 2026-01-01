@@ -1,12 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { getSeatStatusesAPI, getTripByIdAPI, lockSeatsAPI } from '@/lib/api'
-import { ArrowLeft, Radio, AlertCircle, Loader2 } from 'lucide-react'
+import { getSeatStatusesAPI, getTripByIdAPI, lockSeatsAPI, unlockSeatsAPI } from '@/lib/api'
+import { ArrowLeft, Radio, AlertCircle, Loader2, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { detectLayoutAndGroupSeats, detectLayoutPattern } from '@/utils/seatLayout'
+import {
+  detectLayoutAndGroupSeats,
+  detectLayoutPattern,
+  organizeSeatsByFloor,
+  organizeSeatsByRows,
+} from '@/utils/seatLayout'
+import { useBookingSocket } from '@/contexts/BookingSocketContext'
 
 type SeatStatus = 'available' | 'booked' | 'locked' | 'selected'
 
@@ -25,20 +31,80 @@ interface SeatStatusResponse {
   lockedUntil: string | null
 }
 
+type SeatForGrouping = Seat & { seatNumber: string }
+
 export default function SeatSelectionPage() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
   const tripId = params?.id as string
 
+  const socket = useBookingSocket()
+
   const [trip, setTrip] = useState<any>(null)
   const [seats, setSeats] = useState<Seat[]>([])
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const selectedSeatsRef = useRef<string[]>([])
+
+  useEffect(() => {
+    selectedSeatsRef.current = selectedSeats
+  }, [selectedSeats])
   
   // Get passengers from URL params (from search page)
   const passengers = parseInt(searchParams.get('passengers') || '1')
+
+  // Socket listeners (socket is provided by booking layout and stays connected across booking pages)
+  useEffect(() => {
+    if (!socket) return
+
+    const onLocked = ({ tripId: eventTripId, seatIds }: { tripId: string; seatIds: string[] }) => {
+      if (eventTripId !== tripId) return
+
+      setSeats((prev) =>
+        prev.map((s) => {
+          if (!seatIds.includes(s.id)) return s
+          if (s.status === 'booked' || selectedSeatsRef.current.includes(s.id)) return s
+          return { ...s, status: 'locked' }
+        })
+      )
+    }
+
+    const onUnlocked = ({ tripId: eventTripId, seatIds }: { tripId: string; seatIds: string[] }) => {
+      if (eventTripId !== tripId) return
+
+      setSeats((prev) =>
+        prev.map((s) => {
+          if (!seatIds.includes(s.id)) return s
+          if (s.status === 'booked' || selectedSeatsRef.current.includes(s.id)) return s
+          return { ...s, status: 'available' }
+        })
+      )
+    }
+
+    const onBooked = ({ tripId: eventTripId, seatIds }: { tripId: string; seatIds: string[] }) => {
+      if (eventTripId !== tripId) return
+
+      setSeats((prev) => prev.map((s) => (seatIds.includes(s.id) ? { ...s, status: 'booked' } : s)))
+
+      setSelectedSeats((prevSelected) => {
+        const conflict = prevSelected.some((id) => seatIds.includes(id))
+        if (conflict) toast.error('Some of your selected seats were booked by another user.')
+        return prevSelected.filter((id) => !seatIds.includes(id))
+      })
+    }
+
+    socket.on('seats:locked', onLocked)
+    socket.on('seats:unlocked', onUnlocked)
+    socket.on('seats:booked', onBooked)
+
+    return () => {
+      socket.off('seats:locked', onLocked)
+      socket.off('seats:unlocked', onUnlocked)
+      socket.off('seats:booked', onBooked)
+    }
+  }, [socket, tripId])
 
   // Store returnUrl in session storage when arriving from search page
   useEffect(() => {
@@ -78,23 +144,24 @@ export default function SeatSelectionPage() {
 
         setSeats(transformedSeats)
         
-        // Check if user is returning from passenger details with locked seats
-        const returnedSeats = searchParams.get('lockedSeats')
-        if (returnedSeats) {
-          const lockedSeatIds = returnedSeats.split(',')
-          // Select seats that are locked (user's previous selection)
-          const seatsToSelect = lockedSeatIds.filter(seatId => {
-            const seat = transformedSeats.find(s => s.id === seatId)
-            return seat && seat.status === 'locked'
-          })
+        // Check if user is returning from passenger details (via session storage)
+        const pendingSeats = sessionStorage.getItem(`pending_seats_${tripId}`)
+        if (pendingSeats) {
+          const lockedSeatIds = JSON.parse(pendingSeats) as string[]
           
-          if (seatsToSelect.length > 0) {
-            setSelectedSeats(seatsToSelect)
-            // Mark them as selected in the UI
-            setSeats(transformedSeats.map(s => 
-              seatsToSelect.includes(s.id) ? { ...s, status: 'selected' as SeatStatus } : s
+          // Unlock them so user can re-select or change
+          try {
+            await unlockSeatsAPI(tripId, lockedSeatIds)
+            sessionStorage.removeItem(`pending_seats_${tripId}`)
+            
+            // Restore selection in UI
+            setSelectedSeats(lockedSeatIds)
+            setSeats(prev => prev.map(s => 
+              lockedSeatIds.includes(s.id) ? { ...s, status: 'selected' as SeatStatus } : s
             ))
-            toast.info(`Restored ${seatsToSelect.length} previously selected seat(s)`)
+            toast.info('Previous selection restored')
+          } catch (e) {
+            console.error('Failed to unlock pending seats', e)
           }
         }
       } catch (err) {
@@ -157,12 +224,32 @@ export default function SeatSelectionPage() {
 
     try {
       // Lock seats before proceeding
-      await lockSeatsAPI(tripId, selectedSeats, 10) // Lock for 10 minutes
+      await lockSeatsAPI(tripId, selectedSeats)
       
+      // Save to session storage in case user comes back
+      sessionStorage.setItem(`pending_seats_${tripId}`, JSON.stringify(selectedSeats))
+
       router.push(`/booking/passenger-details?tripId=${tripId}&seats=${selectedSeats.join(',')}&totalPrice=${totalPrice}&passengers=${selectedSeats.length}`)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to lock seats:', err)
-      toast.error('Failed to lock seats. Please try again.')
+      
+      if (err.response?.status === 409) {
+        toast.error('Some seats are already taken. Refreshing...')
+      } else {
+        toast.error('Failed to lock seats. Please try again.')
+      }
+      
+      // Refresh seats
+      const seatStatusData = await getSeatStatusesAPI(tripId)
+      const transformedSeats: Seat[] = (seatStatusData as SeatStatusResponse[]).map((ss: SeatStatusResponse) => ({
+        id: ss.seatId,
+        code: ss.seatCode,
+        status: ss.status as SeatStatus,
+        price: trip?.basePrice || 0,
+      }))
+      setSeats(transformedSeats)
+      // Clear invalid selection
+      setSelectedSeats([])
     }
   }
 
@@ -192,9 +279,85 @@ export default function SeatSelectionPage() {
     )
   }
 
-  // Detect layout pattern from seat codes and group seats by rows
+  const renderSeatRow = (row: Seat[], layoutPattern: ReturnType<typeof detectLayoutPattern>) => {
+    return (
+      <div className="flex items-center justify-center gap-3">
+        {/* Left seats */}
+        <div className="flex gap-2">
+          {row.slice(0, layoutPattern.left).map((seat) => (
+            <button
+              key={seat.id}
+              onClick={() => handleSeatClick(seat.id)}
+              disabled={seat.status === 'booked' || seat.status === 'locked'}
+              className={`${getSeatColor(
+                seat.status
+              )} text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-70 min-w-[60px]`}
+            >
+              {seat.code}
+            </button>
+          ))}
+        </div>
+
+        {/* Aisle */}
+        <div className="w-8 shrink-0" />
+
+        {/* Middle seats (for sleeper buses) */}
+        {layoutPattern.hasMiddle && layoutPattern.middle && (
+          <>
+            <div className="flex gap-2">
+              {row
+                .slice(layoutPattern.left, layoutPattern.left + layoutPattern.middle)
+                .map((seat) => (
+                  <button
+                    key={seat.id}
+                    onClick={() => handleSeatClick(seat.id)}
+                    disabled={seat.status === 'booked' || seat.status === 'locked'}
+                    className={`${getSeatColor(
+                      seat.status
+                    )} text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-70 min-w-[60px]`}
+                  >
+                    {seat.code}
+                  </button>
+                ))}
+            </div>
+            <div className="w-8 shrink-0" />
+          </>
+        )}
+
+        {/* Right seats */}
+        <div className="flex gap-2">
+          {row
+            .slice(
+              layoutPattern.hasMiddle && layoutPattern.middle
+                ? layoutPattern.left + layoutPattern.middle
+                : layoutPattern.left
+            )
+            .map((seat) => (
+              <button
+                key={seat.id}
+                onClick={() => handleSeatClick(seat.id)}
+                disabled={seat.status === 'booked' || seat.status === 'locked'}
+                className={`${getSeatColor(
+                  seat.status
+                )} text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-70 min-w-[60px]`}
+              >
+                {seat.code}
+              </button>
+            ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Multi-floor detection (seat codes like 1A1 / 2B3) and grouping
+  const seatsForGrouping: SeatForGrouping[] = seats.map((s) => ({ ...s, seatNumber: s.code }))
+  const floorSeats = organizeSeatsByFloor(seatsForGrouping)
+  const floorNumbers = Object.keys(floorSeats).map(Number).sort((a, b) => a - b)
+  const hasMultipleFloors = floorNumbers.length > 1
+
+  // Single-floor fallback: keep current behavior
   const { rows: seatRows, columns } = detectLayoutAndGroupSeats(seats)
-  const layoutPattern = detectLayoutPattern(columns)
+  const singleFloorLayoutPattern = detectLayoutPattern(columns)
 
   return (
     <div className="bg-gray-50 dark:bg-gray-900">
@@ -270,38 +433,71 @@ export default function SeatSelectionPage() {
                 </div>
 
                 {/* Seats Grid */}
-                <div className="space-y-3">
-                  {Object.keys(seatRows)
-                    .sort((a, b) => Number(a) - Number(b))
-                    .map((rowNum) => {
-                      const row = seatRows[Number(rowNum)]
+                  {hasMultipleFloors ? (
+                    <div className="grid grid-cols-[1fr_auto_1fr] gap-6">
+                      {(() => {
+                        const floor1 = floorNumbers[0]
+                        const floor2 = floorNumbers[1]
 
-                      return (
-                        <div key={rowNum} className="flex items-center justify-center gap-3">
-                          {/* Left seats */}
-                          <div className="flex gap-2">
-                            {row.slice(0, layoutPattern.left).map((seat) => (
-                              <button
-                                key={seat.id}
-                                onClick={() => handleSeatClick(seat.id)}
-                                disabled={seat.status === 'booked' || seat.status === 'locked'}
-                                className={`${getSeatColor(
-                                  seat.status
-                                )} text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-70 min-w-[60px]`}
-                              >
-                                {seat.code}
-                              </button>
-                            ))}
-                          </div>
+                        const renderFloor = (floorNum: number) => {
+                          const seatsOnFloor = (floorSeats[floorNum] || []) as SeatForGrouping[]
+                          const rowSeats = organizeSeatsByRows(seatsOnFloor)
+                          const rowNumbers = Object.keys(rowSeats).sort((a, b) => Number(a) - Number(b))
 
-                          {/* Aisle */}
-                          <div className="w-8 shrink-0" />
+                          const columnSet = new Set<string>()
+                          for (const s of seatsOnFloor) {
+                            const col = s.seatNumber.replace(/\d/g, '')
+                            if (col) columnSet.add(col)
+                          }
+                          const columnsOnFloor = Array.from(columnSet).sort()
+                          const floorLayoutPattern = detectLayoutPattern(columnsOnFloor)
 
-                          {/* Middle seats (for sleeper buses) */}
-                          {layoutPattern.hasMiddle && layoutPattern.middle && (
-                            <>
+                          return (
+                            <div key={floorNum} className="space-y-4">
+                              <div className="flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                  Floor {floorNum}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">Front of Bus</span>
+                              </div>
+
+                              <div className="space-y-3">
+                                {rowNumbers.map((rowNum) => {
+                                  const row = (rowSeats[rowNum] || []) as unknown as Seat[]
+                                  return (
+                                    <div key={`${floorNum}-${rowNum}`}>
+                                      {renderSeatRow(row, floorLayoutPattern)}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        }
+
+                        return (
+                          <>
+                            {renderFloor(floor1)}
+                            <div className="flex items-center justify-center text-gray-400 dark:text-gray-500 select-none">
+                              <span className="text-3xl font-light">|</span>
+                            </div>
+                            {renderFloor(floor2)}
+                          </>
+                        )
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {Object.keys(seatRows)
+                        .sort((a, b) => Number(a) - Number(b))
+                        .map((rowNum) => {
+                          const row = seatRows[Number(rowNum)]
+
+                          return (
+                            <div key={rowNum} className="flex items-center justify-center gap-3">
+                              {/* Left seats */}
                               <div className="flex gap-2">
-                                {row.slice(layoutPattern.left, layoutPattern.left + layoutPattern.middle).map((seat) => (
+                                {row.slice(0, singleFloorLayoutPattern.left).map((seat) => (
                                   <button
                                     key={seat.id}
                                     onClick={() => handleSeatClick(seat.id)}
@@ -314,32 +510,63 @@ export default function SeatSelectionPage() {
                                   </button>
                                 ))}
                               </div>
-                              <div className="w-8 shrink-0" />
-                            </>
-                          )}
 
-                          {/* Right seats */}
-                          <div className="flex gap-2">
-                            {row.slice(layoutPattern.hasMiddle && layoutPattern.middle 
-                              ? layoutPattern.left + layoutPattern.middle 
-                              : layoutPattern.left
-                            ).map((seat) => (
-                              <button
-                                key={seat.id}
-                                onClick={() => handleSeatClick(seat.id)}
-                                disabled={seat.status === 'booked' || seat.status === 'locked'}
-                                className={`${getSeatColor(
-                                  seat.status
-                                )} text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-70 min-w-[60px]`}
-                              >
-                                {seat.code}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
+                              {/* Aisle */}
+                              <div className="w-8 shrink-0" />
+
+                              {/* Middle seats (for sleeper buses) */}
+                              {singleFloorLayoutPattern.hasMiddle &&
+                                singleFloorLayoutPattern.middle && (
+                                  <>
+                                    <div className="flex gap-2">
+                                      {row
+                                        .slice(
+                                          singleFloorLayoutPattern.left,
+                                          singleFloorLayoutPattern.left + singleFloorLayoutPattern.middle
+                                        )
+                                        .map((seat) => (
+                                          <button
+                                            key={seat.id}
+                                            onClick={() => handleSeatClick(seat.id)}
+                                            disabled={seat.status === 'booked' || seat.status === 'locked'}
+                                            className={`${getSeatColor(
+                                              seat.status
+                                            )} text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-70 min-w-[60px]`}
+                                          >
+                                            {seat.code}
+                                          </button>
+                                        ))}
+                                    </div>
+                                    <div className="w-8 shrink-0" />
+                                  </>
+                                )}
+
+                              {/* Right seats */}
+                              <div className="flex gap-2">
+                                {row
+                                  .slice(
+                                    singleFloorLayoutPattern.hasMiddle && singleFloorLayoutPattern.middle
+                                      ? singleFloorLayoutPattern.left + singleFloorLayoutPattern.middle
+                                      : singleFloorLayoutPattern.left
+                                  )
+                                  .map((seat) => (
+                                    <button
+                                      key={seat.id}
+                                      onClick={() => handleSeatClick(seat.id)}
+                                      disabled={seat.status === 'booked' || seat.status === 'locked'}
+                                      className={`${getSeatColor(
+                                        seat.status
+                                      )} text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-70 min-w-[60px]`}
+                                    >
+                                      {seat.code}
+                                    </button>
+                                  ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  )}
 
                 {/* Legend */}
                 <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">

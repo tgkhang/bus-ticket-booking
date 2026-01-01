@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { PublicLayout } from '@/components/layout'
 import Link from 'next/link'
 import Image from 'next/image'
-import TripSearchForm from '@/components/common/TripSearchForm'
+import SearchBusTicketsCard from '@/components/common/SearchBusTicketsCard'
+import { toast } from 'sonner'
 import {
   ArrowRight,
   Shield,
@@ -24,8 +25,24 @@ import {
 } from 'lucide-react'
 
 export default function Home() {
-  const { isAuthenticated, isInitialized, user, logout  } = useAuth()
+  const { isAuthenticated, isInitialized, user, logout, refreshUser  } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Handle OAuth callback
+  useEffect(() => {
+    const loginSuccess = searchParams.get('login')
+    const provider = searchParams.get('provider')
+    // the login success something like: https://yourapp.com/?login=success&provider=google
+    if (loginSuccess === 'success' && provider) {
+      // OAuth login successful, fetch user data
+      refreshUser().then(() => {
+        toast.success(`Successfully logged in with ${provider}!`)
+        // Remove query params
+        router.replace('/')
+      })
+    }
+  }, [searchParams, refreshUser, router])
 
   useEffect(() => {
     if (!isInitialized || !isAuthenticated) return;
@@ -100,13 +117,22 @@ export default function Home() {
               </button>
             </Link>
           </div>
+
+          <div className="text-center">
+            <Link
+              href="/booking/lookup"
+              className="text-sm text-blue-100 hover:text-white underline underline-offset-4"
+            >
+              Already booked as a guest? Lookup your booking
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* Search Form Section */}
       <section className="py-12 -mt-24 relative z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <TripSearchForm />
+          <SearchBusTicketsCard />
         </div>
       </section>
 

@@ -6,7 +6,59 @@ const createBooking = async (req, res, next) => {
     const userId = req.jwtDecoded.id
     const bookingData = req.body
     const booking = await bookingService.createBooking(userId, bookingData)
+    // Notify clients that seats are now booked
+    if (bookingData?.tripId && Array.isArray(bookingData?.seatIds) && bookingData.seatIds.length > 0) {
+      req.io.emit('seats:booked', { tripId: bookingData.tripId, seatIds: bookingData.seatIds })
+    }
     res.status(StatusCodes.CREATED).json(booking)
+  } catch (error) {
+    next(error)
+  }
+}
+
+const createBookingPublic = async (req, res, next) => {
+  try {
+    const bookingData = req.body
+    const userId = req.jwtDecoded?.id || null
+    const lockOwnerId = userId || req.guestSid
+    const result = await bookingService.createBooking(
+      {
+        userId,
+        lockOwnerId,
+        contactInfo: bookingData.contactInfo,
+        returnGuestAccess: !userId,
+      },
+      bookingData
+    )
+
+    // Notify clients that seats are now booked
+    if (bookingData?.tripId && Array.isArray(bookingData?.seatIds) && bookingData.seatIds.length > 0) {
+      req.io.emit('seats:booked', { tripId: bookingData.tripId, seatIds: bookingData.seatIds })
+    }
+
+    res.status(StatusCodes.CREATED).json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
+const getBookingPublicByReference = async (req, res, next) => {
+  try {
+    const { referenceCode } = req.params
+    const token = req.query.token
+    const booking = await bookingService.getBookingPublicByReference(referenceCode, token)
+    res.status(StatusCodes.OK).json(booking)
+  } catch (error) {
+    next(error)
+  }
+}
+
+const cancelBookingPublicByReference = async (req, res, next) => {
+  try {
+    const { referenceCode } = req.params
+    const token = req.query.token
+    const result = await bookingService.cancelBookingPublicByReference(referenceCode, token)
+    res.status(StatusCodes.OK).json(result)
   } catch (error) {
     next(error)
   }
@@ -38,16 +90,6 @@ const getUserBookings = async (req, res, next) => {
   }
 }
 
-const lockSeats = async (req, res, next) => {
-  try {
-    const { tripId, seatIds, lockDuration } = req.body
-    const result = await bookingService.lockSeats(tripId, seatIds, lockDuration)
-    res.status(StatusCodes.OK).json(result)
-  } catch (error) {
-    next(error)
-  }
-}
-
 const getSeatStatuses = async (req, res, next) => {
   try {
     const { tripId } = req.params
@@ -64,6 +106,12 @@ const confirmBooking = async (req, res, next) => {
     const userId = req.jwtDecoded.id
     const paymentData = req.body
     const booking = await bookingService.confirmBooking(id, userId, paymentData)
+    // If service returns seatIdsBooked, broadcast booked event
+    if (booking?.__meta?.seatIdsBooked && booking?.tripId) {
+      req.io.emit('seats:booked', { tripId: booking.tripId, seatIds: booking.__meta.seatIdsBooked })
+      // Clean meta before responding
+      delete booking.__meta
+    }
     res.status(StatusCodes.OK).json(booking)
   } catch (error) {
     next(error)
@@ -83,9 +131,11 @@ const cancelBooking = async (req, res, next) => {
 
 export const bookingController = {
   createBooking,
+  createBookingPublic,
+  getBookingPublicByReference,
+  cancelBookingPublicByReference,
   getBookingById,
   getUserBookings,
-  lockSeats,
   getSeatStatuses,
   confirmBooking,
   cancelBooking,

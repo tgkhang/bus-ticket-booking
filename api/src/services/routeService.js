@@ -88,6 +88,17 @@ const autocompleteStops = async (query, limit = 10, page = 1) => {
   }
 }
 
+// Public fulltext search endpoints for browse/search page
+const searchStopsPublic = async (query, limit = 10, page = 1) => {
+  const q = typeof query === 'string' ? query.trim() : ''
+  return await stopModel.fullTextSearchStops(q, limit, page)
+}
+
+const searchRoutesPublic = async (query, limit = 10, page = 1) => {
+  const q = typeof query === 'string' ? query.trim() : ''
+  return await routeModel.fullTextSearchRoutes(q, limit, page)
+}
+
 // Routes CRUD
 const createRoute = async (payload) => {
   // Validate operator exists
@@ -162,6 +173,10 @@ const listRoutes = async (filters, pagination) => {
   return await routeModel.getRoutes(filters, pagination)
 }
 
+const getPopularRoutes = async (limit = 4) => {
+  return await routeModel.getPopularRoutes(limit)
+}
+
 export const routeService = {
   // Stops
   createStop,
@@ -170,10 +185,13 @@ export const routeService = {
   getStop,
   listStops,
   autocompleteStops,
+  searchStopsPublic,
   // Routes
   createRoute,
   updateRoute,
   deleteRoute,
   getRoute,
   listRoutes,
+  searchRoutesPublic,
+  getPopularRoutes,
 }

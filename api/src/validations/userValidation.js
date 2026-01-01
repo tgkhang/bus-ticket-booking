@@ -50,7 +50,10 @@ const login = async (req, res, next) => {
 
 const update = async (req, res, next) => {
   const correctCondition = Joi.object({
-    username: Joi.string().trim().strict(),
+    displayName: Joi.string().trim().strict(),
+    phoneNumber: Joi.string().trim(),
+    address: Joi.string().trim(),
+    bankAccount: Joi.string().trim(),
     currentPassword: Joi.string()
       .pattern(PASSWORD_RULE)
       .message('current_password: ' + PASSWORD_RULE_MESSAGE),
@@ -102,6 +105,7 @@ const createByAdmin = async (req, _res, next) => {
     displayName: Joi.string().trim().optional(),
     role: Joi.string().valid('client', 'operator', 'admin').optional(),
     isActive: Joi.boolean().optional(),
+    operatorId: Joi.string().trim().optional(),
   })
 
   try {
@@ -122,6 +126,7 @@ const updateByAdmin = async (req, _res, next) => {
     role: Joi.string().valid('client', 'operator', 'admin').optional(),
     active: Joi.boolean().optional(),
     isActive: Joi.boolean().optional(),
+    operatorId: Joi.string().trim().optional(),
   })
 
   try {

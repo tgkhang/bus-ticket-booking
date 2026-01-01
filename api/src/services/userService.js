@@ -11,6 +11,7 @@ import { JwtProvider } from '~/providers/JwtProvider'
 import { env } from '~/config/environment'
 import ms from 'ms'
 import { GET_DB } from '~/config/prisma'
+import { CloudinaryProvider } from '~/providers/CloudinaryProvider'
 
 // Helper to get client info from request
 const getClientInfo = (req) => ({
@@ -44,9 +45,12 @@ const createNew = async (reqBody, isAdminCreating = false) => {
 
     const createdUser = await userModel.createNew(newUser)
 
+    console.log('📧 Preparing to send verification email. isAdminCreating:', isAdminCreating)
+
     // Send verification email only for non-admin created users
     if (!isAdminCreating) {
       try {
+        console.log('📧 Sending verification email to:', createdUser.email)
         const verificationLink = `${WEBSITE_DOMAIN}/account/verification?email=${createdUser.email}&token=${createdUser.verifyToken}`
         const emailSubject = 'Please verify your email'
         const textContent = `Here is your verification link: ${verificationLink}\n\nThank you for registering!`
@@ -56,8 +60,11 @@ const createNew = async (reqBody, isAdminCreating = false) => {
           <h3>Thank you for registering!</h3>
         `
         await BrevoEmailProvider.sendEmail(createdUser.email, emailSubject, textContent, htmlContent)
+        console.log('✅ Verification email sent to:', createdUser.email)
         // eslint-disable-next-line no-unused-vars
       } catch (emailError) {
+        console.error('❌ Failed to send verification email:', emailError.message)
+        console.error('Email error details:', emailError.response?.body || emailError)
         throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to send verification email')
       }
     }
@@ -119,9 +126,43 @@ const login = async (reqBody, req) => {
       throw invalidCredentialsError
     }
 
+    // Check if account is active (verified)
+    if (!existingUser.isActive) {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        'Your account is not verified. Please check your email for the verification link.'
+      )
+    }
+
     // Verify password
     if (!bcryptjs.compareSync(reqBody.password, existingUser.password)) {
       throw invalidCredentialsError
+    }
+
+    // Get staff info if user is staff
+    let staffId = null
+    let operatorId = null
+    let operatorName = null
+    if (existingUser.role === 'staff') {
+      const staff = await GET_DB().staff.findUnique({
+        where: { userId: existingUser.id },
+        include: {
+          operator: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      })
+      staffId = staff?.id || null
+      operatorId = staff?.operatorId || null
+      operatorName = staff?.operator?.name || null
+    }
+
+    // Get operator info if user is operator
+    if (existingUser.role === 'operator' && existingUser.operatorId) {
+      operatorId = existingUser.operatorId
     }
 
     // Create tokens
@@ -129,6 +170,9 @@ const login = async (reqBody, req) => {
       id: existingUser.id,
       email: existingUser.email,
       role: existingUser.role,
+      ...(staffId && { staffId }),
+      ...(operatorId && { operatorId }),
+      ...(operatorName && { operatorName }),
     }
 
     const accessToken = await JwtProvider.generateToken(userInfo, env.ACCESS_JWT_SECRET_KEY, env.ACCESS_JWT_EXPIRES_IN)
@@ -191,11 +235,45 @@ const refreshToken = async (clientRefreshToken, req) => {
     // Revoke old token (rotation)
     await refreshTokenModel.revokeToken(clientRefreshToken)
 
+    // Get staff info if user is staff
+    let staffId = refreshTokenDecoded.staffId || null
+    let operatorId = refreshTokenDecoded.operatorId || null
+    let operatorName = refreshTokenDecoded.operatorName || null
+
+    if (refreshTokenDecoded.role === 'staff' && !staffId) {
+      const staff = await GET_DB().staff.findUnique({
+        where: { userId: refreshTokenDecoded.id },
+        include: {
+          operator: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      })
+      staffId = staff?.id || null
+      operatorId = staff?.operatorId || null
+      operatorName = staff?.operator?.name || null
+    }
+
+    // Get operator info if user is operator
+    if (refreshTokenDecoded.role === 'operator' && !operatorId) {
+      const user = await GET_DB().user.findUnique({
+        where: { id: refreshTokenDecoded.id },
+        select: { operatorId: true },
+      })
+      operatorId = user?.operatorId || null
+    }
+
     // Generate new tokens
     const userInfo = {
       id: refreshTokenDecoded.id,
       email: refreshTokenDecoded.email,
       role: refreshTokenDecoded.role,
+      ...(staffId && { staffId }),
+      ...(operatorId && { operatorId }),
+      ...(operatorName && { operatorName }),
     }
 
     const newAccessToken = await JwtProvider.generateToken(
@@ -328,15 +406,11 @@ const resetPassword = async (reqBody) => {
   }
 }
 
-const update = async (userId, reqBody) => {
+const update = async (userId, reqBody, userAvatarFile) => {
   try {
     const existUser = await userModel.findOneById(userId)
-    if (!existUser) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found')
-    }
-    if (!existUser.isActive) {
-      throw new ApiError(StatusCodes.NOT_ACCEPTABLE, 'Account is not active')
-    }
+    if (!existUser) throw new ApiError(StatusCodes.NOT_FOUND, 'User not found')
+    if (!existUser.isActive) throw new ApiError(StatusCodes.NOT_ACCEPTABLE, 'Account is not active')
 
     let updatedUser = {}
 
@@ -352,6 +426,13 @@ const update = async (userId, reqBody) => {
 
       // Revoke all sessions except current for security
       await refreshTokenModel.revokeAllUserTokens(existUser.id)
+    } else if (userAvatarFile) {
+      // case upload avatar
+      const uploadResult = await CloudinaryProvider.streamUpload(userAvatarFile.buffer, 'users')
+      // save url
+      updatedUser = await userModel.update(existUser.id, {
+        avatar: uploadResult.secure_url,
+      })
     } else {
       // Update general info
       updatedUser = await userModel.update(existUser.id, {
@@ -371,7 +452,36 @@ const getMe = async (userId) => {
     if (!user) {
       throw new ApiError(StatusCodes.NOT_FOUND, 'User not found')
     }
-    return pickUser(user)
+
+    const userData = pickUser(user)
+
+    // If user is staff, include operator information
+    if (user.role === 'staff') {
+      const staff = await GET_DB().staff.findUnique({
+        where: { userId: user.id },
+        include: {
+          operator: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      })
+
+      if (staff) {
+        userData.staffId = staff.id
+        userData.operatorId = staff.operatorId
+        userData.operatorName = staff.operator?.name || null
+      }
+    }
+
+    // If user is operator, include operator information
+    if (user.role === 'operator' && user.operatorId) {
+      userData.operatorId = user.operatorId
+    }
+
+    return userData
   } catch (error) {
     throw error
   }
@@ -382,7 +492,7 @@ const oauthGoogleLogin = async (reqBody, req) => {
     const { email, name, picture, sub } = reqBody
 
     // Check if user exists by email or OAuth sub
-    let user = await userModel.findOneByEmail(email) || await userModel.findOneByOauthSub(sub)
+    let user = (await userModel.findOneByEmail(email)) || (await userModel.findOneByOauthSub(sub))
 
     if (user) {
       // Update existing user with OAuth info
@@ -413,11 +523,40 @@ const oauthGoogleLogin = async (reqBody, req) => {
       })
     }
 
+    // Get staff info if user is staff
+    let staffId = null
+    let operatorId = null
+    let operatorName = null
+    if (user.role === 'staff') {
+      const staff = await GET_DB().staff.findUnique({
+        where: { userId: user.id },
+        include: {
+          operator: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      })
+      staffId = staff?.id || null
+      operatorId = staff?.operatorId || null
+      operatorName = staff?.operator?.name || null
+    }
+
+    // Get operator info if user is operator
+    if (user.role === 'operator' && user.operatorId) {
+      operatorId = user.operatorId
+    }
+
     // Create tokens (same as regular login)
     const userInfo = {
       id: user.id,
       email: user.email,
       role: user.role,
+      ...(staffId && { staffId }),
+      ...(operatorId && { operatorId }),
+      ...(operatorName && { operatorName }),
     }
 
     const accessToken = await JwtProvider.generateToken(userInfo, env.ACCESS_JWT_SECRET_KEY, env.ACCESS_JWT_EXPIRES_IN)
@@ -452,28 +591,28 @@ const oauthGoogleLogin = async (reqBody, req) => {
 
 // Get list of users (admin)
 const listUsers = async (query) => {
-  return userModel.listUsers(query);
+  return userModel.listUsers(query)
 }
 
 // Admin update user
 const updateByAdmin = async (id, data) => {
-  const updateData = { ...data };
+  const updateData = { ...data }
   if ('active' in updateData) {
-    updateData.isActive = updateData.active;
-    delete updateData.active;
+    updateData.isActive = updateData.active
+    delete updateData.active
   }
-  
+
   // Hash password if provided
   if (updateData.password) {
-    updateData.password = bcryptjs.hashSync(updateData.password, 10);
+    updateData.password = bcryptjs.hashSync(updateData.password, 10)
   }
-  
-  return userModel.updateByAdmin(id, updateData);
+
+  return userModel.updateByAdmin(id, updateData)
 }
 
 // Admin delete user
 const deleteUser = async (id) => {
-  return userModel.deleteUser(id);
+  return userModel.deleteUser(id)
 }
 
 export const userService = {
@@ -492,4 +631,3 @@ export const userService = {
   updateByAdmin,
   deleteUser,
 }
-  

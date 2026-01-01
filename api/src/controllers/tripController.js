@@ -12,6 +12,16 @@ const search = async (req, res, next) => {
   }
 }
 
+const searchPublic = async (req, res, next) => {
+  try {
+    const filters = res.locals.filters || req.query || {}
+    const result = await tripService.searchTripsPublic(filters)
+    res.status(StatusCodes.OK).json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
 const getTripById = async (req, res, next) => {
   try {
     const { id } = req.params
@@ -41,6 +51,12 @@ const listTrips = async (req, res, next) => {
     basePrice: req.query.basePrice,
     status: req.query.status,
     search: req.query.search,
+    operatorId: req.query.operatorId,
+    staffId: req.query.staffId,
+    dateFrom: req.query.dateFrom,
+    dateTo: req.query.dateTo,
+    sortBy: req.query.sortBy,
+    sortOrder: req.query.sortOrder,
   }
 
   let { page, limit } = req.query
@@ -69,11 +85,29 @@ const deleteTrip = async (req, res, next) => {
   res.status(StatusCodes.OK).json(result)
 }
 
+const cancelTrip = async (req, res, next) => {
+  try {
+    const { id } = req.params
+    const result = await tripService.cancelScheduledTrip(id)
+
+    // Live update for connected clients
+    if (req.io) {
+      req.io.emit('trip:statusUpdated', { tripId: id, status: 'cancelled' })
+    }
+
+    res.status(StatusCodes.OK).json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const tripController = {
   createTrip,
   search,
+  searchPublic,
   getTripById,
   updateTrip,
   deleteTrip,
   listTrips,
+  cancelTrip,
 }

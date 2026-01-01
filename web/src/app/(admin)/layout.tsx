@@ -23,6 +23,8 @@ import {
   User,
   Bell,
   Search,
+  BarChart,
+  TrendingUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -128,17 +130,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         } flex flex-col`}
       >
         {/* Logo Section */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800 shrink-0">
-          <div className={`flex items-center gap-2 ${sidebarCollapsed ? 'justify-center w-full' : ''}`}>
-            <Bus className="w-8 h-8 text-blue-600 shrink-0" />
-            {!sidebarCollapsed && <span className="text-xl font-bold text-gray-900 dark:text-white">BusBooking</span>}
+        <div className="p-6 border-b border-gray-200 dark:border-gray-800 shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <div className={`flex items-center gap-2 ${sidebarCollapsed ? 'justify-center w-full' : ''}`}>
+              <Bus className="w-8 h-8 text-blue-600 shrink-0" />
+              {!sidebarCollapsed && <span className="text-xl font-bold text-gray-900 dark:text-white">BusBooking</span>}
+            </div>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="lg:hidden text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            >
+              <X className="w-6 h-6" />
+            </button>
           </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          {!sidebarCollapsed && (
+            <div className="bg-purple-50 dark:bg-purple-900/20 px-3 py-2 rounded-lg">
+              <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">
+                Super Admin Dashboard
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Navigation */}
@@ -169,27 +180,55 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* User Profile Section - Bottom of Sidebar */}
         <div className="border-t border-gray-200 dark:border-gray-800 p-4 shrink-0">
-          {sidebarCollapsed ? (
-            <div className="flex justify-center">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={user?.avatar} alt={user?.username || user?.email} />
-                <AvatarFallback className="bg-blue-600 text-white">{getUserInitials()}</AvatarFallback>
-              </Avatar>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={user?.avatar} alt={user?.username || user?.email} />
-                <AvatarFallback className="bg-blue-600 text-white">{getUserInitials()}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {user?.username || 'Admin User'}
-                </p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{user?.email}</p>
-              </div>
-            </div>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-full hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg p-2 transition-colors text-left">
+                {sidebarCollapsed ? (
+                  <div className="flex justify-center">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={user?.avatar} alt={user?.username || user?.email} />
+                      <AvatarFallback className="bg-blue-600 text-white">{getUserInitials()}</AvatarFallback>
+                    </Avatar>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={user?.avatar} alt={user?.username || user?.email} />
+                      <AvatarFallback className="bg-blue-600 text-white">{getUserInitials()}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {user?.username || 'Admin User'}
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{user?.email}</p>
+                    </div>
+                  </div>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align={sidebarCollapsed ? "center" : "end"} className="w-56">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium">{user?.username || 'Admin User'}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/admin/profile')}>
+                <User className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/admin/settings')}>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Logout</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Collapse Button - Desktop Only - Sticks out from sidebar */}
@@ -261,8 +300,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       <p className="text-sm font-medium text-gray-900 dark:text-white">
                         {user?.username || 'Admin User'}
                       </p>
-                      <Badge variant="info" className="text-xs">
-                        {user?.role}
+                      <Badge variant="error" className="text-xs">
+                        Super Admin
                       </Badge>
                     </div>
                   </Button>
@@ -275,7 +314,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push('//profile')}>
+                  <DropdownMenuItem onClick={() => router.push('/admin/profile')}>
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>

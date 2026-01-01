@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { Search, Clock, TrendingUp, Ticket, ArrowRight, Sparkles, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { autocompleteStopsAPI } from '@/lib/api'
+import { autocompleteStopsAPI, getPopularRoutesAPI, type PopularRouteItem } from '@/lib/api'
+import { addRecentSearch, loadRecentSearches, type RecentSearchItem } from '@/utils/recentSearches'
 
 interface Stop {
   id: string
@@ -15,23 +16,7 @@ interface Stop {
   longitude: number
 }
 
-interface RecentSearch {
-  id: string
-  from: string
-  fromId: string
-  to: string
-  toId: string
-  date: string
-}
-
-interface PopularRoute {
-  id: string
-  from: string
-  to: string
-  price: number
-  duration: string
-  trips: number
-}
+type PopularRoute = PopularRouteItem
 
 export default function UserHomePage() {
   const router = useRouter()
@@ -58,43 +43,24 @@ export default function UserHomePage() {
   const [loadingFrom, setLoadingFrom] = useState(false)
   const [loadingTo, setLoadingTo] = useState(false)
 
-  // Mock data - in production, fetch from API
-  const recentSearches: RecentSearch[] = []
+  const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>([])
+  const [popularRoutes, setPopularRoutes] = useState<PopularRoute[]>([])
 
-  const popularRoutes: PopularRoute[] = [
-    {
-      id: '1',
-      from: 'Ho Chi Minh City',
-      to: 'Da Lat',
-      price: 350000,
-      duration: '6h 30m',
-      trips: 12,
-    },
-    {
-      id: '2',
-      from: 'Hanoi',
-      to: 'Ha Long Bay',
-      price: 280000,
-      duration: '4h 15m',
-      trips: 8,
-    },
-    {
-      id: '3',
-      from: 'Da Nang',
-      to: 'Hoi An',
-      price: 150000,
-      duration: '1h 30m',
-      trips: 15,
-    },
-    {
-      id: '4',
-      from: 'HCMC',
-      to: 'Vung Tau',
-      price: 180000,
-      duration: '2h 45m',
-      trips: 10,
-    },
-  ]
+  useEffect(() => {
+    setRecentSearches(loadRecentSearches())
+  }, [])
+
+  useEffect(() => {
+    const loadPopular = async () => {
+      try {
+        const routes = await getPopularRoutesAPI(4)
+        setPopularRoutes(routes.slice(0, 4))
+      } catch (e) {
+        setPopularRoutes([])
+      }
+    }
+    loadPopular()
+  }, [])
 
   const fetchStops = async (query: string, page: number, type: 'from' | 'to') => {
     try {
@@ -178,6 +144,19 @@ export default function UserHomePage() {
         params.set('toText', searchData.to)
       }
 
+      const fromText = selectedOriginStop ? selectedOriginStop.name : searchData.from
+      const toText = selectedDestinationStop ? selectedDestinationStop.name : searchData.to
+
+      const nextRecent = addRecentSearch({
+        fromText: fromText || 'All Stops',
+        toText: toText || 'All Stops',
+        originStopId: selectedOriginStop?.id,
+        destinationStopId: selectedDestinationStop?.id,
+        date: searchData.date,
+        passengers: searchData.passengers,
+      })
+      setRecentSearches(nextRecent)
+
       router.push(`/trips/search?${params.toString()}`)
     }
   }
@@ -187,6 +166,34 @@ export default function UserHomePage() {
       style: 'currency',
       currency: 'VND',
     }).format(amount)
+  }
+
+  const formatDuration = (minutes: number) => {
+    if (!minutes || minutes <= 0) return ''
+    const h = Math.floor(minutes / 60)
+    const m = minutes % 60
+    if (h <= 0) return `${m}m`
+    if (m === 0) return `${h}h`
+    return `${h}h ${m}m`
+  }
+
+  const buildSearchUrl = (input: {
+    originStopId?: string
+    destinationStopId?: string
+    fromText?: string
+    toText?: string
+    date: string
+    passengers: number
+  }) => {
+    const params = new URLSearchParams({
+      date: input.date,
+      passengers: input.passengers.toString(),
+    })
+    if (input.originStopId) params.set('originStopId', input.originStopId)
+    if (input.destinationStopId) params.set('destinationStopId', input.destinationStopId)
+    if (input.fromText) params.set('fromText', input.fromText)
+    if (input.toText) params.set('toText', input.toText)
+    return `/trips/search?${params.toString()}`
   }
 
   return (
@@ -203,9 +210,21 @@ export default function UserHomePage() {
 
         {/* Search Card */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-          <div className="flex items-center gap-2 mb-6">
-            <Search className="w-6 h-6 text-blue-600" />
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Search Bus Tickets</h2>
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <Search className="w-6 h-6 text-blue-600" />
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Search Bus Tickets</h2>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push('/routes-stops')}
+              className="shrink-0"
+            >
+              Browse Stops & Routes
+              <ArrowRight className="w-4 h-4" />
+            </Button>
           </div>
 
           <form onSubmit={handleSearch}>
@@ -373,19 +392,24 @@ export default function UserHomePage() {
                   {recentSearches.map((search) => (
                     <button
                       key={search.id}
-                      onClick={() =>
-                        router.push(
-                          `/trips/search?originStopId=${search.fromId}&destinationStopId=${search.toId}&date=${search.date}&passengers=1`
-                        )
-                      }
+                      onClick={() => router.push(buildSearchUrl({
+                        originStopId: search.originStopId,
+                        destinationStopId: search.destinationStopId,
+                        fromText: search.fromText,
+                        toText: search.toText,
+                        date: search.date,
+                        passengers: search.passengers,
+                      }))}
                       className="w-full flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-md hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         <div className="text-left">
                           <p className="text-gray-900 dark:text-white font-medium">
-                            {search.from} → {search.to}
+                            {search.fromText} → {search.toText}
                           </p>
-                          <p className="text-gray-600 dark:text-gray-400 text-sm">{search.date}</p>
+                          <p className="text-gray-600 dark:text-gray-400 text-sm">
+                            {search.date} • {search.passengers} passenger{search.passengers > 1 ? 's' : ''}
+                          </p>
                         </div>
                       </div>
                       <ArrowRight className="w-5 h-5 text-gray-400 dark:text-gray-500" />
@@ -406,6 +430,26 @@ export default function UserHomePage() {
                 {popularRoutes.map((route) => (
                   <button
                     key={route.id}
+                    onClick={() => {
+                      const today = new Date().toISOString().split('T')[0]
+                      const nextRecent = addRecentSearch({
+                        fromText: route.from,
+                        toText: route.to,
+                        originStopId: route.originStopId,
+                        destinationStopId: route.destinationStopId,
+                        date: today,
+                        passengers: 1,
+                      })
+                      setRecentSearches(nextRecent)
+                      router.push(buildSearchUrl({
+                        originStopId: route.originStopId,
+                        destinationStopId: route.destinationStopId,
+                        fromText: route.from,
+                        toText: route.to,
+                        date: today,
+                        passengers: 1,
+                      }))
+                    }}
                     className="p-4 border border-gray-200 dark:border-gray-700 rounded-md hover:border-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors text-left"
                   >
                     <div className="flex justify-between items-start mb-2">
@@ -413,11 +457,12 @@ export default function UserHomePage() {
                         {route.from} → {route.to}
                       </p>
                       <span className="text-green-600 font-bold text-sm">
-                        {formatCurrency(route.price)}
+                        {formatCurrency(route.minPrice)}
                       </span>
                     </div>
                     <p className="text-gray-600 dark:text-gray-400 text-sm">
-                      {route.duration} • {route.trips} trips/day
+                      {route.avgDurationMinutes ? `${formatDuration(route.avgDurationMinutes)} • ` : ''}
+                      {route.bookings} booking{route.bookings === 1 ? '' : 's'}
                     </p>
                   </button>
                 ))}

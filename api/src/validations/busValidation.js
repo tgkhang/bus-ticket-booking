@@ -20,6 +20,7 @@ const createNewBus = async (req, _res, next) => {
       }),
     model: Joi.string().min(2).max(100).required().trim(),
     seatCapacity: Joi.number().integer().min(1).max(100).required(),
+    images: Joi.array().items(Joi.string().uri()).max(10).optional(),
     amenities: Joi.object({
       wifi: Joi.boolean().default(false),
       ac: Joi.boolean().default(false),
@@ -54,6 +55,7 @@ const updateBus = async (req, _res, next) => {
     model: Joi.string().min(2).max(100).trim(),
     seatCapacity: Joi.number().integer().min(1).max(100),
     status: Joi.string().valid('active', 'inactive', 'maintenance'),
+    images: Joi.array().items(Joi.string().uri()).max(10),
     amenities: Joi.object({
       wifi: Joi.boolean(),
       ac: Joi.boolean(),
@@ -127,7 +129,7 @@ const generateSeats = async (req, _res, next) => {
         'Sleeper-40',
         'Cabin-VIP',
         'Limo-9',
-        'Limo-16',
+        'Limo-16'
         // 'City-Transit',
         // 'Mini-Bus'
       )

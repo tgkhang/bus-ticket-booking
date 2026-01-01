@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState, Suspense, useRef } from 'react'
+import { useEffect, useState, Suspense, useRef, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { searchTripsAPI, autocompleteStopsAPI } from '@/lib/api'
+import { addRecentSearch } from '@/utils/recentSearches'
 import { 
   Calendar, 
   MapPin, 
@@ -59,6 +60,7 @@ interface FilterState {
   timeSlots: string[]
   priceRange: [number, number]
   amenities: string[]
+  busType: string[]
 }
 
 const SORT_OPTIONS = [
@@ -70,6 +72,42 @@ const SORT_OPTIONS = [
   { value: 'duration:desc', label: 'Duration: Longest First' },
 ]
 
+// Helper to convert time slots to time ranges for API
+const getTimeRange = (slots: string[]) => {
+  if (slots.length === 0) return {}
+  
+  let minStart = '23:59'
+  let maxEnd = '00:00'
+  
+  const ranges: Record<string, { start: string; end: string }> = {
+    early_morning: { start: '00:00', end: '06:00' },
+    morning: { start: '06:01', end: '12:00' },
+    afternoon: { start: '12:01', end: '18:00' },
+    evening: { start: '18:01', end: '23:59' },
+  }
+
+  slots.forEach(slot => {
+    const range = ranges[slot]
+    if (range) {
+      if (range.start < minStart) minStart = range.start
+      if (range.end > maxEnd) maxEnd = range.end
+    }
+  })
+  
+  return { startTime: minStart, endTime: maxEnd }
+}
+
+// Helper to convert time range from API to time slots
+const getTimeSlotsFromRange = (start?: string | null, end?: string | null) => {
+  if (!start || !end) return []
+  const slots: string[] = []
+  if (start <= '00:00' && end >= '06:00') slots.push('early_morning')
+  if (start <= '06:01' && end >= '12:00') slots.push('morning')
+  if (start <= '12:01' && end >= '18:00') slots.push('afternoon')
+  if (start <= '18:01' && end >= '23:59') slots.push('evening')
+  return slots
+}
+
 function SearchContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -80,13 +118,74 @@ function SearchContent() {
   const isInitialLoad = useRef(true)
   const scrollPositionRef = useRef(0)
   
-  // Filter and sort state
-  const [filters, setFilters] = useState<FilterState>({
-    timeSlots: [],
-    priceRange: [0, 10000000],
-    amenities: [],
-  })
-  const [sortBy, setSortBy] = useState('departure:asc')
+  // Derived state from URL
+  const filters = useMemo<FilterState>(() => {
+    const minPrice = searchParams.get('minPrice')
+    const maxPrice = searchParams.get('maxPrice')
+    const amenities = searchParams.get('amenities')
+    const busType = searchParams.get('busType')
+    const startTime = searchParams.get('startTime')
+    const endTime = searchParams.get('endTime')
+
+    return {
+      timeSlots: getTimeSlotsFromRange(startTime, endTime),
+      priceRange: [
+        minPrice ? parseInt(minPrice) : 0,
+        maxPrice ? parseInt(maxPrice) : 10000000
+      ],
+      amenities: amenities ? amenities.split(',') : [],
+      busType: busType ? busType.split(',') : [],
+    }
+  }, [searchParams])
+
+  const sortBy = useMemo(() => {
+    const field = searchParams.get('sortBy')
+    const order = searchParams.get('sortOrder')
+    if (field && order) {
+      return `${field}:${order}`
+    }
+    return 'departure:asc'
+  }, [searchParams])
+
+  const updateFilters = useCallback((newFilters: FilterState) => {
+    const params = new URLSearchParams(searchParams.toString())
+    
+    // Update price
+    if (newFilters.priceRange[0] > 0) params.set('minPrice', newFilters.priceRange[0].toString())
+    else params.delete('minPrice')
+    
+    if (newFilters.priceRange[1] < 10000000) params.set('maxPrice', newFilters.priceRange[1].toString())
+    else params.delete('maxPrice')
+
+    // Update amenities
+    if (newFilters.amenities.length > 0) params.set('amenities', newFilters.amenities.join(','))
+    else params.delete('amenities')
+
+    // Update busType
+    if (newFilters.busType.length > 0) params.set('busType', newFilters.busType.join(','))
+    else params.delete('busType')
+
+    // Update time slots
+    const timeRange = getTimeRange(newFilters.timeSlots)
+    if (timeRange.startTime) params.set('startTime', timeRange.startTime)
+    else params.delete('startTime')
+    
+    if (timeRange.endTime) params.set('endTime', timeRange.endTime)
+    else params.delete('endTime')
+
+    // Reset page to 1 on filter change
+    params.set('page', '1')
+
+    router.push(`/trips/search?${params.toString()}`)
+  }, [searchParams, router])
+
+  const updateSort = useCallback((newSort: string) => {
+    const [field, order] = newSort.split(':')
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('sortBy', field)
+    params.set('sortOrder', order)
+    router.push(`/trips/search?${params.toString()}`)
+  }, [searchParams, router])
 
   // Search editor state
   const [showSearchEditor, setShowSearchEditor] = useState(false)
@@ -100,6 +199,60 @@ function SearchContent() {
   const [showToDropdown, setShowToDropdown] = useState(false)
   const [selectedOriginStop, setSelectedOriginStop] = useState<Stop | null>(null)
   const [selectedDestinationStop, setSelectedDestinationStop] = useState<Stop | null>(null)
+
+  // Pagination state for stop suggestions (mirrors homepage dropdown)
+  const [fromPage, setFromPage] = useState(1)
+  const [toPage, setToPage] = useState(1)
+  const [hasMoreFrom, setHasMoreFrom] = useState(true)
+  const [hasMoreTo, setHasMoreTo] = useState(true)
+  const [loadingFrom, setLoadingFrom] = useState(false)
+  const [loadingTo, setLoadingTo] = useState(false)
+
+  const fetchStops = async (query: string, page: number, type: 'from' | 'to') => {
+    try {
+      if (type === 'from') setLoadingFrom(true)
+      else setLoadingTo(true)
+
+      const limit = 5
+      const results = await autocompleteStopsAPI(query, limit, page)
+
+      if (type === 'from') {
+        if (page === 1) setFromSuggestions(results)
+        else setFromSuggestions((prev) => [...prev, ...results])
+        setHasMoreFrom(results.length === limit)
+      } else {
+        if (page === 1) setToSuggestions(results)
+        else setToSuggestions((prev) => [...prev, ...results])
+        setHasMoreTo(results.length === limit)
+      }
+    } catch (error) {
+      if (type === 'from') {
+        if (page === 1) setFromSuggestions([])
+        setHasMoreFrom(false)
+      } else {
+        if (page === 1) setToSuggestions([])
+        setHasMoreTo(false)
+      }
+    } finally {
+      if (type === 'from') setLoadingFrom(false)
+      else setLoadingTo(false)
+    }
+  }
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>, type: 'from' | 'to') => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget
+    if (scrollHeight - scrollTop <= clientHeight + 1) {
+      if (type === 'from' && hasMoreFrom && !loadingFrom) {
+        const nextPage = fromPage + 1
+        setFromPage(nextPage)
+        fetchStops(editFrom, nextPage, 'from')
+      } else if (type === 'to' && hasMoreTo && !loadingTo) {
+        const nextPage = toPage + 1
+        setToPage(nextPage)
+        fetchStops(editTo, nextPage, 'to')
+      }
+    }
+  }
 
   const originStopId = searchParams.get('originStopId')
   const destinationStopId = searchParams.get('destinationStopId')
@@ -133,56 +286,35 @@ function SearchContent() {
 
   // Debounced autocomplete for "from" field
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (editFrom && editFrom.length >= 2 && showFromDropdown) {
-        try {
-          const results = await autocompleteStopsAPI(editFrom, 5)
-          setFromSuggestions(results)
-        } catch (error) {
-          setFromSuggestions([])
-        }
-      } else {
-        setFromSuggestions([])
-      }
+    if (!showFromDropdown) {
+      setFromSuggestions([])
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setFromPage(1)
+      fetchStops(editFrom || '', 1, 'from')
     }, 300)
+
     return () => clearTimeout(timer)
   }, [editFrom, showFromDropdown])
 
   // Debounced autocomplete for "to" field
   useEffect(() => {
-    const timer = setTimeout(async () => {
-      if (editTo && editTo.length >= 2 && showToDropdown) {
-        try {
-          const results = await autocompleteStopsAPI(editTo, 5)
-          setToSuggestions(results)
-        } catch (error) {
-          setToSuggestions([])
-        }
-      } else {
-        setToSuggestions([])
-      }
+    if (!showToDropdown) {
+      setToSuggestions([])
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setToPage(1)
+      fetchStops(editTo || '', 1, 'to')
     }, 300)
+
     return () => clearTimeout(timer)
   }, [editTo, showToDropdown])
 
-  // Convert time slots to time ranges for API
-  const getTimeRange = (slots: string[]) => {
-    if (slots.length === 0) return {}
-    // Map time slots to hour ranges
-    const timeMap: Record<string, { start: string; end: string }> = {
-      early_morning: { start: '00:00', end: '06:00' },
-      morning: { start: '06:01', end: '12:00' },
-      afternoon: { start: '12:01', end: '18:00' },
-      evening: { start: '18:01', end: '23:59' },
-    }
-    // For simplicity, if multiple slots selected, use the earliest start and latest end
-    // In a real app, you might want to handle this differently
-    if (slots.includes('early_morning')) return { startTime: '00:00', endTime: '06:00' }
-    if (slots.includes('morning')) return { startTime: '06:01', endTime: '12:00' }
-    if (slots.includes('afternoon')) return { startTime: '12:01', endTime: '18:00' }
-    if (slots.includes('evening')) return { startTime: '18:01', endTime: '23:59' }
-    return {}
-  }
+
 
   useEffect(() => {
     const fetchTrips = async () => {
@@ -220,6 +352,7 @@ function SearchContent() {
           minPrice: filters.priceRange[0] > 0 ? filters.priceRange[0] : undefined,
           maxPrice: filters.priceRange[1] < 10000000 ? filters.priceRange[1] : undefined,
           amenities: filters.amenities.length > 0 ? filters.amenities.join(',') : undefined,
+          busType: filters.busType.length > 0 ? filters.busType.join(',') : undefined,
           ...timeRange,
         })
 
@@ -257,10 +390,11 @@ function SearchContent() {
   }, [originStopId, destinationStopId, date, page, filters, sortBy])
 
   const handleClearFilters = () => {
-    setFilters({
+    updateFilters({
       timeSlots: [],
       priceRange: [0, 10000000],
       amenities: [],
+      busType: [],
     })
   }
 
@@ -285,6 +419,15 @@ function SearchContent() {
       } else if (editTo) {
         params.set('toText', editTo)
       }
+
+      addRecentSearch({
+        fromText: selectedOriginStop?.name || editFrom || 'All Stops',
+        toText: selectedDestinationStop?.name || editTo || 'All Stops',
+        originStopId: selectedOriginStop?.id,
+        destinationStopId: selectedDestinationStop?.id,
+        date: editDate,
+        passengers: editPassengers,
+      })
 
       router.push(`/trips/search?${params.toString()}`)
       setShowSearchEditor(false)
@@ -404,12 +547,15 @@ function SearchContent() {
                     <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
                     
                     {showFromDropdown && fromSuggestions.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div
+                        className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                        onScroll={(e) => handleScroll(e, 'from')}
+                      >
                         {fromSuggestions.map((stop) => (
                           <button
                             key={stop.id}
                             type="button"
-                            onClick={() => {
+                            onMouseDown={() => {
                               setEditFrom(stop.name)
                               setSelectedOriginStop(stop)
                               setShowFromDropdown(false)
@@ -422,6 +568,9 @@ function SearchContent() {
                             </div>
                           </button>
                         ))}
+                        {loadingFrom && (
+                          <div className="p-2 text-center text-gray-500 dark:text-gray-400 text-sm">Loading...</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -447,12 +596,15 @@ function SearchContent() {
                     <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
                     
                     {showToDropdown && toSuggestions.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      <div
+                        className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                        onScroll={(e) => handleScroll(e, 'to')}
+                      >
                         {toSuggestions.map((stop) => (
                           <button
                             key={stop.id}
                             type="button"
-                            onClick={() => {
+                            onMouseDown={() => {
                               setEditTo(stop.name)
                               setSelectedDestinationStop(stop)
                               setShowToDropdown(false)
@@ -465,6 +617,9 @@ function SearchContent() {
                             </div>
                           </button>
                         ))}
+                        {loadingTo && (
+                          <div className="p-2 text-center text-gray-500 dark:text-gray-400 text-sm">Loading...</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -529,7 +684,7 @@ function SearchContent() {
           <div className="lg:col-span-1">
             <FilterSidebar
               filters={filters}
-              onFiltersChange={setFilters}
+              onFiltersChange={updateFilters}
               onClearFilters={handleClearFilters}
               totalResults={meta?.total || trips.length}
               isLoading={loading}
@@ -559,7 +714,7 @@ function SearchContent() {
                         <select
                           id="sortBy"
                           value={sortBy}
-                          onChange={(e) => setSortBy(e.target.value)}
+                          onChange={(e) => updateSort(e.target.value)}
                           disabled={loading}
                           className="appearance-none bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 pr-10 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         >

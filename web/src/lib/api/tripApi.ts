@@ -1,11 +1,6 @@
 import authorizedAxiosInstance from '@/lib/axios/authorizeAxios'
 import { API_ROOT } from '@/lib/utils/constants'
-import type {
-
-  PaginationParams,
-  PaginatedResponse,
-
-} from '@/types/api'
+import type { PaginationParams, PaginatedResponse } from '@/types/api'
 import type { TripDetail, CreateTripData, UpdateTripData, ListTripsFilters, Trip } from '@/types/trip'
 import { toast } from 'sonner'
 
@@ -41,5 +36,11 @@ export const updateTripAPI = async (tripId: string, tripData: Partial<UpdateTrip
 export const deleteTripAPI = async (tripId: string) => {
   const response = await authorizedAxiosInstance.delete(`${API_ROOT}/v1/trips/${tripId}`)
   toast.success('Trip deleted successfully')
+  return response.data
+}
+
+export const cancelTripAPI = async (tripId: string) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/trips/${tripId}/cancel`)
+  toast.success('Trip cancelled successfully')
   return response.data
 }

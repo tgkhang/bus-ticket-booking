@@ -219,6 +219,54 @@ const checkAvailability = async (req, res, next) => {
   }
 }
 
+const uploadBusImages = async (req, res, next) => {
+  const busId = req.params.id
+  const files = req.files // Array of uploaded files from multer
+
+  if (!files || files.length === 0) {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      message: 'No images provided',
+    })
+  }
+
+  const result = await busService.uploadBusImages(busId, files)
+  res.status(StatusCodes.OK).json(result)
+}
+
+const updateBusImages = async (req, res, next) => {
+  const busId = req.params.id
+  const files = req.files // Array of uploaded files from multer
+
+  if (!files || files.length === 0) {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      message: 'No images provided',
+    })
+  }
+
+  const result = await busService.updateBusImages(busId, files)
+  res.status(StatusCodes.OK).json(result)
+}
+
+const deleteBusImage = async (req, res, next) => {
+  const busId = req.params.id
+  const imageIndex = parseInt(req.params.imageIndex, 10)
+
+  if (isNaN(imageIndex) || imageIndex < 0) {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      message: 'Invalid image index',
+    })
+  }
+
+  const result = await busService.deleteBusImage(busId, imageIndex)
+  res.status(StatusCodes.OK).json(result)
+}
+
+const deleteAllBusImages = async (req, res, next) => {
+  const busId = req.params.id
+  const result = await busService.deleteAllBusImages(busId)
+  res.status(StatusCodes.OK).json(result)
+}
+
 export const busController = {
   // Bus CRUD
   createBus,
@@ -240,4 +288,10 @@ export const busController = {
   getSeatLayout,
   getBusTrips,
   checkAvailability,
+
+  // Upload bus images
+  uploadBusImages,
+  updateBusImages,
+  deleteBusImage,
+  deleteAllBusImages,
 }

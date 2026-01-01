@@ -15,12 +15,16 @@ const search = async (req, res, next) => {
     minPrice: Joi.number().min(0),
     maxPrice: Joi.number().min(0),
     busModel: Joi.string(),
+    busType: Joi.alternatives().try(Joi.string(), Joi.array().items(Joi.string()).min(1)),
     amenities: Joi.string(), // comma-separated
     status: Joi.string().valid('scheduled', 'active', 'completed', 'cancelled'),
+    passengers: Joi.number().integer().min(1).default(1),
     page: Joi.number().integer().min(1).default(1),
     limit: Joi.number().integer().min(1).max(100).default(20),
     sortBy: Joi.string().valid('price', 'departure', 'duration').default('departure'),
     sortOrder: Joi.string().valid('asc', 'desc').default('asc'),
+    staffId: Joi.string().uuid(),
+    operatorId: Joi.string().uuid(),
   }).custom((value, helpers) => {
     if (value.minPrice && value.maxPrice && value.minPrice > value.maxPrice) {
       return helpers.error('any.invalid', { message: 'minPrice must be <= maxPrice' })
@@ -49,7 +53,6 @@ const search = async (req, res, next) => {
     next(new ApiError(StatusCodes.UNPROCESSABLE_ENTITY, new Error(error).message))
   }
 }
-
 
 const createTrip = async (req, res, next) => {
   const schema = Joi.object({
@@ -82,6 +85,7 @@ const updateTrip = async (req, res, next) => {
     arrivalTime: Joi.date().iso(),
     basePrice: Joi.number().min(0),
     status: Joi.string().valid('scheduled', 'active', 'completed', 'cancelled'),
+    staffId: Joi.string().uuid(),
   }).custom((value, helpers) => {
     // If both departure and arrival are provided, ensure arrival > departure
     if (value.departureTime && value.arrivalTime) {
