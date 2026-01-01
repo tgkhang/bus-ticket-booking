@@ -7,10 +7,12 @@ const COLORS = ["#16a34a", "#2563eb", "#f59e42", "#eab308", "#a21caf"];
 
 const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value }: PieLabelRenderProps & { value: number }) => {
   const RADIAN = Math.PI / 180;
+  // Provide a default value for midAngle if undefined
+  const safeMidAngle = midAngle ?? 0;
   // Calculate label position
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  const x = cx + radius * Math.cos(-safeMidAngle * RADIAN);
+  const y = cy + radius * Math.sin(-safeMidAngle * RADIAN);
   return (
     <text x={x} y={y} fill="#222" textAnchor="middle" dominantBaseline="central" fontSize={14} fontWeight={600}>
       {value}
