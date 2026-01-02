@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Plus,
   Edit,
@@ -11,7 +12,24 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Check,
+  ChevronsUpDown,
+  Search,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { listBusesAPI, createBusAPI, updateBusAPI, deleteBusAPI, listOperatorsAPI } from '@/lib/api'
 import type { Bus, CreateBusData, UpdateBusData, BusAmenities } from '@/types/api'
 import { toast } from 'sonner'
@@ -38,6 +56,8 @@ export default function BusManagementPage() {
   const [editingBus, setEditingBus] = useState<Bus | null>(null)
   const [deletingBus, setDeletingBus] = useState<Bus | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [operatorComboboxOpen, setOperatorComboboxOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -223,16 +243,33 @@ export default function BusManagementPage() {
     }
   }
 
+  // Filter buses based on search query
+  const filteredBuses = buses.filter((bus) => {
+    const query = searchQuery.toLowerCase()
+    const operatorName = operators.find((op) => op.id === bus.operatorId)?.name?.toLowerCase() || ''
+
+    return (
+      bus.plateNumber.toLowerCase().includes(query) ||
+      bus.model.toLowerCase().includes(query) ||
+      operatorName.includes(query)
+    )
+  })
+
   // Pagination calculations
-  const totalPages = Math.ceil(buses.length / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(filteredBuses.length / ITEMS_PER_PAGE)
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE
-  const currentBuses = buses.slice(indexOfFirstItem, indexOfLastItem)
+  const currentBuses = filteredBuses.slice(indexOfFirstItem, indexOfLastItem)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   const router = useRouter()
 
@@ -253,6 +290,22 @@ export default function BusManagementPage() {
         </Button>
       </div>
 
+      {/* Search Panel */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="Search by plate number, model, or operator name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 py-6 text-base"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Buses Table */}
       <Card>
         <CardContent className="p-0">
@@ -263,6 +316,12 @@ export default function BusManagementPage() {
           ) : buses.length === 0 ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-gray-500 dark:text-gray-400">No buses found. Add one to get started!</div>
+            </div>
+          ) : filteredBuses.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-gray-500 dark:text-gray-400">
+                No buses match your search criteria. Try a different search term.
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -359,10 +418,11 @@ export default function BusManagementPage() {
           )}
 
           {/* Pagination */}
-          {!loading && buses.length > 0 && totalPages > 1 && (
+          {!loading && filteredBuses.length > 0 && totalPages > 1 && (
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, buses.length)} of {buses.length} buses
+                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredBuses.length)} of {filteredBuses.length} buses
+                {searchQuery && ` (filtered from ${buses.length} total)`}
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -477,18 +537,52 @@ export default function BusManagementPage() {
                 {!editingBus && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Operator</label>
-                    <select
-                      {...register('operatorId', { required: 'Operator is required' })}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      disabled={loadingOperators}
-                    >
-                      <option value="">{loadingOperators ? 'Loading operators...' : 'Select an operator'}</option>
-                      {operators.map((operator) => (
-                        <option key={operator.id} value={operator.id}>
-                          {operator.name}
-                        </option>
-                      ))}
-                    </select>
+                    <Popover open={operatorComboboxOpen} onOpenChange={setOperatorComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={operatorComboboxOpen}
+                          className="w-full justify-between px-4 py-2 h-auto bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          disabled={loadingOperators}
+                        >
+                          {watch('operatorId')
+                            ? operators.find((op) => op.id === watch('operatorId'))?.name
+                            : loadingOperators
+                            ? 'Loading operators...'
+                            : 'Select or type operator name...'}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search operator..." className="h-9" />
+                          <CommandList>
+                            <CommandEmpty>No operator found.</CommandEmpty>
+                            <CommandGroup>
+                              {operators.map((operator) => (
+                                <CommandItem
+                                  key={operator.id}
+                                  value={operator.name}
+                                  onSelect={() => {
+                                    setValue('operatorId', operator.id)
+                                    setOperatorComboboxOpen(false)
+                                  }}
+                                >
+                                  {operator.name}
+                                  <Check
+                                    className={cn(
+                                      'ml-auto h-4 w-4',
+                                      watch('operatorId') === operator.id ? 'opacity-100' : 'opacity-0'
+                                    )}
+                                  />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     {errors.operatorId && (
                       <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.operatorId.message}</p>
                     )}

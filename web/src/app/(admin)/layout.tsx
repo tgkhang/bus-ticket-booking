@@ -22,9 +22,6 @@ import {
   Settings,
   User,
   Bell,
-  Search,
-  BarChart,
-  TrendingUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -206,7 +203,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align={sidebarCollapsed ? "center" : "end"} className="w-56">
+            <DropdownMenuContent align={sidebarCollapsed ? 'center' : 'end'} className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium">{user?.username || 'Admin User'}</p>
@@ -234,7 +231,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Collapse Button - Desktop Only - Sticks out from sidebar */}
         <button
           onClick={toggleSidebarCollapse}
-          className={`hidden lg:flex absolute ${sidebarCollapsed ? 'left-[72px]' : 'left-[248px]'} top-1/2 -translate-y-1/2 items-center justify-center w-6 h-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-r-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300 shadow-md`}
+          className={`hidden lg:flex absolute ${
+            sidebarCollapsed ? 'left-[72px]' : 'left-[248px]'
+          } top-1/2 -translate-y-1/2 items-center justify-center w-6 h-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-r-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300 shadow-md`}
           title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -256,14 +255,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </button>
 
               {/* Search Bar */}
-              <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg min-w-[300px]">
+              {/* <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg min-w-[300px]">
                 <Search className="w-5 h-5 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search..."
                   className="bg-transparent border-none outline-none text-sm text-gray-900 dark:text-white placeholder-gray-400 w-full"
                 />
-              </div>
+              </div> */}
             </div>
 
             {/* Right Section */}

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -11,9 +12,24 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  Filter,
   SlidersHorizontal,
+  Check,
+  ChevronsUpDown,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { Trip, TripStatus, CreateTripData } from '@/types/trip'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -52,6 +68,8 @@ export default function TripManagementPage() {
   const [deletingTrip, setDeletingTrip] = useState<Trip | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [totalItems, setTotalItems] = useState(0)
+  const [routeComboboxOpen, setRouteComboboxOpen] = useState(false)
+  const [busComboboxOpen, setBusComboboxOpen] = useState(false)
 
   // Get params from URL
   const searchQuery = searchParams.get('search') || ''
@@ -74,6 +92,8 @@ export default function TripManagementPage() {
     register,
     handleSubmit: handleFormSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<TripFormData>({
     defaultValues: {
@@ -85,6 +105,17 @@ export default function TripManagementPage() {
       status: 'scheduled',
     },
   })
+
+  // Get buses filtered by selected route's operator
+  const getFilteredBuses = () => {
+    const selectedRouteId = watch('routeId')
+    if (!selectedRouteId) return buses
+
+    const selectedRoute = routes.find((r) => r.id === selectedRouteId)
+    if (!selectedRoute) return buses
+
+    return buses.filter((b) => b.operatorId === selectedRoute.operatorId)
+  }
 
   // Update URL when filters/search/sort change
   const updateURL = useCallback(
@@ -188,6 +219,22 @@ export default function TripManagementPage() {
       setLoadingOperators(false)
     }
   }
+
+  // Clear bus selection if it doesn't match the selected route's operator
+  useEffect(() => {
+    const selectedRouteId = watch('routeId')
+    const selectedBusId = watch('busId')
+
+    if (!selectedRouteId || !selectedBusId) return
+
+    const selectedRoute = routes.find((r) => r.id === selectedRouteId)
+    const selectedBus = buses.find((b) => b.id === selectedBusId)
+
+    // If bus doesn't belong to route's operator, clear it
+    if (selectedRoute && selectedBus && selectedBus.operatorId !== selectedRoute.operatorId) {
+      setValue('busId', '', { shouldValidate: true })
+    }
+  }, [watch('routeId'), buses, routes, setValue, watch])
 
   const handleOpenModal = () => {
     reset({
@@ -800,18 +847,53 @@ export default function TripManagementPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Route</label>
-                    <select
-                      {...register('routeId', { required: 'Route is required' })}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      disabled={loadingRoutes}
-                    >
-                      <option value="">{loadingRoutes ? 'Loading routes...' : 'Select a route'}</option>
-                      {routes.map((route) => (
-                        <option key={route.id} value={route.id}>
-                          {route.name}
-                        </option>
-                      ))}
-                    </select>
+                    <input type="hidden" {...register('routeId', { required: 'Route is required' })} />
+                    <Popover open={routeComboboxOpen} onOpenChange={setRouteComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={routeComboboxOpen}
+                          className="w-full justify-between px-4 py-2 h-auto bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          disabled={loadingRoutes}
+                        >
+                          {watch('routeId')
+                            ? routes.find((route) => route.id === watch('routeId'))?.name
+                            : loadingRoutes
+                            ? 'Loading routes...'
+                            : 'Select or type route name...'}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search route..." className="h-9" />
+                          <CommandList>
+                            <CommandEmpty>No route found.</CommandEmpty>
+                            <CommandGroup>
+                              {routes.map((route) => (
+                                <CommandItem
+                                  key={route.id}
+                                  value={route.name}
+                                  onSelect={() => {
+                                    setValue('routeId', route.id, { shouldValidate: true })
+                                    setRouteComboboxOpen(false)
+                                  }}
+                                >
+                                  {route.name}
+                                  <Check
+                                    className={cn(
+                                      'ml-auto h-4 w-4',
+                                      watch('routeId') === route.id ? 'opacity-100' : 'opacity-0'
+                                    )}
+                                  />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     {errors.routeId && (
                       <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.routeId.message}</p>
                     )}
@@ -819,18 +901,60 @@ export default function TripManagementPage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bus</label>
-                    <select
-                      {...register('busId', { required: 'Bus is required' })}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      disabled={loadingBuses}
-                    >
-                      <option value="">{loadingBuses ? 'Loading buses...' : 'Select a bus'}</option>
-                      {buses.map((bus) => (
-                        <option key={bus.id} value={bus.id}>
-                          {bus.model} - {bus.plateNumber}
-                        </option>
-                      ))}
-                    </select>
+                    <input type="hidden" {...register('busId', { required: 'Bus is required' })} />
+                    <Popover open={busComboboxOpen} onOpenChange={setBusComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={busComboboxOpen}
+                          className="w-full justify-between px-4 py-2 h-auto bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          disabled={loadingBuses}
+                        >
+                          {watch('busId')
+                            ? (() => {
+                                const bus = buses.find((b) => b.id === watch('busId'))
+                                return bus ? `${bus.model} - ${bus.plateNumber}` : ''
+                              })()
+                            : loadingBuses
+                            ? 'Loading buses...'
+                            : 'Select or type bus...'}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search bus..." className="h-9" />
+                          <CommandList>
+                            <CommandEmpty>
+                              {watch('routeId')
+                                ? "No buses available for this route's operator."
+                                : 'No bus found.'}
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {getFilteredBuses().map((bus) => (
+                                <CommandItem
+                                  key={bus.id}
+                                  value={`${bus.model} ${bus.plateNumber}`}
+                                  onSelect={() => {
+                                    setValue('busId', bus.id, { shouldValidate: true })
+                                    setBusComboboxOpen(false)
+                                  }}
+                                >
+                                  {bus.model} - {bus.plateNumber}
+                                  <Check
+                                    className={cn(
+                                      'ml-auto h-4 w-4',
+                                      watch('busId') === bus.id ? 'opacity-100' : 'opacity-0'
+                                    )}
+                                  />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     {errors.busId && (
                       <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.busId.message}</p>
                     )}

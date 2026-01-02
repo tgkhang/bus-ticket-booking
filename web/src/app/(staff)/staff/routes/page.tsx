@@ -1,7 +1,8 @@
 'use client'
 
 import { Card, CardContent } from '@/components/ui/card'
-import { MapPin, Navigation, Clock, Map as MapIcon, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { MapPin, Navigation, Clock, Map as MapIcon, ArrowRight, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { Route, Stop } from '@/types/routeAndStop'
 import { listOperatorsAPI, listRoutesAPI, listStopsAPI } from '@/lib/api'
@@ -19,17 +20,36 @@ export default function RoutesPage() {
   const [routes, setRoutes] = useState<Route[]>([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // Filter routes based on search query
+  const filteredRoutes = routes?.filter((route) => {
+    const query = searchQuery.toLowerCase()
+    const originName = route.originStop?.name?.toLowerCase() || ''
+    const destName = route.destinationStop?.name?.toLowerCase() || ''
+
+    return (
+      route.name.toLowerCase().includes(query) ||
+      originName.includes(query) ||
+      destName.includes(query)
+    )
+  }) || []
 
   // Pagination calculations
-  const totalPages = Math.ceil((routes?.length || 0) / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil((filteredRoutes?.length || 0) / ITEMS_PER_PAGE)
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE
-  const currentRoutes = routes?.slice(indexOfFirstItem, indexOfLastItem) || []
+  const currentRoutes = filteredRoutes?.slice(indexOfFirstItem, indexOfLastItem) || []
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -68,6 +88,22 @@ export default function RoutesPage() {
           <p className="text-gray-600 dark:text-gray-400">{user?.operatorName}</p>
         </div>
       </div>
+
+      {/* Search Panel */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="Search by route name, origin, or destination..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 py-6 text-base"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

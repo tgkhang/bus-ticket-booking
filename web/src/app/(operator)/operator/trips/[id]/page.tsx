@@ -20,10 +20,27 @@ import {
   ChevronLeft,
   ChevronRight,
   Route as RouteIcon,
+  Check,
+  ChevronsUpDown,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { TripDetail, TripStatus } from '@/types/trip'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { getTripDetailsAPI, updateTripAPI, getStaffByOperatorAPI } from '@/lib/api'
 import { toast } from 'sonner'
 import { amenityOptions } from '@/utils/constants'
@@ -67,6 +84,7 @@ export default function TripDetailPage() {
   const [loadingStaff, setLoadingStaff] = useState(false)
   const [savingStaff, setSavingStaff] = useState(false)
   const [savingTrip, setSavingTrip] = useState(false)
+  const [staffComboboxOpen, setStaffComboboxOpen] = useState(false)
 
   // Image slider state
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -296,7 +314,7 @@ export default function TripDetailPage() {
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => router.push('/admin/trips')}
+            onClick={() => router.push('/operator/trips')}
             className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-6 h-6" />
@@ -438,19 +456,67 @@ export default function TripDetailPage() {
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">
                       Assigned Staff {trip.status === 'scheduled' && <span className="text-red-500">*</span>}
                     </label>
-                    <select
-                      value={selectedStaffId || ''}
-                      onChange={(e) => setSelectedStaffId(e.target.value || null)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      disabled={savingStaff}
-                    >
-                      <option value="">No staff assigned</option>
-                      {staffList.map((staff) => (
-                        <option key={staff.id} value={staff.id}>
-                          {staff.user?.displayName || staff.user?.email} ({staff.user?.phoneNumber || 'No phone'})
-                        </option>
-                      ))}
-                    </select>
+                    <Popover open={staffComboboxOpen} onOpenChange={setStaffComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={staffComboboxOpen}
+                          className="w-full justify-between px-3 py-2 h-auto bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          disabled={savingStaff}
+                        >
+                          {selectedStaffId
+                            ? (() => {
+                                const staff = staffList.find((s) => s.id === selectedStaffId)
+                                return staff
+                                  ? `${staff.displayName || staff.email} (${staff.phoneNumber || 'No phone'})`
+                                  : ''
+                              })()
+                            : 'Select or type staff name...'}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search staff..." className="h-9" />
+                          <CommandList>
+                            <CommandEmpty>No staff found.</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                value="none"
+                                onSelect={() => {
+                                  setSelectedStaffId(null)
+                                  setStaffComboboxOpen(false)
+                                }}
+                              >
+                                No staff assigned
+                                <Check
+                                  className={cn('ml-auto h-4 w-4', !selectedStaffId ? 'opacity-100' : 'opacity-0')}
+                                />
+                              </CommandItem>
+                              {staffList.map((staff) => (
+                                <CommandItem
+                                  key={staff.id}
+                                  value={`${staff.displayName || staff.email} ${staff.phoneNumber || ''}`}
+                                  onSelect={() => {
+                                    setSelectedStaffId(staff.id)
+                                    setStaffComboboxOpen(false)
+                                  }}
+                                >
+                                  {staff.displayName || staff.email} ({staff.phoneNumber || 'No phone'})
+                                  <Check
+                                    className={cn(
+                                      'ml-auto h-4 w-4',
+                                      selectedStaffId === staff.id ? 'opacity-100' : 'opacity-0'
+                                    )}
+                                  />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     {trip.status === 'scheduled' && !selectedStaffId && (
                       <p className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
                         <span>⚠️</span>
@@ -460,11 +526,10 @@ export default function TripDetailPage() {
                     {selectedStaffId && staffList.find((s) => s.id === selectedStaffId) && (
                       <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
                         <p className="text-sm text-gray-700 dark:text-gray-300">
-                          <strong>Selected Staff:</strong>{' '}
-                          {staffList.find((s) => s.id === selectedStaffId)?.user?.displayName}
+                          <strong>Selected Staff:</strong> {staffList.find((s) => s.id === selectedStaffId)?.displayName}
                         </p>
                         <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          Email: {staffList.find((s) => s.id === selectedStaffId)?.user?.email}
+                          Email: {staffList.find((s) => s.id === selectedStaffId)?.email}
                         </p>
                       </div>
                     )}
@@ -728,9 +793,29 @@ export default function TripDetailPage() {
           <Card className="mb-6">
             <CardContent className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Bus Seat Layout</h3>
+              
+              <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
+                <div className="text-center">
+                  <Bus className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    View detailed bus seat layout and configuration
+                  </p>
+                  <Button
+                    onClick={() => router.push(`/operator/busses/${trip.busId}`)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    View Bus Details
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Legend */}
-              <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          {/* Seat Layout - Bus View */}
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Seat Status Legend</h3>
+              <div className="flex flex-wrap gap-4 mb-6">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 bg-green-500 rounded"></div>
                   <span className="text-sm text-gray-700 dark:text-gray-300">Available</span>

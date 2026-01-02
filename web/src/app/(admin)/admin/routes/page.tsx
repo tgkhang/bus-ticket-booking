@@ -2,6 +2,7 @@
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Plus,
   Edit,
@@ -16,7 +17,24 @@ import {
   ArrowRight,
   ChevronLeft,
   ChevronRight,
+  Check,
+  ChevronsUpDown,
+  Search,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { useEffect, useState } from 'react'
 import type { Route, RouteStop, Stop, CreateRouteData } from '@/types/routeAndStop'
 import {
@@ -55,17 +73,42 @@ export default function RoutesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [routeToDelete, setRouteToDelete] = useState<Route | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [operatorComboboxOpen, setOperatorComboboxOpen] = useState(false)
+  const [originComboboxOpen, setOriginComboboxOpen] = useState(false)
+  const [destinationComboboxOpen, setDestinationComboboxOpen] = useState(false)
+  const [stopComboboxOpen, setStopComboboxOpen] = useState<number | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  // Filter routes based on search query
+  const filteredRoutes = routes?.filter((route) => {
+    const query = searchQuery.toLowerCase()
+    const operatorName = route.operator?.name?.toLowerCase() || ''
+    const originName = route.originStop?.name?.toLowerCase() || ''
+    const destName = route.destinationStop?.name?.toLowerCase() || ''
+
+    return (
+      route.name.toLowerCase().includes(query) ||
+      operatorName.includes(query) ||
+      originName.includes(query) ||
+      destName.includes(query)
+    )
+  }) || []
 
   // Pagination calculations
-  const totalPages = Math.ceil((routes?.length || 0) / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil((filteredRoutes?.length || 0) / ITEMS_PER_PAGE)
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE
-  const currentRoutes = routes?.slice(indexOfFirstItem, indexOfLastItem) || []
+  const currentRoutes = filteredRoutes?.slice(indexOfFirstItem, indexOfLastItem) || []
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   const [formData, setFormData] = useState({
     name: '',
@@ -322,6 +365,22 @@ export default function RoutesPage() {
         </div>
       </div>
 
+      {/* Search Panel */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="Search by route name, operator, origin, or destination..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 py-6 text-base"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card>
@@ -397,6 +456,12 @@ export default function RoutesPage() {
             ) : !routes || routes.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-gray-500 dark:text-gray-400">No routes found. Add one to get started!</div>
+              </div>
+            ) : filteredRoutes.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-gray-500 dark:text-gray-400">
+                  No routes match your search criteria. Try a different search term.
+                </div>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -547,10 +612,11 @@ export default function RoutesPage() {
               </div>
             )}
             {/* Pagination */}
-            {!loading && routes && routes.length > 0 && totalPages > 1 && (
+            {!loading && filteredRoutes && filteredRoutes.length > 0 && totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, routes?.length || 0)} of {routes?.length || 0} routes
+                  Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredRoutes?.length || 0)} of {filteredRoutes?.length || 0} routes
+                  {searchQuery && ` (filtered from ${routes?.length || 0} total)`}
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -643,19 +709,49 @@ export default function RoutesPage() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Operator <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={formData.operatorId}
-                      onChange={(e) => setFormData({ ...formData, operatorId: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      required
-                    >
-                      <option value="">Select Operator</option>
-                      {operators?.map((op) => (
-                        <option key={op.id} value={op.id}>
-                          {op.name}
-                        </option>
-                      ))}
-                    </select>
+                    <Popover open={operatorComboboxOpen} onOpenChange={setOperatorComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={operatorComboboxOpen}
+                          className="w-full justify-between px-4 py-3 h-auto bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          {formData.operatorId
+                            ? operators?.find((op) => op.id === formData.operatorId)?.name
+                            : 'Select or type operator name...'}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search operator..." className="h-9" />
+                          <CommandList>
+                            <CommandEmpty>No operator found.</CommandEmpty>
+                            <CommandGroup>
+                              {operators?.map((operator) => (
+                                <CommandItem
+                                  key={operator.id}
+                                  value={operator.name}
+                                  onSelect={() => {
+                                    setFormData({ ...formData, operatorId: operator.id })
+                                    setOperatorComboboxOpen(false)
+                                  }}
+                                >
+                                  {operator.name}
+                                  <Check
+                                    className={cn(
+                                      'ml-auto h-4 w-4',
+                                      formData.operatorId === operator.id ? 'opacity-100' : 'opacity-0'
+                                    )}
+                                  />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
 
@@ -665,38 +761,98 @@ export default function RoutesPage() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Origin Stop <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={formData.originStopId}
-                      onChange={(e) => setFormData({ ...formData, originStopId: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      required
-                    >
-                      <option value="">Select Origin</option>
-                      {availableStops?.map((stop) => (
-                        <option key={stop.id} value={stop.id}>
-                          {stop.name}
-                        </option>
-                      ))}
-                    </select>
+                    <Popover open={originComboboxOpen} onOpenChange={setOriginComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={originComboboxOpen}
+                          className="w-full justify-between px-4 py-3 h-auto bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          {formData.originStopId
+                            ? availableStops?.find((stop) => stop.id === formData.originStopId)?.name
+                            : 'Select or type origin stop...'}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search stop..." className="h-9" />
+                          <CommandList>
+                            <CommandEmpty>No stop found.</CommandEmpty>
+                            <CommandGroup>
+                              {availableStops?.map((stop) => (
+                                <CommandItem
+                                  key={stop.id}
+                                  value={stop.name}
+                                  onSelect={() => {
+                                    setFormData({ ...formData, originStopId: stop.id })
+                                    setOriginComboboxOpen(false)
+                                  }}
+                                >
+                                  {stop.name}
+                                  <Check
+                                    className={cn(
+                                      'ml-auto h-4 w-4',
+                                      formData.originStopId === stop.id ? 'opacity-100' : 'opacity-0'
+                                    )}
+                                  />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Destination Stop <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={formData.destinationStopId}
-                      onChange={(e) => setFormData({ ...formData, destinationStopId: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      required
-                    >
-                      <option value="">Select Destination</option>
-                      {availableStops?.map((stop) => (
-                        <option key={stop.id} value={stop.id}>
-                          {stop.name}
-                        </option>
-                      ))}
-                    </select>
+                    <Popover open={destinationComboboxOpen} onOpenChange={setDestinationComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={destinationComboboxOpen}
+                          className="w-full justify-between px-4 py-3 h-auto bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          {formData.destinationStopId
+                            ? availableStops?.find((stop) => stop.id === formData.destinationStopId)?.name
+                            : 'Select or type destination stop...'}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search stop..." className="h-9" />
+                          <CommandList>
+                            <CommandEmpty>No stop found.</CommandEmpty>
+                            <CommandGroup>
+                              {availableStops?.map((stop) => (
+                                <CommandItem
+                                  key={stop.id}
+                                  value={stop.name}
+                                  onSelect={() => {
+                                    setFormData({ ...formData, destinationStopId: stop.id })
+                                    setDestinationComboboxOpen(false)
+                                  }}
+                                >
+                                  {stop.name}
+                                  <Check
+                                    className={cn(
+                                      'ml-auto h-4 w-4',
+                                      formData.destinationStopId === stop.id ? 'opacity-100' : 'opacity-0'
+                                    )}
+                                  />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
 
@@ -786,19 +942,49 @@ export default function RoutesPage() {
                             <div className="flex-1 grid grid-cols-4 gap-3">
                               <div className="col-span-2">
                                 <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Stop</label>
-                                <select
-                                  value={stop.stopId}
-                                  onChange={(e) => handleStopChange(index, 'stopId', e.target.value)}
-                                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                                  required
-                                >
-                                  <option value="">Select Stop</option>
-                                  {availableStops?.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                      {s.name}
-                                    </option>
-                                  ))}
-                                </select>
+                                <Popover open={stopComboboxOpen === index} onOpenChange={(open) => setStopComboboxOpen(open ? index : null)}>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      aria-expanded={stopComboboxOpen === index}
+                                      className="w-full justify-between px-3 py-2 h-auto bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                                    >
+                                      {stop.stopId
+                                        ? availableStops?.find((s) => s.id === stop.stopId)?.name
+                                        : 'Select or type stop...'}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-full p-0" align="start">
+                                    <Command>
+                                      <CommandInput placeholder="Search stop..." className="h-9" />
+                                      <CommandList>
+                                        <CommandEmpty>No stop found.</CommandEmpty>
+                                        <CommandGroup>
+                                          {availableStops?.map((s) => (
+                                            <CommandItem
+                                              key={s.id}
+                                              value={s.name}
+                                              onSelect={() => {
+                                                handleStopChange(index, 'stopId', s.id)
+                                                setStopComboboxOpen(null)
+                                              }}
+                                            >
+                                              {s.name}
+                                              <Check
+                                                className={cn(
+                                                  'ml-auto h-4 w-4',
+                                                  stop.stopId === s.id ? 'opacity-100' : 'opacity-0'
+                                                )}
+                                              />
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
                               </div>
 
                               <div>

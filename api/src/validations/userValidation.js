@@ -1,7 +1,7 @@
 import Joi from 'joi'
 import { StatusCodes } from 'http-status-codes'
 import ApiError from '~/utils/ApiError'
-import { EMAIL_RULE_MESSAGE, PASSWORD_RULE, PASSWORD_RULE_MESSAGE } from '~/utils/constants'
+import { EMAIL_RULE_MESSAGE, PASSWORD_RULE, PASSWORD_RULE_MESSAGE, USER_ROLES } from '~/utils/constants'
 
 const createNew = async (req, res, next) => {
   const correctCondition = Joi.object({
@@ -103,7 +103,9 @@ const createByAdmin = async (req, _res, next) => {
     email: Joi.string().email().required().trim().message(EMAIL_RULE_MESSAGE),
     password: Joi.string().required().pattern(PASSWORD_RULE).message(PASSWORD_RULE_MESSAGE),
     displayName: Joi.string().trim().optional(),
-    role: Joi.string().valid('client', 'operator', 'admin').optional(),
+    role: Joi.string()
+      .valid(...Object.values(USER_ROLES))
+      .optional(),
     isActive: Joi.boolean().optional(),
     operatorId: Joi.string().trim().optional(),
   })
@@ -123,7 +125,7 @@ const updateByAdmin = async (req, _res, next) => {
     username: Joi.string().alphanum().min(3).max(30).trim().optional(),
     email: Joi.string().email().message(EMAIL_RULE_MESSAGE).trim().optional(),
     password: Joi.string().pattern(PASSWORD_RULE).message(PASSWORD_RULE_MESSAGE).optional(),
-    role: Joi.string().valid('client', 'operator', 'admin').optional(),
+    role: Joi.string().valid(...Object.values(USER_ROLES)).optional(),
     active: Joi.boolean().optional(),
     isActive: Joi.boolean().optional(),
     operatorId: Joi.string().trim().optional(),

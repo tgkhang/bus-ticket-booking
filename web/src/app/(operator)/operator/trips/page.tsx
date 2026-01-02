@@ -43,6 +43,7 @@ export default function TripManagementPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletingTrip, setDeletingTrip] = useState<Trip | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Get operator ID from current user
   const operatorId = user?.operatorId
@@ -228,11 +229,25 @@ export default function TripManagementPage() {
     return bus ? { model: bus.model, plateNumber: bus.plateNumber } : { model: 'Unknown', plateNumber: busId }
   }
 
+  // Filter trips based on search query
+  const filteredTrips = trips.filter((trip) => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    const routeName = getRouteName(trip.routeId).toLowerCase()
+    const busInfo = getBusInfo(trip.busId)
+    return (
+      routeName.includes(query) ||
+      busInfo.plateNumber.toLowerCase().includes(query) ||
+      busInfo.model.toLowerCase().includes(query) ||
+      trip.status.toLowerCase().includes(query)
+    )
+  })
+
   // Pagination calculations
-  const totalPages = Math.ceil(trips.length / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(filteredTrips.length / ITEMS_PER_PAGE)
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE
-  const currentTrips = trips.slice(indexOfFirstItem, indexOfLastItem)
+  const currentTrips = filteredTrips.slice(indexOfFirstItem, indexOfLastItem)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -241,19 +256,48 @@ export default function TripManagementPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Trip Management</h1>
-          <p className="text-gray-600">Manage your bus trips</p>
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Trip Management</h1>
+            <p className="text-gray-600">Manage your bus trips</p>
+          </div>
+
+          <Button
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-6 text-base"
+          >
+            <Plus className="w-6 h-6" />
+            Add New Trip
+          </Button>
         </div>
 
-        <Button
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-6 text-base"
-        >
-          <Plus className="w-6 h-6" />
-          Add New Trip
-        </Button>
+        {/* Search Bar */}
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search by route, bus plate, model, or status..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setCurrentPage(1)
+            }}
+            className="w-full px-4 py-3 pl-10 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+          />
+          <svg
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+        </div>
       </div>
 
       {/* Trips Table */}
@@ -305,7 +349,7 @@ export default function TripManagementPage() {
                       <tr
                         key={trip.id}
                         className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        onClick={() => router.push(`/admin/trips/${trip.id}`)}
+                        onClick={() => router.push(`/operator/trips/${trip.id}`)}
                       >
                         <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">
                           <span className="font-mono text-sm">{trip.id.substring(0, 8)}...</span>
@@ -334,7 +378,7 @@ export default function TripManagementPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                router.push(`/admin/trips/${trip.id}`)
+                                router.push(`/operator/trips/${trip.id}`)
                               }}
                               className="text-blue-600 hover:text-blue-700 transition-colors"
                               title="Edit trip"
@@ -362,10 +406,10 @@ export default function TripManagementPage() {
           )}
 
           {/* Pagination */}
-          {!loading && trips.length > 0 && totalPages > 1 && (
+          {!loading && filteredTrips.length > 0 && totalPages > 1 && (
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, trips.length)} of {trips.length} trips
+                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredTrips.length)} of {filteredTrips.length} trips
               </div>
               <div className="flex items-center gap-2">
                 <button
