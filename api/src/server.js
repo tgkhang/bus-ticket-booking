@@ -199,16 +199,11 @@ const START_SERVER = async () => {
   // Background job: auto-update trip statuses (scheduled->active->completed)
   tripAutoStatusService.startTripAutoStatusJob({ intervalMs: 120_000, io })
 
-  if (env.BUILD_MODE === 'production') {
-    // Listen on 0.0.0.0 for Render/public cloud
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`4.Production: Server is running on http://0.0.0.0:${PORT}`)
-    })
-  } else {
-    httpServer.listen(PORT, hostname, () => {
-      console.log(`4.Local: Server is running on http://${hostname}:${PORT}`)
-    })
-  }
+  // Always use httpServer.listen so socket.io works in all environments
+  const listenHost = env.BUILD_MODE === 'production' ? '0.0.0.0' : hostname;
+  httpServer.listen(PORT, listenHost, () => {
+    console.log(`Server is running on http://${listenHost}:${PORT}`);
+  });
 
   exitHook(async (callback) => {
     console.log('\n5.Exiting application, closing DB connection...')
