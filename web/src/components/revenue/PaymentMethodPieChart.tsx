@@ -9,8 +9,9 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
   const RADIAN = Math.PI / 180;
   // Calculate label position
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  const safeMidAngle = midAngle ?? 0;
+  const x = cx + radius * Math.cos(-safeMidAngle * RADIAN);
+  const y = cy + radius * Math.sin(-safeMidAngle * RADIAN);
   return (
     <text x={x} y={y} fill="#222" textAnchor="middle" dominantBaseline="central" fontSize={14} fontWeight={600}>
       {value}
