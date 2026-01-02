@@ -11,6 +11,7 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
   const safeMidAngle = midAngle ?? 0;
   // Calculate label position
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const safeMidAngle = midAngle ?? 0;
   const x = cx + radius * Math.cos(-safeMidAngle * RADIAN);
   const y = cy + radius * Math.sin(-safeMidAngle * RADIAN);
   return (

@@ -177,6 +177,98 @@ const getPopularRoutes = async (limit = 4) => {
   return await routeModel.getPopularRoutes(limit)
 }
 
+const bulkImportStops = async (stops) => {
+  const results = {
+    success: [],
+    errors: [],
+  }
+
+  for (const [index, stopData] of stops.entries()) {
+    try {
+      // Validate required fields
+      if (!stopData.name || stopData.latitude === undefined || stopData.longitude === undefined) {
+        results.errors.push({
+          index,
+          data: stopData,
+          error: 'Missing required fields: name, latitude, longitude',
+        })
+        continue
+      }
+
+      // Validate coordinate ranges
+      if (stopData.latitude < -90 || stopData.latitude > 90) {
+        results.errors.push({
+          index,
+          data: stopData,
+          error: 'Latitude must be between -90 and 90',
+        })
+        continue
+      }
+
+      if (stopData.longitude < -180 || stopData.longitude > 180) {
+        results.errors.push({
+          index,
+          data: stopData,
+          error: 'Longitude must be between -180 and 180',
+        })
+        continue
+      }
+
+      const created = await stopModel.createStop({
+        name: stopData.name,
+        latitude: parseFloat(stopData.latitude),
+        longitude: parseFloat(stopData.longitude),
+        address: stopData.address || '',
+        active: stopData.active !== undefined ? stopData.active : true,
+      })
+
+      results.success.push({ index, id: created.id, name: created.name })
+    } catch (error) {
+      results.errors.push({
+        index,
+        data: stopData,
+        error: error.message || 'Failed to create stop',
+      })
+    }
+  }
+
+  return {
+    total: stops.length,
+    successCount: results.success.length,
+    errorCount: results.errors.length,
+    success: results.success,
+    errors: results.errors,
+  }
+}
+
+const exportStops = async (filters) => {
+  // Get all stops without pagination for export
+  const result = await stopModel.getStops(filters, { page: 1, limit: 100000 })
+  const stops = result.data
+
+  // Generate CSV with UTF-8 BOM for proper Vietnamese character encoding
+  const csvHeaders = ['Name', 'Latitude', 'Longitude', 'Address', 'Active', 'Created At']
+  const csvRows = stops.map((stop) => [
+    stop.name,
+    stop.latitude,
+    stop.longitude,
+    stop.address || '',
+    stop.active ? 'Yes' : 'No',
+    new Date(stop.createdAt).toLocaleString(),
+  ])
+
+  const csvContent = [
+    csvHeaders.join(','),
+    ...csvRows.map((row) =>
+      row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ),
+  ].join('\n')
+
+  // Add UTF-8 BOM to ensure proper encoding in Excel
+  const utf8BOM = '\uFEFF'
+  return utf8BOM + csvContent
+}
+
 export const routeService = {
   // Stops
   createStop,
@@ -186,6 +278,8 @@ export const routeService = {
   listStops,
   autocompleteStops,
   searchStopsPublic,
+  bulkImportStops,
+  exportStops,
   // Routes
   createRoute,
   updateRoute,

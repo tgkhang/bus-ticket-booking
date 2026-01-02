@@ -171,6 +171,40 @@ const searchRoutesPublic = async (req, res, next) => {
   }
 }
 
+const bulkImportStops = async (req, res, next) => {
+  try {
+    const { stops } = req.body
+    if (!Array.isArray(stops) || stops.length === 0) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        message: 'Invalid request: stops array is required and must not be empty',
+      })
+    }
+    const result = await routeService.bulkImportStops(stops)
+    res.status(StatusCodes.CREATED).json(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
+const exportStops = async (req, res, next) => {
+  try {
+    const filters = {
+      name: req.query.name,
+      address: req.query.address,
+      active: req.query.active !== undefined ? req.query.active === 'true' : undefined,
+      search: req.query.search,
+    }
+    const result = await routeService.exportStops(filters)
+    
+    // Set CSV headers
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="stops_${new Date().toISOString().split('T')[0]}.csv"`)
+    res.status(StatusCodes.OK).send(result)
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const routeController = {
   // Routes
   createRoute,
@@ -188,4 +222,6 @@ export const routeController = {
   getPopularRoutes,
   searchStopsPublic,
   searchRoutesPublic,
+  bulkImportStops,
+  exportStops,
 }
