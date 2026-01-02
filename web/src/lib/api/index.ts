@@ -229,6 +229,66 @@ export const listStopsAPI = async (
   return response.data
 }
 
+export const getStopAPI = async (id: string): Promise<Stop> => {
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/stops/${id}`)
+  return response.data
+}
+
+export const createStopAPI = async (data: {
+  name: string
+  latitude: number
+  longitude: number
+  address?: string
+  active?: boolean
+}): Promise<Stop> => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/stops`, data)
+  return response.data
+}
+
+export const updateStopAPI = async (
+  id: string,
+  data: {
+    name?: string
+    latitude?: number
+    longitude?: number
+    address?: string
+    active?: boolean
+  }
+): Promise<Stop> => {
+  const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/stops/${id}`, data)
+  return response.data
+}
+
+export const deleteStopAPI = async (id: string): Promise<void> => {
+  await authorizedAxiosInstance.delete(`${API_ROOT}/v1/stops/${id}`)
+}
+
+export const bulkImportStopsAPI = async (stops: Array<{
+  name: string
+  latitude: number
+  longitude: number
+  address?: string
+  active?: boolean
+}>): Promise<{
+  total: number
+  successCount: number
+  errorCount: number
+  success: Array<{ index: number; id: string; name: string }>
+  errors: Array<{ index: number; data: any; error: string }>
+}> => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/stops/bulk-import`, { stops })
+  return response.data
+}
+
+export const exportStopsAPI = async (filters?: ListStopsFilters): Promise<Blob> => {
+  const params = { ...filters }
+  const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/stops/export`, {
+    params,
+    responseType: 'blob',
+  })
+  return response.data
+}
+
 //=================================
 // Operator API Calls
 //=================================
