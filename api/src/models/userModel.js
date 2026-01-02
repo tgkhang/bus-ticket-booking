@@ -17,8 +17,20 @@ const createNew = async (data) => {
         isActive: data.isActive || false,
         verifyToken: data.verifyToken || null,
         verifyTokenExpiry: data.verifyTokenExpiry || null,
+        operatorId: data.operatorId || null,
       },
     })
+
+    // If role is 'staff', ensure a Staff record exists
+    if (createdUser.role === 'staff' && createdUser.operatorId) {
+      await prisma.staff.create({
+        data: {
+          userId: createdUser.id,
+          operatorId: createdUser.operatorId,
+        },
+      })
+    }
+
     return createdUser
   } catch (error) {
     throw new Error(error)
@@ -163,23 +175,39 @@ const listUsers = async (query) => {
 const updateByAdmin = async (id, data) => {
   try {
     const prisma = GET_DB();
-    
+
     // Remove invalid fields that don't exist in schema
     const validData = { ...data };
     delete validData.id;
     delete validData.createdAt;
     delete validData.updatedAt;
-    
+
     // Map 'name' to 'displayName'
     if (validData.name) {
       validData.displayName = validData.name;
       delete validData.name;
     }
-    
-    return await prisma.user.update({
+
+    const updatedUser = await prisma.user.update({
       where: { id },
       data: validData,
     });
+
+    // If role is 'staff', ensure a Staff record exists
+    if (updatedUser.role === 'staff') {
+      await prisma.staff.upsert({
+        where: { userId: updatedUser.id },
+        update: {
+          operatorId: updatedUser.operatorId,
+        },
+        create: {
+          userId: updatedUser.id,
+          operatorId: updatedUser.operatorId,
+        },
+      });
+    }
+
+    return updatedUser;
   } catch (error) {
     throw new Error(error);
   }

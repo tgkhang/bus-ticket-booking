@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -20,7 +21,23 @@ import {
   ChevronLeft,
   ChevronRight,
   Route as RouteIcon,
+  Check,
+  ChevronsUpDown,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { TripDetail, TripStatus } from '@/types/trip'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -40,12 +57,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  organizeSeatsByFloor,
-  organizeSeatsByRows,
-  getSeatStatusColor,
-  getSeatTypeBorderColor,
-} from '@/utils/seatLayout'
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -72,7 +83,6 @@ export default function TripDetailPage() {
 
   const [trip, setTrip] = useState<TripDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [staffList, setStaffList] = useState<any[]>([])
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
   const [originalStaffId, setOriginalStaffId] = useState<string | null>(null)
@@ -81,8 +91,7 @@ export default function TripDetailPage() {
   const [savingTrip, setSavingTrip] = useState(false)
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
   const [cancellingTrip, setCancellingTrip] = useState(false)
-
-  // Image slider state
+  const [staffComboboxOpen, setStaffComboboxOpen] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   const handlePrevImage = () => {
@@ -149,6 +158,8 @@ export default function TripDetailPage() {
           try {
             setLoadingStaff(true)
             const staffResponse = await getStaffByOperatorAPI(response.bus.operator.id)
+            console.log('Operator ID:', response.bus.operator.id)
+            console.log('Fetched staff:', staffResponse)
             setStaffList(staffResponse.data || [])
           } catch (err) {
             console.error('Error fetching staff:', err)
@@ -281,8 +292,6 @@ export default function TripDetailPage() {
     }
   }
 
-  const [selectedFloor, setSelectedFloor] = useState(1)
-
   // Map logic - only render map if we have stops with coordinates
   const mapPoints = useMemo(() => {
     if (!trip?.route?.stops || trip.route.stops.length === 0) return []
@@ -386,7 +395,8 @@ export default function TripDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel this trip?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will cancel the trip and cancel all bookings for it. Seats will be released. This action cannot be undone.
+              This will cancel the trip and cancel all bookings for it. Seats will be released. This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -525,19 +535,67 @@ export default function TripDetailPage() {
                     <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">
                       Assigned Staff {trip.status === 'scheduled' && <span className="text-red-500">*</span>}
                     </label>
-                    <select
-                      value={selectedStaffId || ''}
-                      onChange={(e) => setSelectedStaffId(e.target.value || null)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      disabled={savingStaff}
-                    >
-                      <option value="">No staff assigned</option>
-                      {staffList.map((staff) => (
-                        <option key={staff.id} value={staff.id}>
-                          {staff.user?.displayName || staff.user?.email} ({staff.user?.phoneNumber || 'No phone'})
-                        </option>
-                      ))}
-                    </select>
+                    <Popover open={staffComboboxOpen} onOpenChange={setStaffComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={staffComboboxOpen}
+                          className="w-full justify-between px-3 py-2 h-auto bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          disabled={savingStaff}
+                        >
+                          {selectedStaffId
+                            ? (() => {
+                                const staff = staffList.find((s) => s.id === selectedStaffId)
+                                return staff
+                                  ? `${staff.displayName || staff.email} (${staff.phoneNumber || 'No phone'})`
+                                  : ''
+                              })()
+                            : 'Select or type staff name...'}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search staff..." className="h-9" />
+                          <CommandList>
+                            <CommandEmpty>No staff found.</CommandEmpty>
+                            <CommandGroup>
+                              <CommandItem
+                                value="none"
+                                onSelect={() => {
+                                  setSelectedStaffId(null)
+                                  setStaffComboboxOpen(false)
+                                }}
+                              >
+                                No staff assigned
+                                <Check
+                                  className={cn('ml-auto h-4 w-4', !selectedStaffId ? 'opacity-100' : 'opacity-0')}
+                                />
+                              </CommandItem>
+                              {staffList.map((staff) => (
+                                <CommandItem
+                                  key={staff.id}
+                                  value={`${staff.displayName || staff.email} ${staff.phoneNumber || ''}`}
+                                  onSelect={() => {
+                                    setSelectedStaffId(staff.id)
+                                    setStaffComboboxOpen(false)
+                                  }}
+                                >
+                                  {staff.displayName || staff.email} ({staff.phoneNumber || 'No phone'})
+                                  <Check
+                                    className={cn(
+                                      'ml-auto h-4 w-4',
+                                      selectedStaffId === staff.id ? 'opacity-100' : 'opacity-0'
+                                    )}
+                                  />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     {trip.status === 'scheduled' && !selectedStaffId && (
                       <p className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
                         <span>⚠️</span>
@@ -547,11 +605,10 @@ export default function TripDetailPage() {
                     {selectedStaffId && staffList.find((s) => s.id === selectedStaffId) && (
                       <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
                         <p className="text-sm text-gray-700 dark:text-gray-300">
-                          <strong>Selected Staff:</strong>{' '}
-                          {staffList.find((s) => s.id === selectedStaffId)?.user?.displayName}
+                          <strong>Selected Staff:</strong> {staffList.find((s) => s.id === selectedStaffId)?.displayName}
                         </p>
                         <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          Email: {staffList.find((s) => s.id === selectedStaffId)?.user?.email}
+                          Email: {staffList.find((s) => s.id === selectedStaffId)?.email}
                         </p>
                       </div>
                     )}
@@ -815,218 +872,21 @@ export default function TripDetailPage() {
           <Card className="mb-6">
             <CardContent className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Bus Seat Layout</h3>
-
-              {/* Legend */}
-              <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-green-500 rounded"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Available</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-yellow-500 rounded"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Locked</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-gray-400 rounded"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Booked</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 border-4 border-purple-400 bg-white dark:bg-gray-800 rounded"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Premium</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 border-4 border-blue-400 bg-white dark:bg-gray-800 rounded"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Sleeper</span>
+              
+              <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
+                <div className="text-center">
+                  <Bus className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    View detailed bus seat layout and configuration
+                  </p>
+                  <Button
+                    onClick={() => router.push(`/admin/busses/${trip.busId}`)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    View Bus Details
+                  </Button>
                 </div>
               </div>
-
-              {/* Bus Layout View */}
-              {trip.seats && trip.seats.length > 0 ? (
-                <div className="space-y-4">
-                  {(() => {
-                    const floorSeats = organizeSeatsByFloor(trip.seats)
-                    const floorNumbers = Object.keys(floorSeats).map(Number).sort()
-                    const hasMultipleFloors = floorNumbers.length > 1
-
-                    return (
-                      <>
-                        {/* Floor Tabs for multi-floor buses */}
-                        {hasMultipleFloors && (
-                          <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
-                            {floorNumbers.map((floorNum) => (
-                              <button
-                                key={floorNum}
-                                onClick={() => setSelectedFloor(floorNum)}
-                                className={`px-4 py-2 font-medium transition-colors ${
-                                  selectedFloor === floorNum
-                                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                                }`}
-                              >
-                                Floor {floorNum}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Display seats for selected floor */}
-                        {floorNumbers.map((floorNum) => {
-                          if (hasMultipleFloors && floorNum !== selectedFloor) return null
-
-                          const seatsOnFloor = floorSeats[floorNum] || []
-                          const rowSeats = organizeSeatsByRows(seatsOnFloor)
-                          const rowNumbers = Object.keys(rowSeats)
-
-                          return (
-                            <div key={floorNum} className="space-y-4">
-                              {/* Driver section indicator */}
-                              <div className="flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                  🚗 Driver {hasMultipleFloors && `- Floor ${floorNum}`}
-                                </span>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">Front of Bus</span>
-                              </div>
-
-                              {/* Seat Layout by Rows */}
-                              <div className="space-y-3 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
-                                {rowNumbers.map((rowNum) => {
-                                  const seatsInRow = rowSeats[rowNum]
-
-                                  // Sort seats by column letter to ensure proper order
-                                  const sortedSeats = [...seatsInRow].sort((a, b) => {
-                                    const colA = a.seatNumber.replace(/\d/g, '')
-                                    const colB = b.seatNumber.replace(/\d/g, '')
-                                    return colA.localeCompare(colB)
-                                  })
-
-                                  // Organize seats based on their column positions
-                                  const leftSeats: typeof trip.seats = []
-                                  const middleSeats: typeof trip.seats = []
-                                  const rightSeats: typeof trip.seats = []
-
-                                  // Determine the layout type based on columns present
-                                  const columns = [...new Set(sortedSeats.map((s) => s.seatNumber.replace(/\d/g, '')))]
-                                  const totalColumns = columns.length
-
-                                  sortedSeats.forEach((seat) => {
-                                    const col = seat.seatNumber.replace(/\d/g, '')
-
-                                    if (totalColumns === 2) {
-                                      // 1-1 layout: A (left) | B (right)
-                                      if (col === 'A') {
-                                        leftSeats.push(seat)
-                                      } else {
-                                        rightSeats.push(seat)
-                                      }
-                                    } else if (totalColumns === 3) {
-                                      // 1-1-1 layout: A (left) | B (middle) | C (right)
-                                      if (col === 'A') {
-                                        leftSeats.push(seat)
-                                      } else if (col === 'B') {
-                                        middleSeats.push(seat)
-                                      } else {
-                                        rightSeats.push(seat)
-                                      }
-                                    } else if (totalColumns >= 4) {
-                                      // 2-2 layout: AB (left) | CD (right)
-                                      if (col === 'A' || col === 'B') {
-                                        leftSeats.push(seat)
-                                      } else {
-                                        rightSeats.push(seat)
-                                      }
-                                    } else {
-                                      // Single column, put on left
-                                      leftSeats.push(seat)
-                                    }
-                                  })
-
-                                  return (
-                                    <div key={rowNum} className="flex items-center gap-3 justify-center">
-                                      {/* Left seats */}
-                                      <div className="flex gap-2">
-                                        {leftSeats.map((seat) => (
-                                          <div key={seat.id} className="relative group">
-                                            <div
-                                              className={`w-12 h-12 rounded-lg text-white text-xs font-semibold transition-all border-4 flex items-center justify-center ${getSeatStatusColor(
-                                                seat.status
-                                              )} ${getSeatTypeBorderColor(seat.seatType)}`}
-                                              title={`${seat.seatNumber} - ${seat.seatType} (${seat.status})`}
-                                            >
-                                              {seat.seatNumber}
-                                            </div>
-                                            {seat.status === 'booked' && seat.passengerName && (
-                                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                                {seat.passengerName}
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-
-                                      {/* Aisle */}
-                                      <div className="w-8 border-l-2 border-r-2 border-dashed border-gray-300 dark:border-gray-600 h-12"></div>
-
-                                      {/* Middle seats (for 1-1-1 layouts) */}
-                                      {middleSeats.length > 0 && (
-                                        <>
-                                          <div className="flex gap-2">
-                                            {middleSeats.map((seat) => (
-                                              <div key={seat.id} className="relative group">
-                                                <div
-                                                  className={`w-12 h-12 rounded-lg text-white text-xs font-semibold transition-all border-4 flex items-center justify-center ${getSeatStatusColor(
-                                                    seat.status
-                                                  )} ${getSeatTypeBorderColor(seat.seatType)}`}
-                                                  title={`${seat.seatNumber} - ${seat.seatType} (${seat.status})`}
-                                                >
-                                                  {seat.seatNumber}
-                                                </div>
-                                                {seat.status === 'booked' && seat.passengerName && (
-                                                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                                    {seat.passengerName}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            ))}
-                                          </div>
-                                          {/* Another aisle */}
-                                          <div className="w-8 border-l-2 border-r-2 border-dashed border-gray-300 dark:border-gray-600 h-12"></div>
-                                        </>
-                                      )}
-
-                                      {/* Right seats */}
-                                      <div className="flex gap-2">
-                                        {rightSeats.map((seat) => (
-                                          <div key={seat.id} className="relative group">
-                                            <div
-                                              className={`w-12 h-12 rounded-lg text-white text-xs font-semibold transition-all border-4 flex items-center justify-center ${getSeatStatusColor(
-                                                seat.status
-                                              )} ${getSeatTypeBorderColor(seat.seatType)}`}
-                                              title={`${seat.seatNumber} - ${seat.seatType} (${seat.status})`}
-                                            >
-                                              {seat.seatNumber}
-                                            </div>
-                                            {seat.status === 'booked' && seat.passengerName && (
-                                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                                {seat.passengerName}
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </>
-                    )
-                  })()}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">No seat data available</div>
-              )}
             </CardContent>
           </Card>
 

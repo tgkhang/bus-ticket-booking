@@ -16,6 +16,7 @@ export async function createUser(data: {
   password: string
   role: string
   isActive: boolean
+  operatorId?: string
 }) {
   const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/users`, data)
   return response.data

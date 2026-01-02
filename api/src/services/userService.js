@@ -37,10 +37,11 @@ const createNew = async (reqBody, isAdminCreating = false) => {
       verifyTokenExpiry: new Date(Date.now() + VERIFY_TOKEN_EXPIRY_MS),
     }
 
-    // If admin is creating, allow setting role and isActive
+    // If admin is creating, allow setting role, isActive, and operatorId
     if (isAdminCreating) {
       if (reqBody.role) newUser.role = reqBody.role
       if (reqBody.isActive !== undefined) newUser.isActive = reqBody.isActive
+      if (reqBody.operatorId) newUser.operatorId = reqBody.operatorId
     }
 
     const createdUser = await userModel.createNew(newUser)

@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 
 import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { listBusesAPI, listOperatorsAPI } from '@/lib/api'
 import type { Bus } from '@/types/api'
 import { toast } from 'sonner'
@@ -19,6 +20,7 @@ export default function BusManagementPage() {
   const [loading, setLoading] = useState(true)
   const [loadingOperators, setLoadingOperators] = useState(false)
   const { user } = useAuth()
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -68,16 +70,27 @@ export default function BusManagementPage() {
     }
   }
 
+  // Filter buses based on search query
+  const filteredBuses = buses.filter((bus) => {
+    const query = searchQuery.toLowerCase()
+    return bus.plateNumber.toLowerCase().includes(query) || bus.model.toLowerCase().includes(query)
+  })
+
   // Pagination calculations
-  const totalPages = Math.ceil(buses.length / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(filteredBuses.length / ITEMS_PER_PAGE)
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE
-  const currentBuses = buses.slice(indexOfFirstItem, indexOfLastItem)
+  const currentBuses = filteredBuses.slice(indexOfFirstItem, indexOfLastItem)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   const router = useRouter()
 
@@ -90,6 +103,22 @@ export default function BusManagementPage() {
         </div>
       </div>
 
+      {/* Search Panel */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="Search by plate number or model..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 py-6 text-base"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Buses Table */}
       <Card>
         <CardContent className="p-0">
@@ -100,6 +129,12 @@ export default function BusManagementPage() {
           ) : buses.length === 0 ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-gray-500 dark:text-gray-400">No buses found. Add one to get started!</div>
+            </div>
+          ) : filteredBuses.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-gray-500 dark:text-gray-400">
+                No buses match your search criteria. Try a different search term.
+              </div>
             </div>
           ) : (
             <div className="overflow-x-auto">

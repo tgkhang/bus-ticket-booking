@@ -39,8 +39,8 @@ model User {
   oauthSub      String? @unique // Auth0 user ID
   isOauthUser   Boolean @default(false)
 
-  // Operator link (for users with role 'operator')
-  operatorId String? @unique @map("operator_id")
+  // Operator link (for users with role 'operator' or 'staff')
+  operatorId String? @map("operator_id")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -122,7 +122,7 @@ model Operator {
   buses  Bus[]
   staff  Staff[]
   trips  Trip[]
-  user   User? // Link to the operator user account
+  users  User[] // Link to users (operators/staff) belonging to this operator
 
   @@map("operators")
 }

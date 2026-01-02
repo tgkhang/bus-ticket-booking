@@ -575,198 +575,21 @@ export default function StaffTripDetailPage() {
           <Card className="mb-6">
             <CardContent className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Bus Seat Layout</h3>
-
-              {/* Legend */}
-              <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-green-500 rounded"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Available</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-yellow-500 rounded"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Locked</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-gray-400 rounded"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Booked</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 border-4 border-purple-400 bg-white dark:bg-gray-800 rounded"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Premium</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 border-4 border-blue-400 bg-white dark:bg-gray-800 rounded"></div>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">Sleeper</span>
+              
+              <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
+                <div className="text-center">
+                  <Bus className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    View detailed bus seat layout and configuration
+                  </p>
+                  <Button
+                    onClick={() => router.push(`/staff/busses/${trip.busId}`)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    View Bus Details
+                  </Button>
                 </div>
               </div>
-
-              {/* Bus Layout View */}
-              {trip.seats && trip.seats.length > 0 ? (
-                <div className="space-y-4">
-                  {(() => {
-                    const floorSeats = organizeSeatsByFloor(trip.seats)
-                    const floorNumbers = Object.keys(floorSeats).map(Number).sort()
-                    const hasMultipleFloors = floorNumbers.length > 1
-
-                    return (
-                      <>
-                        {/* Floor Tabs */}
-                        {hasMultipleFloors && (
-                          <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
-                            {floorNumbers.map((floorNum) => (
-                              <button
-                                key={floorNum}
-                                onClick={() => setSelectedFloor(floorNum)}
-                                className={`px-4 py-2 font-medium transition-colors ${
-                                  selectedFloor === floorNum
-                                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                                }`}
-                              >
-                                Floor {floorNum}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Display seats */}
-                        {floorNumbers.map((floorNum) => {
-                          if (hasMultipleFloors && floorNum !== selectedFloor) return null
-
-                          const seatsOnFloor = floorSeats[floorNum] || []
-                          const rowSeats = organizeSeatsByRows(seatsOnFloor)
-                          const rowNumbers = Object.keys(rowSeats)
-
-                          return (
-                            <div key={floorNum} className="space-y-4">
-                              {/* Driver section */}
-                              <div className="flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                  🚗 Driver {hasMultipleFloors && `- Floor ${floorNum}`}
-                                </span>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">Front of Bus</span>
-                              </div>
-
-                              {/* Seat rows */}
-                              <div className="space-y-3 bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
-                                {rowNumbers.map((rowNum) => {
-                                  const seatsInRow = rowSeats[rowNum]
-                                  const sortedSeats = [...seatsInRow].sort((a, b) => {
-                                    const colA = a.seatNumber.replace(/\d/g, '')
-                                    const colB = b.seatNumber.replace(/\d/g, '')
-                                    return colA.localeCompare(colB)
-                                  })
-
-                                  const leftSeats: typeof trip.seats = []
-                                  const middleSeats: typeof trip.seats = []
-                                  const rightSeats: typeof trip.seats = []
-
-                                  const columns = [...new Set(sortedSeats.map((s) => s.seatNumber.replace(/\d/g, '')))]
-                                  const totalColumns = columns.length
-
-                                  sortedSeats.forEach((seat) => {
-                                    const col = seat.seatNumber.replace(/\d/g, '')
-                                    if (totalColumns === 2) {
-                                      if (col === 'A') leftSeats.push(seat)
-                                      else rightSeats.push(seat)
-                                    } else if (totalColumns === 3) {
-                                      if (col === 'A') leftSeats.push(seat)
-                                      else if (col === 'B') middleSeats.push(seat)
-                                      else rightSeats.push(seat)
-                                    } else if (totalColumns >= 4) {
-                                      if (col === 'A' || col === 'B') leftSeats.push(seat)
-                                      else rightSeats.push(seat)
-                                    } else {
-                                      leftSeats.push(seat)
-                                    }
-                                  })
-
-                                  return (
-                                    <div key={rowNum} className="flex items-center gap-3 justify-center">
-                                      {/* Left seats */}
-                                      <div className="flex gap-2">
-                                        {leftSeats.map((seat) => (
-                                          <div key={seat.id} className="relative group">
-                                            <div
-                                              className={`w-12 h-12 rounded-lg text-white text-xs font-semibold transition-all border-4 flex items-center justify-center ${getSeatStatusColor(
-                                                seat.status
-                                              )} ${getSeatTypeBorderColor(seat.seatType)}`}
-                                              title={`${seat.seatNumber} - ${seat.seatType} (${seat.status})`}
-                                            >
-                                              {seat.seatNumber}
-                                            </div>
-                                            {seat.status === 'booked' && seat.passengerName && (
-                                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                                {seat.passengerName}
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-
-                                      {/* Aisle */}
-                                      <div className="w-8 border-l-2 border-r-2 border-dashed border-gray-300 dark:border-gray-600 h-12"></div>
-
-                                      {/* Middle seats */}
-                                      {middleSeats.length > 0 && (
-                                        <>
-                                          <div className="flex gap-2">
-                                            {middleSeats.map((seat) => (
-                                              <div key={seat.id} className="relative group">
-                                                <div
-                                                  className={`w-12 h-12 rounded-lg text-white text-xs font-semibold transition-all border-4 flex items-center justify-center ${getSeatStatusColor(
-                                                    seat.status
-                                                  )} ${getSeatTypeBorderColor(seat.seatType)}`}
-                                                  title={`${seat.seatNumber} - ${seat.seatType} (${seat.status})`}
-                                                >
-                                                  {seat.seatNumber}
-                                                </div>
-                                                {seat.status === 'booked' && seat.passengerName && (
-                                                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                                    {seat.passengerName}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            ))}
-                                          </div>
-                                          <div className="w-8 border-l-2 border-r-2 border-dashed border-gray-300 dark:border-gray-600 h-12"></div>
-                                        </>
-                                      )}
-
-                                      {/* Right seats */}
-                                      <div className="flex gap-2">
-                                        {rightSeats.map((seat) => (
-                                          <div key={seat.id} className="relative group">
-                                            <div
-                                              className={`w-12 h-12 rounded-lg text-white text-xs font-semibold transition-all border-4 flex items-center justify-center ${getSeatStatusColor(
-                                                seat.status
-                                              )} ${getSeatTypeBorderColor(seat.seatType)}`}
-                                              title={`${seat.seatNumber} - ${seat.seatType} (${seat.status})`}
-                                            >
-                                              {seat.seatNumber}
-                                            </div>
-                                            {seat.status === 'booked' && seat.passengerName && (
-                                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                                                {seat.passengerName}
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </>
-                    )
-                  })()}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">No seat data available</div>
-              )}
             </CardContent>
           </Card>
 

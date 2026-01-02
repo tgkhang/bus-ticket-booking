@@ -156,18 +156,24 @@ const updateTripStatus = async (tripId, staffId, status) => {
 
 // Get staff by operator
 const getStaffByOperator = async (operatorId) => {
-  const staff = await prisma.staff.findMany({
+  const users = await prisma.user.findMany({
     where: {
-      operatorId,
+      role: 'staff',
+      operatorId: operatorId,
+      staff: {
+        isNot: null, // Only include users who have a Staff record
+      },
     },
-    include: {
-      user: {
+    select: {
+      id: true,
+      displayName: true,
+      email: true,
+      phoneNumber: true,
+      avatar: true,
+      operatorId: true,
+      staff: {
         select: {
           id: true,
-          displayName: true,
-          email: true,
-          phoneNumber: true,
-          avatar: true,
         },
       },
     },
@@ -175,6 +181,19 @@ const getStaffByOperator = async (operatorId) => {
       createdAt: 'desc',
     },
   })
+
+  // Transform to include staffId at the top level for easier access
+  const staff = users
+    .filter((user) => user.staff?.id) // Extra safety: filter out any without staff.id
+    .map((user) => ({
+      id: user.staff.id, // Staff table ID (used for trip assignment)
+      userId: user.id, // User table ID
+      displayName: user.displayName,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      avatar: user.avatar,
+      operatorId: user.operatorId,
+    }))
 
   return staff
 }

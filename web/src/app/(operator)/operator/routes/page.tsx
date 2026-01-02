@@ -54,15 +54,29 @@ export default function RoutesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [routeToDelete, setRouteToDelete] = useState<Route | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Get operator ID from current user
   const operatorId = user?.operatorId
 
+  // Filter routes based on search query
+  const filteredRoutes = routes.filter((route) => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    const originStop = availableStops.find(s => s.id === route.originStopId)
+    const destStop = availableStops.find(s => s.id === route.destinationStopId)
+    return (
+      route.name.toLowerCase().includes(query) ||
+      originStop?.name.toLowerCase().includes(query) ||
+      destStop?.name.toLowerCase().includes(query)
+    )
+  })
+
   // Pagination calculations
-  const totalPages = Math.ceil((routes?.length || 0) / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil((filteredRoutes?.length || 0) / ITEMS_PER_PAGE)
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE
-  const currentRoutes = routes?.slice(indexOfFirstItem, indexOfLastItem) || []
+  const currentRoutes = filteredRoutes?.slice(indexOfFirstItem, indexOfLastItem) || []
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -290,12 +304,13 @@ export default function RoutesPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Route Management</h1>
-          <p className="text-gray-600 dark:text-gray-400">Manage routes, stops, and journey details</p>
-        </div>
-        <div className="flex items-center gap-3">
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Route Management</h1>
+            <p className="text-gray-600 dark:text-gray-400">Manage routes, stops, and journey details</p>
+          </div>
+          <div className="flex items-center gap-3">
           {/* View Toggle */}
           <div className="flex bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
             <button
@@ -329,6 +344,34 @@ export default function RoutesPage() {
             <Plus className="w-6 h-6" />
             Add Route
           </Button>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search by route name, origin, or destination..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setCurrentPage(1)
+            }}
+            className="w-full px-4 py-3 pl-10 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+          />
+          <svg
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
         </div>
       </div>
 
@@ -547,7 +590,7 @@ export default function RoutesPage() {
               </div>
             )}
             {/* Pagination */}
-            {!loading && routes && routes.length > 0 && totalPages > 1 && (
+            {!loading && filteredRoutes && filteredRoutes.length > 0 && totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, routes?.length || 0)} of {routes?.length || 0} routes

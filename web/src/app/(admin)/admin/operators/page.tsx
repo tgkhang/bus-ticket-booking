@@ -2,6 +2,7 @@
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +31,7 @@ import {
   Calendar,
   Mail,
   Phone,
+  Search,
 } from 'lucide-react'
 import { ITEMS_PER_PAGE } from '@/utils/constants'
 import * as operatorApi from '@/lib/api/operator'
@@ -72,6 +74,7 @@ export default function OperatorsPage() {
   const [tab, setTab] = useState('')
   const [loading, setLoading] = useState(true)
   const [totalItems, setTotalItems] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const [showModal, setShowModal] = useState(false)
   const [editingOperator, setEditingOperator] = useState<Operator | null>(null)
@@ -90,6 +93,9 @@ export default function OperatorsPage() {
       if (tab) {
         params.status = tab
       }
+      if (searchQuery) {
+        params.search = searchQuery
+      }
       const response = await operatorApi.fetchOperators(params)
       setOperators(response.data || [])
       setTotalItems(response.pagination?.total || 0)
@@ -103,11 +109,11 @@ export default function OperatorsPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [tab])
+  }, [tab, searchQuery])
 
   useEffect(() => {
     fetchOperators()
-  }, [currentPage, tab])
+  }, [currentPage, tab, searchQuery])
 
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE)
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE
@@ -264,6 +270,22 @@ export default function OperatorsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Search Panel */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="Search by operator name, email, or phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 py-6 text-base"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <div className="mb-6 flex flex-wrap gap-2">
