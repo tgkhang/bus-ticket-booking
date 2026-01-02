@@ -15,6 +15,22 @@ Router.get(
   routeController.autocompleteStops
 )
 
+// Bulk import stops
+Router.post(
+  '/bulk-import',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_STOPS]),
+  routeController.bulkImportStops
+)
+
+// Export stops to CSV
+Router.get(
+  '/export',
+  authMiddleware.isAuthorized,
+  rbacMiddleware.isValidPermission([PERMISSIONS.READ_STOPS]),
+  routeController.exportStops
+)
+
 Router.post(
   '/',
   authMiddleware.isAuthorized,
@@ -46,7 +62,7 @@ Router.put(
 )
 
 Router.delete(
-  '/stops/:id',
+  '/:id',
   authMiddleware.isAuthorized,
   rbacMiddleware.isValidPermission([PERMISSIONS.MANAGE_STOPS]),
   routeController.deleteStop

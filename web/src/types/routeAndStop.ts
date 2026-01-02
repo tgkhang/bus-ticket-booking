@@ -5,6 +5,8 @@ export interface Stop {
   longitude: number
   address: string
   active: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 export interface RouteStop {
