@@ -45,7 +45,6 @@ export default function StaffTripsPage() {
 
       const response = await listTripsAPI(filters, { page: 1, limit: 100 })
       setTrips(response.data)
-      console.log('response data', response.data)
       setCurrentPage(1) // Reset to first page when filters change
     } catch (error) {
       toast.error('Failed to fetch trips')

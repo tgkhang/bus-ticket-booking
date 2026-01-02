@@ -37,6 +37,7 @@ export default function BusManagementPage() {
   const [editingBus, setEditingBus] = useState<Bus | null>(null)
   const [deletingBus, setDeletingBus] = useState<Bus | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -225,11 +226,22 @@ export default function BusManagementPage() {
     }
   }
 
+  // Filter buses based on search query
+  const filteredBuses = buses.filter((bus) => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      bus.plateNumber.toLowerCase().includes(query) ||
+      bus.model.toLowerCase().includes(query) ||
+      bus.status.toLowerCase().includes(query)
+    )
+  })
+
   // Pagination calculations
-  const totalPages = Math.ceil(buses.length / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(filteredBuses.length / ITEMS_PER_PAGE)
   const indexOfLastItem = currentPage * ITEMS_PER_PAGE
   const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE
-  const currentBuses = buses.slice(indexOfFirstItem, indexOfLastItem)
+  const currentBuses = filteredBuses.slice(indexOfFirstItem, indexOfLastItem)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -240,19 +252,48 @@ export default function BusManagementPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Bus Management</h1>
-          <p className="text-gray-600">Manage your fleet of buses</p>
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Bus Management</h1>
+            <p className="text-gray-600">Manage your fleet of buses</p>
+          </div>
+
+          <Button
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-6 text-base"
+          >
+            <Plus className="w-6 h-6" />
+            Add New Bus
+          </Button>
         </div>
 
-        <Button
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-6 text-base"
-        >
-          <Plus className="w-6 h-6" />
-          Add New Bus
-        </Button>
+        {/* Search Bar */}
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search by plate number, model, or status..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setCurrentPage(1)
+            }}
+            className="w-full px-4 py-3 pl-10 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+          />
+          <svg
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+        </div>
       </div>
 
       {/* Buses Table */}
@@ -361,10 +402,10 @@ export default function BusManagementPage() {
           )}
 
           {/* Pagination */}
-          {!loading && buses.length > 0 && totalPages > 1 && (
+          {!loading && filteredBuses.length > 0 && totalPages > 1 && (
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, buses.length)} of {buses.length} buses
+                Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredBuses.length)} of {filteredBuses.length} buses
               </div>
               <div className="flex items-center gap-2">
                 <button

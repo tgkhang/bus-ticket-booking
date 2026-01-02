@@ -15,6 +15,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useEffect, useState } from 'react'
 import type { User } from '@/types/user'
 import { fetchUsers, createUser, updateUser, deleteUser, toggleUserStatus } from '@/lib/api/user'
@@ -38,7 +40,10 @@ import {
   LogIn,
   Ticket,
   Search,
+  Check,
+  ChevronsUpDown,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { ITEMS_PER_PAGE } from '@/utils/constants'
 import { listOperatorsAPI } from '@/lib/api'
 import type { Operator } from '@/types/operator'
@@ -48,6 +53,7 @@ const ROLE_OPTIONS = [
   { value: 'client', label: 'Clients' },
   { value: 'operator', label: 'Operators' },
   { value: 'admin', label: 'Admins' },
+  { value: 'staff', label: 'Staff' },
 ]
 const STATUS_OPTIONS = [
   { value: '', label: 'All Status' },
@@ -69,6 +75,13 @@ function RoleBadge({ role }: { role: string }) {
       <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
         <UserIcon className="w-3.5 h-3.5" />
         Operator
+      </span>
+    )
+  if (lower === 'staff')
+    return (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 rounded-full text-xs font-medium">
+        <UserIcon className="w-3.5 h-3.5" />
+        Staff
       </span>
     )
   return (
@@ -101,6 +114,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [operators, setOperators] = useState<Operator[]>([])
   const [loadingOperators, setLoadingOperators] = useState(false)
+  const [operatorComboboxOpen, setOperatorComboboxOpen] = useState(false)
 
   const [showAddEdit, setShowAddEdit] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
@@ -117,7 +131,7 @@ export default function UsersPage() {
     username: string
     email: string
     password: string
-    role: 'client' | 'operator' | 'admin'
+    role: 'client' | 'operator' | 'admin' | 'staff'
     active: boolean
     operatorId: string
   }>({
@@ -195,9 +209,9 @@ export default function UsersPage() {
     e.preventDefault()
     if (!editingUser && !form.password) return toast.error('Password required')
 
-    // Validate operator selection for operator role
-    if (form.role === 'operator' && !form.operatorId) {
-      return toast.error('Please select an operator company for operator users')
+    // Validate operator selection for operator and staff roles
+    if ((form.role === 'operator' || form.role === 'staff') && !form.operatorId) {
+      return toast.error('Please select an operator company for operator/staff users')
     }
 
     try {
@@ -210,8 +224,8 @@ export default function UsersPage() {
       }
       if (form.password) payload.password = form.password
 
-      // Add operatorId only if role is operator
-      if (form.role === 'operator' && form.operatorId) {
+      // Add operatorId for operator and staff roles
+      if ((form.role === 'operator' || form.role === 'staff') && form.operatorId) {
         payload.operatorId = form.operatorId
       }
 
@@ -363,9 +377,6 @@ export default function UsersPage() {
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
                       Auth Type
                     </th>
-                    <th className="px-6 py-4 text-center text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
-                      Bookings
-                    </th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
                       Joined
                     </th>
@@ -406,9 +417,6 @@ export default function UsersPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                         {user.googleId ? 'Google OAuth' : 'Email/Password'}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-center">
-                        {user.bookingCount ?? '-'}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
                         {new Date(user.createdAt).toLocaleDateString()}
@@ -671,7 +679,7 @@ export default function UsersPage() {
                     required
                     value={form.role}
                     onChange={(e) => {
-                      const newRole = e.target.value as 'client' | 'operator' | 'admin'
+                      const newRole = e.target.value as 'client' | 'operator' | 'admin' | 'staff'
                       setForm({ ...form, role: newRole, operatorId: newRole === 'operator' ? form.operatorId : '' })
                     }}
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800"
@@ -679,6 +687,7 @@ export default function UsersPage() {
                     <option value="client">Client</option>
                     <option value="operator">Operator</option>
                     <option value="admin">Admin</option>
+                    <option value="staff">Staff</option>
                   </select>
                 </div>
                 <div>
@@ -693,26 +702,61 @@ export default function UsersPage() {
                   </select>
                 </div>
               </div>
-              {/* Operator Company Selection - Only visible when role is operator */}
-              {form.role === 'operator' && (
+              {/* Operator Company Selection - Only visible when role is operator or staff */}
+              {(form.role === 'operator' || form.role === 'staff') && (
                 <div className="mb-6">
                   <label className="block text-sm font-medium mb-2">
                     Operator Company <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    required
-                    value={form.operatorId}
-                    onChange={(e) => setForm({ ...form, operatorId: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800"
-                    disabled={loadingOperators}
-                  >
-                    <option value="">Select an operator company</option>
-                    {operators.map((operator) => (
-                      <option key={operator.id} value={operator.id}>
-                        {operator.name} - {operator.contactEmail}
-                      </option>
-                    ))}
-                  </select>
+                  <Popover open={operatorComboboxOpen} onOpenChange={setOperatorComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={operatorComboboxOpen}
+                        className="w-full justify-between px-4 py-3 h-auto bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        disabled={loadingOperators}
+                      >
+                        {form.operatorId
+                          ? (() => {
+                              const operator = operators.find((op) => op.id === form.operatorId)
+                              return operator ? `${operator.name} - ${operator.contactEmail}` : ''
+                            })()
+                          : loadingOperators
+                          ? 'Loading operators...'
+                          : 'Select or type operator company...'}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search operator..." className="h-9" />
+                        <CommandList>
+                          <CommandEmpty>No operator found.</CommandEmpty>
+                          <CommandGroup>
+                            {operators.map((operator) => (
+                              <CommandItem
+                                key={operator.id}
+                                value={`${operator.name} ${operator.contactEmail}`}
+                                onSelect={() => {
+                                  setForm({ ...form, operatorId: operator.id })
+                                  setOperatorComboboxOpen(false)
+                                }}
+                              >
+                                {operator.name} - {operator.contactEmail}
+                                <Check
+                                  className={cn(
+                                    'ml-auto h-4 w-4',
+                                    form.operatorId === operator.id ? 'opacity-100' : 'opacity-0'
+                                  )}
+                                />
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   {loadingOperators && <p className="text-sm text-gray-500 mt-2">Loading operators...</p>}
                   {!loadingOperators && operators.length === 0 && (
                     <p className="text-sm text-amber-600 mt-2">

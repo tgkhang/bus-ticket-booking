@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Eye, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Eye, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   cancelAdminBooking,
@@ -150,6 +151,7 @@ export default function BookingsPage() {
   const [status, setStatus] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
 
   const [page, setPage] = useState(1)
@@ -162,17 +164,18 @@ export default function BookingsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [status, from, to])
+  }, [status, from, to, searchQuery])
 
   const queryParams = useMemo(
     () => ({
       status: status || undefined,
       from: from || undefined,
       to: to || undefined,
+      search: searchQuery || undefined,
       page,
       limit: PAGE_SIZE,
     }),
-    [status, from, to, page]
+    [status, from, to, searchQuery, page]
   )
 
   useEffect(() => {
@@ -259,6 +262,22 @@ export default function BookingsPage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Booking Management</h1>
 
+      {/* Search Panel */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="Search by booking ID, user email, or route..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 py-3 text-base"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -306,6 +325,7 @@ export default function BookingsPage() {
                   setStatus('')
                   setFrom('')
                   setTo('')
+                  setSearchQuery('')
                 }}
               >
                 Clear filters
