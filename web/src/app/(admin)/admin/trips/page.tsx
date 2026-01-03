@@ -310,7 +310,6 @@ export default function TripManagementPage() {
       // Refresh the trip list
       await fetchTrips()
       handleCloseModal()
-      toast.success('Trip created successfully')
     } catch (error) {
       console.error('Error creating trip:', error)
       toast.error('Failed to create trip')

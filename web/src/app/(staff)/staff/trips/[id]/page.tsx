@@ -26,12 +26,7 @@ import { getTripDetailsAPI } from '@/lib/api'
 import { toast } from 'sonner'
 import { amenityOptions } from '@/utils/constants'
 import Image from 'next/image'
-import {
-  organizeSeatsByFloor,
-  organizeSeatsByRows,
-  getSeatStatusColor,
-  getSeatTypeBorderColor,
-} from '@/utils/seatLayout'
+import { Button } from '@/components/ui/button'
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
 import type { LatLngBoundsExpression } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
