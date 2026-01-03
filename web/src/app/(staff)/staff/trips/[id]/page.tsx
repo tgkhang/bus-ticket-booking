@@ -22,6 +22,7 @@ import {
 import { TripDetail } from '@/types/trip'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { getTripDetailsAPI } from '@/lib/api'
 import { toast } from 'sonner'
 import { amenityOptions } from '@/utils/constants'
