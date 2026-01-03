@@ -10,6 +10,11 @@ export const corsOptions = {
       return callback(null, true)
     }
 
+    // Allow requests with no origin (e.g., mobile apps, Postman, OAuth callbacks)
+    if (!origin) {
+      return callback(null, true)
+    }
+
     if (WHITELIST_DOMAINS.includes(origin)) {
       return callback(null, true)
     }

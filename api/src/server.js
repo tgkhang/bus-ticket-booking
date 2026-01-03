@@ -153,6 +153,12 @@ const START_SERVER = async () => {
     next()
   })
 
+  // Trust proxy for Render/Heroku/behind reverse proxies
+  // This is required for express-rate-limit to work correctly
+  if (env.BUILD_MODE === 'production') {
+    app.set('trust proxy', 1)
+  }
+
   app.use(helmet())
   const hostname = env.LOCAL_DEV_APP_HOST || 'localhost'
   const PORT = env.PORT || env.LOCAL_DEV_APP_PORT || 3000
