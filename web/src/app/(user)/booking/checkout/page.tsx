@@ -4,7 +4,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBookingPublicAPI, getTripByIdAPI } from '@/lib/api'
-import { sendETicketEmailAPI } from '@/lib/api/eTicket'
+import { confirmAndSendEmailPublicAPI } from '@/lib/api/eTicket'
 import { createPaymentLinkAPI, createPaymentLinkPublicAPI } from '@/lib/api/payment'
 import {
   ArrowLeft,
@@ -212,9 +212,12 @@ function CheckoutContent() {
           })
         )
         toast.info('Guest booking created. Save your reference/token for lookup.')
-      } else if (booking?.id) {
-        // Send e-ticket email for logged-in users only (auth required)
-        await sendETicketEmailAPI(booking.id)
+      }
+
+      // Confirm booking and send e-ticket email (works for both logged-in and guest users)
+      if (booking?.id) {
+        await confirmAndSendEmailPublicAPI(booking.id)
+        toast.success('E-ticket sent to your email!')
       }
 
       // Simulate payment processing

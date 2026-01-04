@@ -32,4 +32,9 @@ Router.get(
 // Webhook endpoint - no auth required (PayOS will call this)
 Router.post('/webhook', asyncHandler(paymentController.confirmWebhook))
 
+// Manual confirm booking after payment for local testing without webhook (dev)
+if (process.env.BUILD_MODE === 'dev') {
+  Router.post('/dev-confirm-booking', asyncHandler(paymentController.devConfirmBooking))
+}
+
 export const paymentRoute = Router

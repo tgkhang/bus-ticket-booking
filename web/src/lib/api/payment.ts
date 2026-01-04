@@ -34,3 +34,12 @@ export const getPaymentLinkInfoAPI = async (orderCode: string) => {
   const response = await authorizedAxiosInstance.get(`${API_ROOT}/v1/payments/${orderCode}`)
   return response.data
 }
+
+// Manually confirm booking after payment for local testing without webhook (dev)
+export const devConfirmBookingAPI = async (bookingId: string, orderCode: string) => {
+  const response = await authorizedAxiosInstance.post(`${API_ROOT}/v1/payments/dev-confirm-booking`, {
+    bookingId,
+    orderCode,
+  })
+  return response.data
+}
