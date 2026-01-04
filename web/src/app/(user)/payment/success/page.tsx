@@ -6,7 +6,7 @@ import { CheckCircle, Loader2, ArrowRight, Ticket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { getBookingByIdAPI, getBookingPublicByReferenceAPI } from '@/lib/api'
-import { getPaymentLinkInfoAPI } from '@/lib/api/payment'
+import { getPaymentLinkInfoAPI, devConfirmBookingAPI } from '@/lib/api/payment'
 
 interface BookingData {
   id: string
@@ -54,6 +54,17 @@ function SuccessContent() {
           }
 
           if (storedBookingId === bookingId && referenceCode && token) {
+            // Manually trigger webhook for guest booking
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[Payment Success - Guest] DEV MODE: Triggering manual webhook confirmation`)
+              try {
+                await devConfirmBookingAPI(bookingId, orderCode!)
+                console.log(`[Payment Success - Guest] DEV MODE: Manual confirmation successful`)
+              } catch (devErr) {
+                console.error(`[Payment Success - Guest] DEV MODE: Manual confirmation failed:`, devErr)
+              }
+            }
+
             const maxAttempts = 4
             let attempts = 0
             console.log(`[Payment Success - Guest] Starting to poll booking status (max ${maxAttempts} attempts)`)
@@ -107,6 +118,17 @@ function SuccessContent() {
           setError('Payment was not completed successfully')
           setIsProcessing(false)
           return
+        }
+
+        // Manually trigger webhook since PayOS can't call localhost
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[Payment Success] DEV MODE: Triggering manual webhook confirmation`)
+          try {
+            await devConfirmBookingAPI(bookingId, orderCode)
+            console.log(`[Payment Success] DEV MODE: Manual confirmation successful`)
+          } catch (devErr) {
+            console.error(`[Payment Success] DEV MODE: Manual confirmation failed:`, devErr)
+          }
         }
 
         // Poll booking status until webhook confirms it (max 5 seconds)

@@ -318,7 +318,9 @@ const confirmBooking = async (bookingId, userId, paymentData) => {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
   }
 
-  if (booking.userId !== userId) {
+  // For authenticated users, verify ownership
+  // For guest bookings (both booking.userId and userId are null), skip check
+  if (booking.userId && booking.userId !== userId) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'You do not have permission to confirm this booking')
   }
 
