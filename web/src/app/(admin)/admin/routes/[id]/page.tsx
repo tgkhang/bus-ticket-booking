@@ -16,17 +16,12 @@ import {
   Clock,
   DollarSign,
   ArrowRight,
-  Map,
-  Calendar,
-  Bus,
-  TrendingUp,
-  Users,
   AlertCircle,
   ChevronUp,
   ChevronDown,
   Route as RouteIcon,
 } from 'lucide-react'
-import { getRouteDetailsAPI } from '@/lib/api'
+import { getRouteDetailsAPI, listStopsAPI, listOperatorsAPI, updateRouteAPI } from '@/lib/api'
 import { toast } from 'sonner'
 import { Route, Stop } from '@/types/routeAndStop'
 import {
@@ -63,15 +58,6 @@ interface DisplayRoute extends Omit<Route, 'stops'> {
   destinationStopName: string
   operatorName: string
   stops: DisplayRouteStop[]
-  trips: Trip[]
-}
-
-interface Trip {
-  id: string
-  departureTime: string
-  status: 'scheduled' | 'active' | 'completed' | 'cancelled'
-  seatsBooked: number
-  totalSeats: number
 }
 
 interface RouteStop {
@@ -105,10 +91,10 @@ export default function RouteDetailPage() {
   const [isEditingRoute, setIsEditingRoute] = useState(false)
   const [showAddStopModal, setShowAddStopModal] = useState(false)
   const [editingStop, setEditingStop] = useState<DisplayRouteStop | null>(null)
-  const [activeTab, setActiveTab] = useState<'info' | 'stops' | 'trips'>('info')
+  const [activeTab, setActiveTab] = useState<'info' | 'stops'>('info')
   const [loading, setLoading] = useState(true)
-  const [availableStops] = useState<Stop[]>([]) // TODO: Fetch when needed for editing
-  const [operators] = useState<Array<{ id: string; name: string }>>([]) // TODO: Fetch when needed for editing
+  const [availableStops, setAvailableStops] = useState<Stop[]>([])
+  const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [stopToDelete, setStopToDelete] = useState<string | null>(null)
 
@@ -127,16 +113,21 @@ export default function RouteDetailPage() {
     stopId: '',
     isPickup: true,
     isDropoff: true,
-    distanceFromOrigin: 0,
-    estimatedMinutes: 0,
-    note: '',
   })
 
   useEffect(() => {
-    const fetchRouteDetails = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true)
-        const apiRoute = await getRouteDetailsAPI(routeId)
+        const [apiRoute, stopsResponse, operatorsResponse] = await Promise.all([
+          getRouteDetailsAPI(routeId),
+          listStopsAPI({ active: true }, { page: 1, limit: 500 }),
+          listOperatorsAPI({ status: 'approved' }, { page: 1, limit: 100 }),
+        ])
+
+        // Set available stops and operators
+        setAvailableStops(stopsResponse.data)
+        setOperators(operatorsResponse.data.map((op) => ({ id: op.id, name: op.name })))
 
         // Transform API response to DisplayRoute
         const displayRoute: DisplayRoute = {
@@ -158,7 +149,6 @@ export default function RouteDetailPage() {
             note: routeStop.note || undefined,
             stop: routeStop.stop, // Preserve the full stop object with coordinates
           })),
-          trips: [], // TODO: Fetch trips separately if needed
         }
 
         setRoute(displayRoute)
@@ -173,14 +163,14 @@ export default function RouteDetailPage() {
           active: displayRoute.active,
         })
       } catch (error) {
-        toast.error('Failed to fetch route details')
-        console.error('Error fetching route details:', error)
+        toast.error('Failed to fetch data')
+        console.error('Error fetching data:', error)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchRouteDetails()
+    fetchData()
   }, [routeId])
 
   // Map logic
@@ -257,9 +247,6 @@ export default function RouteDetailPage() {
         stopId: stop.stopId,
         isPickup: stop.isPickup,
         isDropoff: stop.isDropoff,
-        distanceFromOrigin: stop.distanceFromOrigin || 0,
-        estimatedMinutes: stop.estimatedMinutes || 0,
-        note: stop.note || '',
       })
     } else {
       setEditingStop(null)
@@ -267,47 +254,136 @@ export default function RouteDetailPage() {
         stopId: '',
         isPickup: true,
         isDropoff: true,
-        distanceFromOrigin: 0,
-        estimatedMinutes: 0,
-        note: '',
       })
     }
     setShowAddStopModal(true)
   }
 
-  const handleSaveStop = () => {
-    if (route) {
-      const stop = availableStops.find((s) => s.id === stopFormData.stopId)
-      if (!stop) return
+  const handleSaveStop = async () => {
+    if (!route) return
+
+    const stop = availableStops.find((s) => s.id === stopFormData.stopId)
+    if (!stop) {
+      toast.error('Please select a valid stop')
+      return
+    }
+
+    // Check for duplicate stopId (except when editing the same stop)
+    const isDuplicate = route.stops.some(
+      (s) => s.stopId === stopFormData.stopId && (!editingStop || s.id !== editingStop.id)
+    )
+    if (isDuplicate) {
+      toast.error('This stop is already in the route')
+      return
+    }
+
+    try {
+      // Get all existing stops (which already include origin and destination from API)
+      let allStops = route.stops.map((s) => ({
+        stopId: s.stopId,
+        sequence: s.sequence,
+        isPickup: s.isPickup,
+        isDropoff: s.isDropoff,
+      }))
 
       if (editingStop) {
-        // Update existing stop
-        setRoute({
-          ...route,
-          stops: route.stops.map((s) =>
-            s.id === editingStop.id
-              ? {
-                  ...s,
-                  ...stopFormData,
-                  stopName: stop.name,
-                  stopAddress: stop.address,
-                }
-              : s
-          ),
-        })
+        // Update existing stop - find by sequence number instead of stopId
+        // because stopId might change when editing
+        allStops = allStops.map((s) =>
+          s.sequence === editingStop.sequence
+            ? {
+                stopId: stopFormData.stopId,
+                sequence: s.sequence,
+                isPickup: stopFormData.isPickup,
+                isDropoff: stopFormData.isDropoff,
+              }
+            : {
+                stopId: s.stopId,
+                sequence: s.sequence,
+                isPickup: s.isPickup,
+                isDropoff: s.isDropoff,
+              }
+        )
       } else {
-        // Add new stop
-        const newStop: RouteStop = {
-          id: `rs_${Date.now()}`,
-          ...stopFormData,
-          stopName: stop.name,
-          stopAddress: stop.address,
-          sequence: route.stops.length + 1,
+        // Add new intermediate stop
+        // Insert before the last stop (destination) to keep destination as last
+        const newStop = {
+          stopId: stopFormData.stopId,
+          sequence: allStops.length, // Will be inserted before destination
+          isPickup: stopFormData.isPickup,
+          isDropoff: stopFormData.isDropoff,
         }
-        setRoute({ ...route, stops: [...route.stops, newStop] })
+
+        // Insert new stop before the last one, then resequence all
+        allStops.splice(allStops.length - 1, 0, newStop)
+        allStops = allStops.map((s, i) => ({ ...s, sequence: i + 1 }))
       }
+
+      // Validate for duplicates before sending
+      const sequences = allStops.map((s) => s.sequence)
+      const stopIds = allStops.map((s) => s.stopId)
+
+      console.log('Sequences:', sequences)
+      console.log('Stop IDs:', stopIds)
+      console.log('Has duplicate sequences:', new Set(sequences).size !== sequences.length)
+      console.log('Has duplicate stopIds:', new Set(stopIds).size !== stopIds.length)
+
+      // Determine origin and destination from the stops array
+      // Origin is the first stop, destination is the last stop
+      const sortedStops = [...allStops].sort((a, b) => a.sequence - b.sequence)
+      const newOriginStopId = sortedStops[0].stopId
+      const newDestinationStopId = sortedStops[sortedStops.length - 1].stopId
+
+      console.log('Current origin:', route.originStopId)
+      console.log('New origin:', newOriginStopId)
+      console.log('Current destination:', route.destinationStopId)
+      console.log('New destination:', newDestinationStopId)
+
+      // Prepare the payload
+      const payload = {
+        name: route.name,
+        operatorId: route.operatorId,
+        originStopId: newOriginStopId,
+        destinationStopId: newDestinationStopId,
+        distanceKm: route.distanceKm,
+        estimatedMinutes: route.estimatedMinutes,
+        active: route.active,
+        stops: allStops,
+      }
+
+      console.log('Payload:', JSON.stringify(payload, null, 2))
+
+      // Call API to update route with new stops (only required fields)
+      await updateRouteAPI(route.id, payload)
+
+      // Refresh route data
+      const updatedRoute = await getRouteDetailsAPI(route.id)
+      const displayRoute = {
+        ...updatedRoute,
+        basePrice: route.basePrice,
+        originStopName: updatedRoute.originStop.name,
+        destinationStopName: updatedRoute.destinationStop.name,
+        operatorName: updatedRoute.operator.name,
+        stops: updatedRoute.stops.map((routeStop) => ({
+          id: routeStop.id,
+          stopId: routeStop.stopId,
+          stopName: routeStop.stop.name,
+          stopAddress: routeStop.stop.address,
+          sequence: routeStop.sequence,
+          isPickup: routeStop.isPickup,
+          isDropoff: routeStop.isDropoff,
+          distanceFromOrigin: 0,
+          estimatedMinutes: 0,
+          note: routeStop.note || undefined,
+          stop: routeStop.stop,
+        })),
+      }
+      setRoute(displayRoute)
       setShowAddStopModal(false)
-      // TODO: Call API to add/update stop
+      toast.success(editingStop ? 'Stop updated successfully' : 'Stop added successfully')
+    } catch (error) {
+      console.error('Error saving stop:', error)
+      toast.error('Failed to save stop')
     }
   }
 
@@ -316,45 +392,132 @@ export default function RouteDetailPage() {
     setDeleteDialogOpen(true)
   }
 
-  const confirmDeleteStop = () => {
-    if (stopToDelete && route) {
+  const confirmDeleteStop = async () => {
+    if (!stopToDelete || !route) return
+
+    try {
       const newStops = route.stops.filter((s) => s.id !== stopToDelete)
       // Resequence
-      const resequenced = newStops.map((stop, i) => ({ ...stop, sequence: i + 1 }))
-      setRoute({ ...route, stops: resequenced })
+      const resequenced = newStops.map((stop, i) => ({
+        stopId: stop.stopId,
+        sequence: i + 1,
+        isPickup: stop.isPickup,
+        isDropoff: stop.isDropoff,
+      }))
+
+      // Determine origin and destination from the updated stops array
+      const sortedStops = [...resequenced].sort((a, b) => a.sequence - b.sequence)
+      const newOriginStopId = sortedStops[0].stopId
+      const newDestinationStopId = sortedStops[sortedStops.length - 1].stopId
+
+      // Call API to update route with removed stop
+      await updateRouteAPI(route.id, {
+        name: route.name,
+        operatorId: route.operatorId,
+        originStopId: newOriginStopId,
+        destinationStopId: newDestinationStopId,
+        distanceKm: route.distanceKm,
+        estimatedMinutes: route.estimatedMinutes,
+        active: route.active,
+        stops: resequenced,
+      })
+
+      // Refresh route data
+      const updatedRoute = await getRouteDetailsAPI(route.id)
+      const displayRoute = {
+        ...updatedRoute,
+        basePrice: route.basePrice,
+        originStopName: updatedRoute.originStop.name,
+        destinationStopName: updatedRoute.destinationStop.name,
+        operatorName: updatedRoute.operator.name,
+        stops: updatedRoute.stops.map((routeStop) => ({
+          id: routeStop.id,
+          stopId: routeStop.stopId,
+          stopName: routeStop.stop.name,
+          stopAddress: routeStop.stop.address,
+          sequence: routeStop.sequence,
+          isPickup: routeStop.isPickup,
+          isDropoff: routeStop.isDropoff,
+          distanceFromOrigin: 0,
+          estimatedMinutes: 0,
+          note: routeStop.note || undefined,
+          stop: routeStop.stop,
+        })),
+      }
+      setRoute(displayRoute)
       setDeleteDialogOpen(false)
       setStopToDelete(null)
-      // TODO: Call API to delete stop
+      toast.success('Stop deleted successfully')
+    } catch (error) {
+      console.error('Error deleting stop:', error)
+      toast.error('Failed to delete stop')
     }
   }
 
-  const handleMoveStop = (index: number, direction: 'up' | 'down') => {
+  const handleMoveStop = async (index: number, direction: 'up' | 'down') => {
     if (!route) return
 
     const newStops = [...route.stops]
     const newIndex = direction === 'up' ? index - 1 : index + 1
 
-    if (newIndex < 0 || newIndex >= newStops.length) return // Swap
+    if (newIndex < 0 || newIndex >= newStops.length) return
+
+    // Swap
     ;[newStops[index], newStops[newIndex]] = [newStops[newIndex], newStops[index]]
 
     // Resequence
-    const resequenced = newStops.map((stop, i) => ({ ...stop, sequence: i + 1 }))
-    setRoute({ ...route, stops: resequenced })
-    // TODO: Call API to reorder stops
-  }
+    const resequenced = newStops.map((stop, i) => ({
+      stopId: stop.stopId,
+      sequence: i + 1,
+      isPickup: stop.isPickup,
+      isDropoff: stop.isDropoff,
+    }))
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'scheduled':
-        return 'bg-blue-100 text-blue-700'
-      case 'active':
-        return 'bg-green-100 text-green-700'
-      case 'completed':
-        return 'bg-gray-100 text-gray-700'
-      case 'cancelled':
-        return 'bg-red-100 text-red-700'
-      default:
-        return 'bg-gray-100 text-gray-700'
+    try {
+      // Determine origin and destination from the reordered stops array
+      const sortedStops = [...resequenced].sort((a, b) => a.sequence - b.sequence)
+      const newOriginStopId = sortedStops[0].stopId
+      const newDestinationStopId = sortedStops[sortedStops.length - 1].stopId
+
+      // Call API to update route with reordered stops
+      await updateRouteAPI(route.id, {
+        name: route.name,
+        operatorId: route.operatorId,
+        originStopId: newOriginStopId,
+        destinationStopId: newDestinationStopId,
+        distanceKm: route.distanceKm,
+        estimatedMinutes: route.estimatedMinutes,
+        active: route.active,
+        stops: resequenced,
+      })
+
+      // Refresh route data
+      const updatedRoute = await getRouteDetailsAPI(route.id)
+      const displayRoute = {
+        ...updatedRoute,
+        basePrice: route.basePrice,
+        originStopName: updatedRoute.originStop.name,
+        destinationStopName: updatedRoute.destinationStop.name,
+        operatorName: updatedRoute.operator.name,
+        stops: updatedRoute.stops.map((routeStop) => ({
+          id: routeStop.id,
+          stopId: routeStop.stopId,
+          stopName: routeStop.stop.name,
+          stopAddress: routeStop.stop.address,
+          sequence: routeStop.sequence,
+          isPickup: routeStop.isPickup,
+          isDropoff: routeStop.isDropoff,
+          distanceFromOrigin: 0,
+          estimatedMinutes: 0,
+          note: routeStop.note || undefined,
+          stop: routeStop.stop,
+        })),
+      }
+      setRoute(displayRoute)
+      toast.success('Stop order updated successfully')
+    } catch (error) {
+      console.error('Error reordering stops:', error)
+      toast.error('Failed to reorder stops')
     }
   }
 
@@ -484,16 +647,6 @@ export default function RouteDetailPage() {
             }
           >
             Stops Management
-          </Button>
-          <Button
-            onClick={() => setActiveTab('trips')}
-            className={
-              activeTab === 'trips'
-                ? ''
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-            }
-          >
-            Scheduled Trips
           </Button>
         </div>
 
@@ -898,123 +1051,6 @@ export default function RouteDetailPage() {
           </div>
         )}
 
-        {/* Trips Tab */}
-        {activeTab === 'trips' && (
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Scheduled Trips</h2>
-              <Button onClick={() => router.push('/admin/trips')} variant="outline" className="flex items-center gap-2">
-                View All Trips
-                <ArrowRight className="w-5 h-5" />
-              </Button>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-8 h-8 text-blue-600" />
-                  <div>
-                    <p className="text-sm text-blue-700">Total Trips</p>
-                    <p className="text-2xl text-blue-900">{route.trips.length}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <Users className="w-8 h-8 text-green-600" />
-                  <div>
-                    <p className="text-sm text-green-700">Total Bookings</p>
-                    <p className="text-2xl text-green-900">{route.trips.reduce((acc, t) => acc + t.seatsBooked, 0)}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <TrendingUp className="w-8 h-8 text-purple-600" />
-                  <div>
-                    <p className="text-sm text-purple-700">Avg. Occupancy</p>
-                    <p className="text-2xl text-purple-900">
-                      {Math.round(
-                        (route.trips.reduce((acc, t) => acc + t.seatsBooked, 0) /
-                          route.trips.reduce((acc, t) => acc + t.totalSeats, 0)) *
-                          100
-                      )}
-                      %
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Trips List */}
-            <div className="space-y-3">
-              {route.trips.map((trip) => {
-                const occupancyPercentage = (trip.seatsBooked / trip.totalSeats) * 100
-                return (
-                  <div
-                    key={trip.id}
-                    className="bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="bg-blue-100 p-3 rounded-lg">
-                          <Bus className="w-6 h-6 text-[#2563EB]" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-3 mb-1">
-                            <p className="text-gray-900">
-                              {new Date(trip.departureTime).toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric',
-                              })}
-                            </p>
-                            <span className="text-gray-400">•</span>
-                            <p className="text-gray-900">
-                              {new Date(trip.departureTime).toLocaleTimeString('en-US', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 rounded text-xs ${getStatusBadge(trip.status)}`}>
-                              {trip.status}
-                            </span>
-                            <span className="text-sm text-gray-600">
-                              {trip.seatsBooked}/{trip.totalSeats} seats booked
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="w-32">
-                          <div className="flex items-center justify-between text-sm mb-1">
-                            <span className="text-gray-600">Occupancy</span>
-                            <span className="text-gray-900">{occupancyPercentage.toFixed(0)}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className={`h-2 rounded-full ${
-                                occupancyPercentage >= 80
-                                  ? 'bg-red-500'
-                                  : occupancyPercentage >= 50
-                                  ? 'bg-yellow-500'
-                                  : 'bg-green-500'
-                              }`}
-                              style={{ width: `${occupancyPercentage}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
       </Card>
 
       {/* Add/Edit Stop Modal */}
@@ -1053,41 +1089,8 @@ export default function RouteDetailPage() {
                         </option>
                       ))}
                 </select>
-              </div>{' '}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-700 dark:text-gray-300 mb-2">Distance from Origin (km)</label>
-                  <input
-                    type="number"
-                    value={stopFormData.distanceFromOrigin}
-                    onChange={(e) =>
-                      setStopFormData({
-                        ...stopFormData,
-                        distanceFromOrigin: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    step="0.1"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-gray-700 dark:text-gray-300 mb-2">
-                    Estimated Time from Origin (minutes)
-                  </label>
-                  <input
-                    type="number"
-                    value={stopFormData.estimatedMinutes}
-                    onChange={(e) =>
-                      setStopFormData({
-                        ...stopFormData,
-                        estimatedMinutes: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  />
-                </div>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <label className="flex items-center gap-3 p-4 border-2 border-gray-300 dark:border-gray-700 rounded-lg cursor-pointer hover:border-blue-600 transition-colors">
                   <input
@@ -1114,16 +1117,6 @@ export default function RouteDetailPage() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">Passengers can alight here</p>
                   </div>
                 </label>
-              </div>
-              <div>
-                <label className="block text-gray-700 dark:text-gray-300 mb-2">Note (Optional)</label>
-                <textarea
-                  value={stopFormData.note}
-                  onChange={(e) => setStopFormData({ ...stopFormData, note: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  rows={3}
-                  placeholder="e.g., Rest stop - 15 min break"
-                />
               </div>
             </div>
 
