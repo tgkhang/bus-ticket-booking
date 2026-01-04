@@ -1,15 +1,12 @@
 // API Root URL - uses environment variable or defaults based on NODE_ENV
 const getApiRoot = () => {
-  // Use NEXT_PUBLIC_API_URL if defined
+  // Always use NEXT_PUBLIC_API_URL for production
+  // This ensures the correct API endpoint is used when deployed
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL
   }
 
-  // Fallback to NODE_ENV based defaults
-  if (process.env.NODE_ENV === 'production') {
-    return 'https://api.example.com' // Update this for production deployment
-  }
-
+  // Fallback for local development only
   return 'http://localhost:8010'
 }
 
