@@ -11,8 +11,6 @@ import {
   MapPin,
   Navigation,
   Clock,
-  Map as MapIcon,
-  List,
   GripVertical,
   ArrowRight,
   ChevronLeft,
@@ -68,8 +66,6 @@ export default function RoutesPage() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingRoute, setEditingRoute] = useState<Route | null>(null)
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
-  const [selectedRoute, setSelectedRoute] = useState<Route | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [routeToDelete, setRouteToDelete] = useState<Route | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -328,41 +324,13 @@ export default function RoutesPage() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Route Management</h1>
           <p className="text-gray-600 dark:text-gray-400">Manage routes, stops, and journey details</p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* View Toggle */}
-          <div className="flex bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              <List className="w-4 h-4" />
-              List
-            </button>
-            <button
-              onClick={() => setViewMode('map')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                viewMode === 'map'
-                  ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              <MapIcon className="w-4 h-4" />
-              Map
-            </button>
-          </div>
-
-          <Button
-            onClick={() => handleOpenModal()}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-6 text-base"
-          >
-            <Plus className="w-6 h-6" />
-            Add Route
-          </Button>
-        </div>
+        <Button
+          onClick={() => handleOpenModal()}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-6 py-6 text-base"
+        >
+          <Plus className="w-6 h-6" />
+          Add Route
+        </Button>
       </div>
 
       {/* Search Panel */}
@@ -407,7 +375,7 @@ export default function RoutesPage() {
                 </p>
               </div>
               <div className="bg-green-100 dark:bg-green-900 p-3 rounded-lg">
-                <MapIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
+                <Navigation className="w-6 h-6 text-green-600 dark:text-green-400" />
               </div>
             </div>
           </CardContent>
@@ -446,24 +414,23 @@ export default function RoutesPage() {
       </div>
 
       {/* Content */}
-      {viewMode === 'list' ? (
-        <Card>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-gray-500 dark:text-gray-400">Loading routes...</div>
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-gray-500 dark:text-gray-400">Loading routes...</div>
+            </div>
+          ) : !routes || routes.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-gray-500 dark:text-gray-400">No routes found. Add one to get started!</div>
+            </div>
+          ) : filteredRoutes.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-gray-500 dark:text-gray-400">
+                No routes match your search criteria. Try a different search term.
               </div>
-            ) : !routes || routes.length === 0 ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-gray-500 dark:text-gray-400">No routes found. Add one to get started!</div>
-              </div>
-            ) : filteredRoutes.length === 0 ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-gray-500 dark:text-gray-400">
-                  No routes match your search criteria. Try a different search term.
-                </div>
-              </div>
-            ) : (
+            </div>
+          ) : (
               <div className="overflow-x-auto">
                 <table className="w-full table-fixed">
                   <colgroup>
@@ -576,16 +543,6 @@ export default function RoutesPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                setSelectedRoute(route)
-                              }}
-                              className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-lg transition-colors"
-                              title="View on Map"
-                            >
-                              <MapIcon className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
                                 handleOpenModal(route)
                               }}
                               className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-lg transition-colors"
@@ -649,27 +606,8 @@ export default function RoutesPage() {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
-      ) : (
-        /* Map View */
-        <Card>
-          <CardContent className="p-8">
-            <div className="flex items-center justify-center h-96 bg-gray-100 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
-              <div className="text-center">
-                <MapIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Interactive Map View</h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Map integration with route visualization would be displayed here
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-500">
-                  {selectedRoute ? `Showing: ${selectedRoute.name}` : 'Select a route to view on map'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        </CardContent>
+      </Card>
 
       {/* Add/Edit Modal */}
       {showModal && (

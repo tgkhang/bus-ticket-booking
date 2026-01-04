@@ -340,7 +340,7 @@ export const createRouteAPI = async (routeData: CreateRouteData) => {
 
 export const updateRouteAPI = async (routeId: string, routeData: CreateRouteData) => {
   const response = await authorizedAxiosInstance.put(`${API_ROOT}/v1/routes/${routeId}`, routeData)
-  toast.success('Route updated successfully')
+  //toast.success('Route updated successfully')
   return response.data
 }
 
