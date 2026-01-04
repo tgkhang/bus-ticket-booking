@@ -184,7 +184,7 @@ const confirmWebhook = async (req, res, next) => {
 
       // Send e-ticket email (idempotent - won't fail if already sent)
       try {
-        await eTicketService.sendETicketEmail(bookingId, booking.userId)
+        await eTicketService.sendETicketEmail(bookingId, booking.userId || null)       // Pass null for guest bookings
         console.log('E-ticket sent via webhook:', bookingId)
       } catch (emailError) {
         console.error('Failed to send e-ticket via webhook:', emailError)
@@ -214,9 +214,60 @@ const confirmWebhook = async (req, res, next) => {
   }
 }
 
+// Dev: Manual webhook trigger (bypass PayOS webhook call)
+const devConfirmBooking = async (req, res, next) => {
+  try {
+    const { bookingId, orderCode } = req.body
+
+    if (!bookingId || !orderCode) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: 'bookingId and orderCode are required',
+      })
+    }
+
+    const prisma = GET_DB()
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+    })
+
+    if (!booking) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: 'Booking not found',
+      })
+    }
+
+    // Confirm booking
+    await bookingService.confirmBooking(bookingId, booking.userId, {
+      provider: 'payos',
+      transactionRef: String(orderCode),
+    })
+
+    console.log('[DEV] Booking confirmed manually:', bookingId)
+
+    // Send e-ticket email
+    try {
+      await eTicketService.sendETicketEmail(bookingId, booking.userId || null)
+      console.log('[DEV] E-ticket sent:', bookingId)
+    } catch (emailError) {
+      console.error('[DEV] Failed to send e-ticket:', emailError)
+    }
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: 'Booking confirmed and email sent (dev mode)',
+      bookingId,
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
 export const paymentController = {
   createPaymentLink,
   createPaymentLinkPublic,
   getPaymentLinkInformation,
   confirmWebhook,
+  devConfirmBooking,
 }
