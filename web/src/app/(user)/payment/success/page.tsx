@@ -54,7 +54,7 @@ function SuccessContent() {
           }
 
           if (storedBookingId === bookingId && referenceCode && token) {
-            const maxAttempts = 10
+            const maxAttempts = 4
             let attempts = 0
             console.log(`[Payment Success - Guest] Starting to poll booking status (max ${maxAttempts} attempts)`)
 
@@ -84,7 +84,9 @@ function SuccessContent() {
             }
 
             // If not confirmed yet, still show success page.
-            console.warn(`[Payment Success - Guest] ⚠️ Timeout after ${maxAttempts} attempts. Webhook still processing.`)
+            console.warn(
+              `[Payment Success - Guest] ⚠️ Timeout after ${maxAttempts} attempts. Webhook still processing.`
+            )
             setIsProcessing(false)
             toast.success('Payment received. Booking confirmation may take a moment.')
             return
@@ -140,8 +142,12 @@ function SuccessContent() {
 
         // If webhook didn't confirm after polling, still show success
         // The webhook will process in the background
-        console.warn(`[Payment Success] ⚠️ Timeout after ${maxAttempts} attempts. Webhook still processing in background.`)
-        console.log(`[Payment Success] Showing success page anyway. Booking will be confirmed by webhook asynchronously.`)
+        console.warn(
+          `[Payment Success] ⚠️ Timeout after ${maxAttempts} attempts. Webhook still processing in background.`
+        )
+        console.log(
+          `[Payment Success] Showing success page anyway. Booking will be confirmed by webhook asynchronously.`
+        )
         setIsProcessing(false)
         toast.success('Payment successful! Your booking is being confirmed...')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
