@@ -2,19 +2,31 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { CheckCircle, Loader2, ArrowRight } from 'lucide-react'
+import { CheckCircle, Loader2, ArrowRight, Ticket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { confirmBookingAPI, getBookingByIdAPI, getBookingPublicByReferenceAPI } from '@/lib/api'
-import { sendETicketEmailAPI } from '@/lib/api/eTicket'
+import { getBookingByIdAPI, getBookingPublicByReferenceAPI } from '@/lib/api'
 import { getPaymentLinkInfoAPI } from '@/lib/api/payment'
+
+interface BookingData {
+  id: string
+  totalAmount: number
+  status: string
+  trip?: {
+    departureTime: string
+    route?: {
+      originCity: string
+      destinationCity: string
+    }
+  }
+}
 
 function SuccessContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [countdown, setCountdown] = useState(5)
   const [isProcessing, setIsProcessing] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [bookingData, setBookingData] = useState<BookingData | null>(null)
   const [guestAccess, setGuestAccess] = useState<{ referenceCode: string; token: string } | null>(null)
 
   useEffect(() => {
@@ -42,26 +54,39 @@ function SuccessContent() {
           }
 
           if (storedBookingId === bookingId && referenceCode && token) {
-            const maxAttempts = 6
+            const maxAttempts = 4
             let attempts = 0
+            console.log(`[Payment Success - Guest] Starting to poll booking status (max ${maxAttempts} attempts)`)
 
             while (attempts < maxAttempts) {
+              attempts++
+              console.log(`[Payment Success - Guest] Polling attempt ${attempts}/${maxAttempts}`)
+
               try {
                 const booking = await getBookingPublicByReferenceAPI(referenceCode, token)
+                console.log(`[Payment Success - Guest] Booking status: ${booking?.status}`)
+
                 if (booking?.status === 'confirmed') {
+                  console.log(`[Payment Success - Guest] ✅ Webhook confirmed booking after ${attempts} attempts!`)
+                  setBookingData(booking)
                   setIsProcessing(false)
-                  toast.success('Booking confirmed! Your e-ticket will be sent via email.')
+                  toast.success('Booking confirmed! Your e-ticket has been sent via email.')
                   return
                 }
               } catch (err) {
-                console.error('Guest booking lookup failed:', err)
+                console.error(`[Payment Success - Guest] Lookup failed (attempt ${attempts}):`, err)
               }
 
-              await new Promise((resolve) => setTimeout(resolve, 1500))
-              attempts++
+              if (attempts < maxAttempts) {
+                console.log(`[Payment Success - Guest] Waiting 1 second before next attempt...`)
+                await new Promise((resolve) => setTimeout(resolve, 1000))
+              }
             }
 
             // If not confirmed yet, still show success page.
+            console.warn(
+              `[Payment Success - Guest] ⚠️ Timeout after ${maxAttempts} attempts. Webhook still processing.`
+            )
             setIsProcessing(false)
             toast.success('Payment received. Booking confirmation may take a moment.')
             return
@@ -73,51 +98,58 @@ function SuccessContent() {
 
       try {
         // Verify payment was successful from PayOS
+        console.log(`[Payment Success] Verifying payment for orderCode: ${orderCode}`)
         const paymentInfo = await getPaymentLinkInfoAPI(orderCode)
+        console.log(`[Payment Success] PayOS status: ${paymentInfo.data.status}`)
 
         if (paymentInfo.data.status !== 'PAID') {
+          console.error(`[Payment Success] Payment not completed. Status: ${paymentInfo.data.status}`)
           setError('Payment was not completed successfully')
           setIsProcessing(false)
           return
         }
 
-        // Poll booking status until webhook confirms it (max 30 seconds)
-        const maxAttempts = 3
+        // Poll booking status until webhook confirms it (max 5 seconds)
+        const maxAttempts = 5
         let attempts = 0
-        let bookingConfirmed = false
+        console.log(`[Payment Success] Starting to poll booking status (max ${maxAttempts} attempts)`)
 
-        while (attempts < maxAttempts && !bookingConfirmed) {
+        while (attempts < maxAttempts) {
+          attempts++
+          console.log(`[Payment Success] Polling attempt ${attempts}/${maxAttempts} for bookingId: ${bookingId}`)
+
           try {
-            const bookingData = await getBookingByIdAPI(bookingId)
+            const booking = await getBookingByIdAPI(bookingId)
+            console.log(`[Payment Success] Booking status: ${booking?.status}`)
 
-            if (bookingData?.status === 'confirmed') {
-              bookingConfirmed = true
-              // Webhook already confirmed, just send e-ticket as backup
-              await sendETicketEmailAPI(bookingId)
+            if (booking?.status === 'confirmed') {
+              console.log(`[Payment Success] ✅ Webhook confirmed booking after ${attempts} attempts!`)
+              setBookingData(booking)
               setIsProcessing(false)
-              toast.success('Booking confirmed and e-ticket sent!')
-              break
+              toast.success('Payment successful! Your e-ticket has been sent via email.')
+              return
             }
           } catch (err) {
-            console.error('Error checking booking status:', err)
+            console.error(`[Payment Success] Error checking booking status (attempt ${attempts}):`, err)
           }
 
           // Wait 1 second before next attempt
-          await new Promise((resolve) => setTimeout(resolve, 1000))
-          attempts++
+          if (attempts < maxAttempts) {
+            console.log(`[Payment Success] Waiting 1 second before next attempt...`)
+            await new Promise((resolve) => setTimeout(resolve, 1000))
+          }
         }
 
-        // If webhook didn't confirm after 30 seconds, confirm manually as fallback
-        if (!bookingConfirmed) {
-          console.warn('Webhook confirmation timeout, confirming manually')
-          await confirmBookingAPI(bookingId, {
-            provider: 'payos',
-            transactionRef: orderCode,
-          })
-          await sendETicketEmailAPI(bookingId)
-          setIsProcessing(false)
-          toast.success('Booking confirmed and e-ticket sent!')
-        }
+        // If webhook didn't confirm after polling, still show success
+        // The webhook will process in the background
+        console.warn(
+          `[Payment Success] ⚠️ Timeout after ${maxAttempts} attempts. Webhook still processing in background.`
+        )
+        console.log(
+          `[Payment Success] Showing success page anyway. Booking will be confirmed by webhook asynchronously.`
+        )
+        setIsProcessing(false)
+        toast.success('Payment successful! Your booking is being confirmed...')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         console.error('Error confirming payment:', err)
@@ -129,23 +161,6 @@ function SuccessContent() {
 
     waitForWebhookConfirmation()
   }, [searchParams])
-
-  useEffect(() => {
-    if (isProcessing || error) return
-
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer)
-          router.push('/')
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [router, isProcessing, error])
 
   if (isProcessing) {
     return (
@@ -176,7 +191,7 @@ function SuccessContent() {
             Please contact our support team with your order details for assistance.
           </p>
           <Button onClick={() => router.push('/')} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-            Go to Dashboard
+            Go to Home
             <ArrowRight className="w-5 h-5 ml-2" />
           </Button>
         </div>
@@ -184,31 +199,69 @@ function SuccessContent() {
     )
   }
 
+  const bookingId = searchParams.get('bookingId')
+  const orderCode = searchParams.get('orderCode')
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-        <div className="mb-6">
-          <CheckCircle className="w-20 h-20 text-green-500 mx-auto" />
+      <div className="max-w-2xl w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+        <div className="text-center mb-8">
+          <CheckCircle className="w-20 h-20 text-green-500 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Payment Successful!</h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            Thank you for your payment. Your booking has been confirmed.
+          </p>
         </div>
 
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Payment Successful!</h1>
-
-        <p className="text-gray-600 dark:text-gray-300 mb-6">
-          Thank you for using PayOS! Your booking has been confirmed and you should receive an e-ticket via email
-          shortly.
-        </p>
+        {bookingData && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Booking Details</h2>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Booking ID:</span>
+                <span className="font-medium text-gray-900 dark:text-white">#{bookingData.id}</span>
+              </div>
+              {bookingData.trip && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Route:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {bookingData.trip.route?.originCity} → {bookingData.trip.route?.destinationCity}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Departure:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {new Date(bookingData.trip.departureTime).toLocaleString()}
+                    </span>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Total Paid:</span>
+                <span className="font-bold text-green-600 dark:text-green-400">
+                  {bookingData.totalAmount?.toLocaleString()} VND
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Status:</span>
+                <span className="font-medium text-green-600 dark:text-green-400">Confirmed</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {guestAccess && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 text-left">
-            <p className="text-sm text-blue-800 dark:text-blue-300 mb-2">
-              Save these to lookup your booking later:
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
+              📋 Save these credentials to manage your booking:
             </p>
-            <div className="text-sm text-gray-900 dark:text-white break-all">
+            <div className="text-sm text-gray-900 dark:text-white break-all space-y-1">
               <div>
-                <span className="font-semibold">Reference:</span> {guestAccess.referenceCode}
+                <span className="font-semibold">Reference Code:</span> {guestAccess.referenceCode}
               </div>
               <div>
-                <span className="font-semibold">Token:</span> {guestAccess.token}
+                <span className="font-semibold">Access Token:</span> {guestAccess.token}
               </div>
             </div>
           </div>
@@ -216,14 +269,23 @@ function SuccessContent() {
 
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
           <p className="text-sm text-green-800 dark:text-green-300">
-            Redirecting to your bookings in <span className="font-bold">{countdown}</span> seconds...
+            ✅ An e-ticket has been sent to your email address. Please check your inbox.
           </p>
         </div>
 
-        <Button onClick={() => router.push('/')} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-          View My Bookings
-          <ArrowRight className="w-5 h-5 ml-2" />
-        </Button>
+        <div className="flex gap-3">
+          <Button
+            onClick={() => router.push(`/booking/confirmation?bookingId=${bookingId}&orderCode=${orderCode}`)}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <Ticket className="w-5 h-5 mr-2" />
+            View E-Ticket
+          </Button>
+          <Button onClick={() => router.push('/')} variant="outline" className="flex-1">
+            Go to Home
+            <ArrowRight className="w-5 h-5 ml-2" />
+          </Button>
+        </div>
       </div>
     </div>
   )

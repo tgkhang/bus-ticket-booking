@@ -400,6 +400,7 @@ async function main() {
           seqIdx: [0, 1, 2],
           distanceKm: 22,
           estimatedMinutes: 60,
+          operatorRotation: 0,
         },
         // Airport express D1 -> Airport
         {
@@ -407,6 +408,7 @@ async function main() {
           seqIdx: [0, 3],
           distanceKm: 8,
           estimatedMinutes: 35,
+          operatorRotation: 1,
         },
         // Ring route: Airport -> Binh Thanh -> D1 -> Thu Duc
         {
@@ -414,6 +416,79 @@ async function main() {
           seqIdx: [3, 1, 0, 2],
           distanceKm: 30,
           estimatedMinutes: 85,
+          operatorRotation: 2,
+        },
+        // Thu Duc to Airport
+        {
+          name: 'Eastern Express',
+          seqIdx: [2, 1, 3],
+          distanceKm: 25,
+          estimatedMinutes: 70,
+          operatorRotation: 3,
+        },
+        // Binh Thanh to Thu Duc direct
+        {
+          name: 'Metro Line',
+          seqIdx: [1, 2],
+          distanceKm: 15,
+          estimatedMinutes: 40,
+          operatorRotation: 4,
+        },
+        // Airport to Binh Thanh
+        {
+          name: 'Airport Shuttle',
+          seqIdx: [3, 1],
+          distanceKm: 12,
+          estimatedMinutes: 30,
+          operatorRotation: 5,
+        },
+        // Thu Duc to D1 via Binh Thanh
+        {
+          name: 'Suburban Line',
+          seqIdx: [2, 1, 0],
+          distanceKm: 20,
+          estimatedMinutes: 55,
+          operatorRotation: 0,
+        },
+        // D1 to Thu Duc direct
+        {
+          name: 'Fast Track',
+          seqIdx: [0, 2],
+          distanceKm: 18,
+          estimatedMinutes: 45,
+          operatorRotation: 1,
+        },
+        // Circular route
+        {
+          name: 'City Circle',
+          seqIdx: [0, 1, 2, 3, 0],
+          distanceKm: 35,
+          estimatedMinutes: 95,
+          operatorRotation: 2,
+        },
+        // Airport loop
+        {
+          name: 'Airport Loop',
+          seqIdx: [3, 0, 1, 3],
+          distanceKm: 28,
+          estimatedMinutes: 75,
+          operatorRotation: 3,
+        },
+        // Reverse ring
+        {
+          name: 'City Ring C (Reverse)',
+          seqIdx: [2, 0, 1, 3],
+          distanceKm: 32,
+          estimatedMinutes: 90,
+          operatorRotation: 4,
+        },
+        // D1 to Binh Thanh
+        {
+          name: 'Downtown Link',
+          seqIdx: [0, 1],
+          distanceKm: 10,
+          estimatedMinutes: 25,
+          operatorRotation: 5,
         },
       ]
     : [
@@ -422,15 +497,17 @@ async function main() {
           seqIdx: [0, 1],
           distanceKm: 5,
           estimatedMinutes: 20,
+          operatorRotation: 0,
         },
       ]
 
   const createdRoutes = []
   for (let i = 0; i < routeSpecs.length; i++) {
     const spec = routeSpecs[i]
-    // Rotate through approved operators for route assignment
-    const operator = operators.filter((o) => o.status === 'approved')[
-      i % operators.filter((o) => o.status === 'approved').length
+    // Use the specified operator rotation or fall back to round-robin
+    const approvedOperators = operators.filter((o) => o.status === 'approved')
+    const operator = approvedOperators[
+      (spec.operatorRotation ?? i) % approvedOperators.length
     ]
     const stopsSeq = spec.seqIdx.map(pick)
     const origin = stopsSeq[0]
@@ -709,28 +786,36 @@ async function main() {
     return d
   }
 
-  // Multiple departure times throughout the day
+  // Multiple departure times throughout the day (reduced for better manageability)
   const departureSlots = [
-    { time: [6, 0], priceMultiplier: 1.0 }, // Early morning
-    { time: [7, 30], priceMultiplier: 1.1 }, // Morning peak
-    { time: [9, 0], priceMultiplier: 1.0 }, // Mid morning
-    { time: [11, 30], priceMultiplier: 0.9 }, // Late morning
-    { time: [14, 0], priceMultiplier: 0.95 }, // Afternoon
+    { time: [7, 0], priceMultiplier: 1.1 }, // Morning peak
+    { time: [12, 0], priceMultiplier: 0.9 }, // Midday
     { time: [17, 0], priceMultiplier: 1.2 }, // Evening peak
-    { time: [19, 30], priceMultiplier: 1.1 }, // Evening
-    { time: [22, 0], priceMultiplier: 1.0 }, // Night
   ]
 
   let tripCount = 0
-  // Create trips for next 7 days
-  for (let day = 0; day < 7; day++) {
+  // Create trips for next 4 days - ~100-150 trips (12 routes × 3 slots × 4 days = 144 trips)
+  for (let day = 0; day < 4; day++) {
     for (const route of createdRoutes) {
-      // Rotate through buses for variety
-      const busesForDay = day % 2 === 0 ? buses.slice(0, 3) : buses.slice(3, 6)
+      // Get the route with operator info
+      const routeWithOperator = await prisma.route.findUnique({
+        where: { id: route.id },
+        select: { operatorId: true }
+      })
+
+      // Get buses that belong to the same operator as this route
+      const operatorBuses = buses.filter(bus => {
+        const busConfig = busConfigs.find(bc => bc.plateNumber === bus.plateNumber)
+        return busConfig && operators[busConfig.operatorIdx].id === routeWithOperator.operatorId
+      })
+
+      // If no buses for this operator, use all buses
+      const availableBuses = operatorBuses.length > 0 ? operatorBuses : buses
 
       for (const slot of departureSlots) {
-        // Use different buses for different time slots
-        const bus = busesForDay[slot.time[0] % busesForDay.length]
+        // Rotate through available buses for this route's operator
+        const busIndex = (day + slot.time[0]) % availableBuses.length
+        const bus = availableBuses[busIndex]
 
         const dep = makeTime(day, slot.time[0], slot.time[1])
         const arr = new Date(dep)
@@ -744,17 +829,11 @@ async function main() {
         })
 
         if (!exists) {
-          // Get the operator from the bus
-          const busWithOperator = await prisma.bus.findUnique({
-            where: { id: bus.id },
-            select: { operatorId: true }
-          })
-          
           await prisma.trip.create({
             data: {
               routeId: route.id,
               busId: bus.id,
-              operatorId: busWithOperator.operatorId,
+              operatorId: routeWithOperator.operatorId,
               departureTime: dep,
               arrivalTime: arr,
               basePrice: basePrice,
@@ -766,7 +845,7 @@ async function main() {
       }
     }
   }
-  console.log(`🎫 Created ${tripCount} trips across 7 days`)
+  console.log(`🎫 Created ${tripCount} trips across 4 days for ${createdRoutes.length} routes`)
 
   // Assign staff to some trips
   const allTripsForStaff = await prisma.trip.findMany({ take: 50 })
@@ -807,7 +886,6 @@ async function main() {
   console.log(`💺 Created ${seatStatusCount} seat statuses for all trips`)
   // Seed sample bookings with payment - ensure every trip has passengers for checkout
   const allUsers = [user1, user2, user3, user4, user5, user6, user7, user8]
-  const allPayments = ["VNPAY", "CASH"]
   const allTripsForBooking = await prisma.trip.findMany({})
   const allSeatsForBooking = await prisma.seat.findMany({})
   const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
@@ -865,9 +943,11 @@ async function main() {
           bookedAt,
           payments: {
             create: {
-              provider: allPayments[randomInt(0, allPayments.length - 1)],
+              provider: "payos",
               amount: amount * passengerDetails.length,
-              status: "success"
+              status: "completed",
+              transactionRef: `PAYOS_${Date.now()}_${randomInt(10000, 99999)}`,
+              processedAt: new Date()
             }
           },
           passengerDetails: {
@@ -915,7 +995,390 @@ async function main() {
   }
   console.log(`✅ Marked ${boardedCount} passengers as boarded (many left unboarded for staff checkout practice)`)
 
-  console.log('✅ Database seeding completed!')
+  // Update seat statuses for booked seats
+  const allBookingsWithDetails = await prisma.booking.findMany({
+    include: {
+      passengerDetails: true,
+      trip: true,
+    },
+  })
+
+  let bookedSeatCount = 0
+  for (const booking of allBookingsWithDetails) {
+    for (const passenger of booking.passengerDetails) {
+      // Find the seat for this passenger
+      const seat = allSeatsForBooking.find(
+        s => s.busId === booking.trip.busId && s.seatNumber === passenger.seatCode
+      )
+
+      if (seat) {
+        await prisma.seatStatus.updateMany({
+          where: {
+            tripId: booking.tripId,
+            seatId: seat.id,
+          },
+          data: {
+            status: 'booked',
+          },
+        })
+        bookedSeatCount++
+      }
+    }
+  }
+  console.log(`🪑 Updated ${bookedSeatCount} seat statuses to 'booked'`)
+
+  // Create payment methods for users (PayOS only)
+  let paymentMethodCount = 0
+
+  for (const user of allUsers) {
+    // Each user gets 1-2 PayOS payment methods
+    const numMethods = randomInt(1, 2)
+    for (let i = 0; i < numMethods; i++) {
+      await prisma.paymentMethod.create({
+        data: {
+          userId: user.id,
+          provider: 'payos',
+          token: `payos_token_${user.id}_${i}_${Date.now()}`,
+          isDefault: i === 0, // First one is default
+        },
+      })
+      paymentMethodCount++
+    }
+  }
+  console.log(`💳 Created ${paymentMethodCount} PayOS payment methods for users`)
+
+  // Create notifications for bookings
+  const notificationTemplates = [
+    'booking_confirmed',
+    'payment_received',
+    'trip_reminder',
+    'boarding_reminder',
+    'trip_completed',
+    'refund_processed',
+  ]
+  const notificationChannels = ['email', 'sms', 'push']
+
+  let notificationCount = 0
+  const allBookingsForNotifications = await prisma.booking.findMany({
+    include: { trip: true },
+  })
+
+  for (const booking of allBookingsForNotifications) {
+    // Each booking gets 2-4 notifications
+    const numNotifications = randomInt(2, 4)
+
+    for (let i = 0; i < numNotifications; i++) {
+      const template = notificationTemplates[randomInt(0, notificationTemplates.length - 1)]
+      const channel = notificationChannels[randomInt(0, notificationChannels.length - 1)]
+      const status = Math.random() > 0.1 ? 'sent' : Math.random() > 0.5 ? 'pending' : 'failed'
+
+      await prisma.notification.create({
+        data: {
+          bookingId: booking.id,
+          channel,
+          template,
+          status,
+          sentAt: status === 'sent' ? new Date(booking.bookedAt.getTime() + randomInt(1, 30) * 60 * 1000) : null,
+        },
+      })
+      notificationCount++
+    }
+  }
+  console.log(`🔔 Created ${notificationCount} notifications for bookings`)
+
+  // Create feedbacks for completed bookings
+  const completedBookings = await prisma.booking.findMany({
+    where: {
+      status: 'completed',
+    },
+    include: {
+      trip: true,
+    },
+  })
+
+  let feedbackCount = 0
+  const feedbackComments = [
+    'Great service! The bus was clean and comfortable.',
+    'Driver was professional and on time. Highly recommend!',
+    'Good experience overall, though the AC was a bit too cold.',
+    'Pleasant journey. Staff was very helpful.',
+    'Bus arrived late but the trip itself was smooth.',
+    'Excellent service! Will book again.',
+    'Average experience. Expected better amenities.',
+    'Very comfortable seats and smooth ride.',
+    'Good value for money. Punctual departure.',
+    'Staff was friendly. Clean bus with working WiFi.',
+    null, // Some feedbacks have no comment
+  ]
+
+  // Create feedback for 60% of completed bookings
+  for (const booking of completedBookings) {
+    if (Math.random() < 0.6) {
+      const rating = randomInt(3, 5) // Most ratings are 3-5 stars
+      const comment = feedbackComments[randomInt(0, feedbackComments.length - 1)]
+
+      // Check if feedback already exists for this booking
+      const existingFeedback = await prisma.feedback.findUnique({
+        where: { bookingId: booking.id },
+      })
+
+      if (!existingFeedback) {
+        await prisma.feedback.create({
+          data: {
+            bookingId: booking.id,
+            tripId: booking.tripId,
+            userId: booking.userId,
+            rating,
+            comment,
+            submittedAt: new Date(booking.bookedAt.getTime() + randomInt(12, 72) * 60 * 60 * 1000), // 12-72 hours after booking
+          },
+        })
+        feedbackCount++
+      }
+    }
+  }
+  console.log(`⭐ Created ${feedbackCount} feedbacks for completed trips`)
+
+  // Create some guest bookings (no userId)
+  let guestBookingCount = 0
+  const upcomingTripsForGuests = await prisma.trip.findMany({
+    where: {
+      departureTime: { gte: new Date() },
+    },
+    take: 10,
+  })
+
+  for (const trip of upcomingTripsForGuests) {
+    const tripSeats = allSeatsForBooking.filter(s => s.busId === trip.busId)
+
+    // Create 1-2 guest bookings per trip
+    const numGuestBookings = randomInt(1, 2)
+
+    for (let g = 0; g < numGuestBookings; g++) {
+      const amount = randomInt(50000, 250000)
+      const guestNames = ['Nguyen Van Guest', 'Tran Thi Guest', 'Le Van Guest', 'Pham Thi Guest']
+      const guestName = guestNames[randomInt(0, guestNames.length - 1)]
+
+      // Generate unique reference code
+      const referenceCode = `GUEST${Date.now()}${randomInt(1000, 9999)}`
+
+      // Random seats for guest
+      const numPassengers = randomInt(1, 2)
+      const passengerDetails = []
+
+      for (let p = 0; p < numPassengers; p++) {
+        const seat = tripSeats[randomInt(0, tripSeats.length - 1)]
+        passengerDetails.push({
+          fullName: `${guestName} ${p + 1}`,
+          documentId: `GUEST${randomInt(100000000, 999999999)}`,
+          seatCode: seat.seatNumber,
+        })
+      }
+
+      await prisma.booking.create({
+        data: {
+          userId: null, // Guest booking
+          tripId: trip.id,
+          totalAmount: amount * passengerDetails.length,
+          status: 'confirmed',
+          bookedAt: new Date(),
+          guestEmail: `guest${randomInt(1000, 9999)}@example.com`,
+          guestPhone: `+8490${randomInt(1000000, 9999999)}`,
+          guestName,
+          referenceCode,
+          accessTokenHash: `hash_${referenceCode}`,
+          payments: {
+            create: {
+              provider: 'payos',
+              amount: amount * passengerDetails.length,
+              status: 'completed',
+              transactionRef: `PAYOS_${Date.now()}_${randomInt(10000, 99999)}`,
+              processedAt: new Date(),
+            },
+          },
+          passengerDetails: {
+            create: passengerDetails,
+          },
+        },
+      })
+      guestBookingCount++
+    }
+  }
+  console.log(`👤 Created ${guestBookingCount} guest bookings (no user account required)`)
+
+  // Create some cancelled bookings with refunds
+  const someBookingsToCancel = await prisma.booking.findMany({
+    where: {
+      status: 'confirmed',
+    },
+    take: 5,
+  })
+
+  let cancelledBookingCount = 0
+  for (const booking of someBookingsToCancel) {
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        status: 'cancelled',
+      },
+    })
+
+    // Create refund payment via PayOS
+    await prisma.payment.create({
+      data: {
+        bookingId: booking.id,
+        provider: 'payos',
+        amount: booking.totalAmount,
+        status: 'refunded',
+        processedAt: new Date(),
+        transactionRef: `PAYOS_REFUND_${Date.now()}_${randomInt(10000, 99999)}`,
+      },
+    })
+
+    // Update user's account balance
+    if (booking.userId) {
+      await prisma.user.update({
+        where: { id: booking.userId },
+        data: {
+          accountBalance: {
+            increment: booking.totalAmount,
+          },
+        },
+      })
+    }
+
+    cancelledBookingCount++
+  }
+  console.log(`❌ Created ${cancelledBookingCount} cancelled bookings with refunds`)
+
+  // Update some trips to different statuses
+  const tripsToUpdate = await prisma.trip.findMany({
+    where: {
+      departureTime: { lt: new Date() },
+    },
+    take: 20,
+  })
+
+  let completedTripCount = 0
+  let departedTripCount = 0
+  for (const trip of tripsToUpdate) {
+    const now = new Date()
+
+    if (trip.departureTime < now && trip.arrivalTime < now) {
+      // Trip has passed both departure and arrival
+      await prisma.trip.update({
+        where: { id: trip.id },
+        data: {
+          status: 'completed',
+          actualDeparture: new Date(trip.departureTime.getTime() + randomInt(-10, 10) * 60 * 1000),
+          actualArrival: new Date(trip.arrivalTime.getTime() + randomInt(-15, 20) * 60 * 1000),
+        },
+      })
+      completedTripCount++
+    } else if (trip.departureTime < now) {
+      // Trip has departed but not arrived
+      await prisma.trip.update({
+        where: { id: trip.id },
+        data: {
+          status: 'departed',
+          actualDeparture: new Date(trip.departureTime.getTime() + randomInt(-10, 10) * 60 * 1000),
+        },
+      })
+      departedTripCount++
+    }
+  }
+  console.log(`🚌 Updated trips: ${completedTripCount} completed, ${departedTripCount} departed`)
+
+  // Create some refresh tokens for users (for testing JWT rotation)
+  let refreshTokenCount = 0
+  for (const user of [...allUsers, adminUser, operatorUser1, operatorUser2]) {
+    const familyId = `family_${user.id}_${Date.now()}`
+
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        token: `refresh_token_${user.id}_${Date.now()}_${randomInt(10000, 99999)}`,
+        familyId,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        isRevoked: false,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        ipAddress: `192.168.1.${randomInt(1, 255)}`,
+      },
+    })
+    refreshTokenCount++
+  }
+  console.log(`🔑 Created ${refreshTokenCount} refresh tokens for users`)
+
+  // Create some pending/failed payments for testing payment flow
+  const someBookingsForFailedPayments = await prisma.booking.findMany({
+    where: {
+      status: 'initiated',
+    },
+    take: 3,
+  })
+
+  let failedPaymentCount = 0
+  for (const booking of someBookingsForFailedPayments) {
+    await prisma.payment.create({
+      data: {
+        bookingId: booking.id,
+        provider: 'payos',
+        amount: booking.totalAmount,
+        status: 'failed',
+        transactionRef: `PAYOS_FAIL_${Date.now()}_${randomInt(10000, 99999)}`,
+        processedAt: new Date(),
+      },
+    })
+    failedPaymentCount++
+  }
+  console.log(`❗ Created ${failedPaymentCount} failed payments for testing`)
+
+  // Link staff users to their operators properly
+  await prisma.user.updateMany({
+    where: { role: 'staff' },
+    data: { operatorId: operators[0].id },
+  })
+  console.log('🔗 Linked all staff users to their operators')
+
+  console.log('\n📊 === COMPREHENSIVE SEED SUMMARY ===')
+  console.log(`👥 Users: ${allUsers.length + 2 + 2} (${allUsers.length} clients, 1 admin, 2 operators)`)
+  console.log(`👨‍✈️ Staff: ${staffRecords.length}`)
+  console.log(`🏢 Operators: ${operators.length} (${operators.filter(o => o.status === 'approved').length} approved)`)
+  console.log(`📍 Stops: ${importedStops.length}`)
+  console.log(`🛣️  Routes: ${createdRoutes.length}`)
+  console.log(`🚌 Buses: ${buses.length}`)
+  console.log(`💺 Total Seats: ${allSeats.length}`)
+  console.log(`🎫 Trips: ${tripCount} (${completedTripCount} completed, ${departedTripCount} departed, rest scheduled)`)
+  console.log(`📝 Bookings: ${bookingSeedCount + guestBookingCount} (${guestBookingCount} guest bookings, ${cancelledBookingCount} cancelled)`)
+  console.log(`💳 Payment Methods: ${paymentMethodCount} (all PayOS)`)
+  console.log(`💵 Payments: ${bookingSeedCount + guestBookingCount + cancelledBookingCount + failedPaymentCount} (${failedPaymentCount} failed)`)
+  console.log(`🔔 Notifications: ${notificationCount}`)
+  console.log(`⭐ Feedbacks: ${feedbackCount}`)
+  console.log(`✅ Boarded Passengers: ${boardedCount}`)
+  console.log(`🪑 Booked Seats: ${bookedSeatCount}`)
+  console.log(`🔑 Refresh Tokens: ${refreshTokenCount}`)
+  console.log(`👥 Staff Assignments: ${staffAssignmentCount} trips`)
+  console.log('\n✅ Database seeding completed with comprehensive test data!')
+  console.log('\n📝 Test Accounts:')
+  console.log('   Admin: admin@busticket.com / Demo@123')
+  console.log('   Operator 1: operator1@greenbus.com / Demo@123')
+  console.log('   Operator 2: operator2@expresstravel.vn / Demo@123')
+  console.log('   Staff: driver1@greenbus.com / Demo@123')
+  console.log('   Client: john.doe@example.com / Demo@123')
+  console.log('\n💡 Features included:')
+  console.log('   ✓ Multiple operators with approved/pending status')
+  console.log('   ✓ Staff assigned to operators and trips')
+  console.log('   ✓ Various bus types (Seater, Sleeper, VIP Cabin, Limousine)')
+  console.log('   ✓ Routes with multiple stops')
+  console.log('   ✓ Trips for next 7 days with different statuses')
+  console.log('   ✓ User bookings and guest bookings')
+  console.log('   ✓ Passengers (some boarded, some pending for staff checkout)')
+  console.log('   ✓ PayOS payment methods and transactions')
+  console.log('   ✓ Notifications (email, sms, push)')
+  console.log('   ✓ Feedbacks and ratings')
+  console.log('   ✓ Cancelled bookings with refunds')
+  console.log('   ✓ Failed payments for testing')
+  console.log('   ✓ Refresh tokens for JWT authentication')
 }
 
 main()

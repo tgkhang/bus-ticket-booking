@@ -560,9 +560,7 @@ export default function StaffTripDetailPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">Revenue</p>
-                    <p className="text-gray-900 dark:text-white text-2xl font-bold">
-                      ₫{(totalRevenue / 1000).toFixed(0)}K
-                    </p>
+                    <p className="text-gray-900 dark:text-white text-2xl font-bold">₫?</p>
                   </div>
                   <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-lg">
                     <DollarSign className="w-6 h-6 text-purple-600 dark:text-purple-400" />
@@ -576,7 +574,7 @@ export default function StaffTripDetailPage() {
           <Card className="mb-6">
             <CardContent className="p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Bus Seat Layout</h3>
-              
+
               <div className="p-6 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
                 <div className="text-center">
                   <Bus className="w-12 h-12 text-gray-400 mx-auto mb-3" />
@@ -584,7 +582,7 @@ export default function StaffTripDetailPage() {
                     View detailed bus seat layout and configuration
                   </p>
                   <Button
-                    onClick={() => router.push(`/staff/busses/${trip.busId}`)}
+                    onClick={() => router.push(`/staff/buses/${trip.busId}`)}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     View Bus Details

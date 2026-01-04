@@ -116,6 +116,7 @@ export default function BusManagementPage() {
     try {
       setLoading(true)
       const response = await listBusesAPI({}, { page: 1, limit: 100 })
+      console.log('Fetched buses:', response.data)
       setBuses(response.data)
     } catch (error) {
       toast.error('Failed to fetch buses')
@@ -332,6 +333,9 @@ export default function BusManagementPage() {
                       Plate Number
                     </th>
                     <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
+                      Operator
+                    </th>
+                    <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
                       Model
                     </th>
                     <th className="px-6 py-3 text-left text-base font-medium text-gray-700 dark:text-gray-300">
@@ -355,6 +359,8 @@ export default function BusManagementPage() {
                       .filter(([_, value]) => value)
                       .map(([key]) => key)
 
+                    const operatorName = operators.find((op) => op.id === bus.operatorId)?.name || 'N/A'
+
                     return (
                       <tr
                         key={bus.id}
@@ -362,6 +368,7 @@ export default function BusManagementPage() {
                         onClick={() => router.push(`/admin/busses/${bus.id}`)}
                       >
                         <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">{bus.plateNumber}</td>
+                        <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">{operatorName}</td>
                         <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">{bus.model}</td>
                         <td className="px-6 py-4 text-base text-gray-900 dark:text-gray-100">
                           {bus.seatCapacity} seats
