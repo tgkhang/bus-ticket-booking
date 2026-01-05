@@ -202,7 +202,8 @@ const confirmWebhook = async (req, res, next) => {
     console.log('Booking email:', booking.guestEmail || 'N/A')
 
     // Process based on payment status
-    if (verifiedData.code === '00' && verifiedData.status === 'PAID') {
+    console.log('[DEBUG] Webhook data - code:', verifiedData.code, 'desc:', verifiedData.desc)
+    if (verifiedData.code === '00' && verifiedData.desc === 'success') {
       console.log('Processing PAID webhook...')
 
       // Update payment status
@@ -233,7 +234,7 @@ const confirmWebhook = async (req, res, next) => {
         console.error('Email error stack:', emailError.stack)
         // Don't fail the webhook if email fails - booking is already confirmed
       }
-    } else if (verifiedData.code === '01' && verifiedData.status === 'CANCELLED') {
+    } else if (verifiedData.code === '01' && verifiedData.desc === 'cancelled') {
       console.log('Processing CANCELLED webhook...')
 
       // Update payment status
