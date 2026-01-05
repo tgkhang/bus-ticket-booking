@@ -65,7 +65,7 @@ function SuccessContent() {
               }
             }
 
-            const maxAttempts = 4
+            const maxAttempts = 10
             let attempts = 0
             console.log(`[Payment Success - Guest] Starting to poll booking status (max ${maxAttempts} attempts)`)
 
