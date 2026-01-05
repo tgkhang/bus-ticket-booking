@@ -120,26 +120,43 @@ const downloadETicket = async (bookingId, userId) => {
 }
 
 const sendETicketEmail = async (bookingId, userId) => {
+  console.log('====== SEND E-TICKET EMAIL ======')
+  console.log('BookingId:', bookingId)
+  console.log('UserId:', userId)
+
   const booking = await eTicketModel.getBookingForETicket(bookingId)
   if (!booking) {
+    console.error('✗ Booking not found for e-ticket:', bookingId)
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
   }
+  console.log('✓ Booking found for e-ticket')
+
   // Skip user ownership check for testing when userId is not provided
   if (userId && booking.userId !== userId) {
+    console.error('✗ User does not own this booking')
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found or access denied')
   }
 
   const toEmail = booking?.user?.email || booking?.guestEmail
+  console.log('Recipient email:', toEmail)
+
   if (!toEmail) {
+    console.error('✗ No email found for this booking')
     throw new ApiError(StatusCodes.BAD_REQUEST, 'No email found for this booking')
   }
 
+  console.log('Generating PDF...')
   const pdfBuffer = await generateETicketPDF(booking)
+  console.log('✓ PDF generated, size:', pdfBuffer.length, 'bytes')
+
+  console.log('Sending email via Brevo...')
   await BrevoEmailProvider.sendETicket({
     to: toEmail,
     booking,
     pdfBuffer,
   })
+  console.log('✓ Email sent successfully to:', toEmail)
+
   return { success: true }
 }
 
