@@ -334,13 +334,18 @@ const confirmBooking = async (bookingId, userId, paymentData) => {
 
   // Create payment and update booking status in transaction
   const result = await prisma.$transaction(async (tx) => {
-    // Create payment record
-    await tx.payment.create({
-      data: {
+    // Create payment record (or update if it already exists)
+    await tx.payment.upsert({
+      where: { transactionRef: paymentData.transactionRef },
+      create: {
         bookingId,
         provider: paymentData.provider || 'card',
         transactionRef: paymentData.transactionRef,
         amount: booking.totalAmount,
+        status: 'completed',
+        processedAt: new Date(),
+      },
+      update: {
         status: 'completed',
         processedAt: new Date(),
       },
