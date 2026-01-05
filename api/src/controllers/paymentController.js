@@ -159,10 +159,13 @@ const confirmWebhook = async (req, res, next) => {
   const webhookData = req.body
 
   try {
+    console.log('====== WEBHOOK RECEIVED ======')
+    console.log('Webhook data:', JSON.stringify(webhookData, null, 2))
+
     // Verify webhook signature using PayOS SDK
     const verifiedData = await payOS.webhooks.verify(webhookData)
-
-    console.log('Webhook verified:', verifiedData)
+    console.log('✓ Webhook signature verified')
+    console.log('Verified data:', JSON.stringify(verifiedData, null, 2))
 
     // Find payment record by orderCode (stored in transactionRef)
     const prisma = GET_DB()
@@ -172,26 +175,36 @@ const confirmWebhook = async (req, res, next) => {
     })
 
     if (!payment) {
-      console.error('Payment not found for orderCode:', verifiedData.orderCode)
+      console.error('✗ Payment not found for orderCode:', verifiedData.orderCode)
       return res.status(StatusCodes.OK).json({
         success: false,
         message: 'Payment record not found',
       })
     }
 
+    console.log('✓ Payment record found:', payment.id)
+    console.log('Payment status:', payment.status)
+
     const bookingId = payment.bookingId
     const booking = payment.booking
 
     if (!booking) {
-      console.error('Booking not found:', bookingId)
+      console.error('✗ Booking not found:', bookingId)
       return res.status(StatusCodes.OK).json({
         success: false,
         message: 'Booking not found',
       })
     }
 
+    console.log('✓ Booking found:', bookingId)
+    console.log('Booking status:', booking.status)
+    console.log('Booking userId:', booking.userId)
+    console.log('Booking email:', booking.guestEmail || 'N/A')
+
     // Process based on payment status
     if (verifiedData.code === '00' && verifiedData.status === 'PAID') {
+      console.log('Processing PAID webhook...')
+
       // Update payment status
       await prisma.payment.update({
         where: { id: payment.id },
@@ -200,24 +213,29 @@ const confirmWebhook = async (req, res, next) => {
           processedAt: new Date(),
         },
       })
+      console.log('✓ Payment status updated to completed')
 
       // Payment successful - confirm booking
+      console.log('Confirming booking...')
       await bookingService.confirmBooking(bookingId, booking.userId, {
         provider: 'payos',
         transactionRef: String(verifiedData.orderCode),
       })
-
-      console.log('Booking confirmed via webhook:', bookingId)
+      console.log('✓ Booking confirmed successfully:', bookingId)
 
       // Send e-ticket email (idempotent - won't fail if already sent)
       try {
-        await eTicketService.sendETicketEmail(bookingId, booking.userId || null)       // Pass null for guest bookings
-        console.log('E-ticket sent via webhook:', bookingId)
+        console.log('Sending e-ticket email...')
+        await eTicketService.sendETicketEmail(bookingId, booking.userId || null)
+        console.log('✓ E-ticket email sent successfully:', bookingId)
       } catch (emailError) {
-        console.error('Failed to send e-ticket via webhook:', emailError)
+        console.error('✗ Failed to send e-ticket email:', emailError.message)
+        console.error('Email error stack:', emailError.stack)
         // Don't fail the webhook if email fails - booking is already confirmed
       }
     } else if (verifiedData.code === '01' && verifiedData.status === 'CANCELLED') {
+      console.log('Processing CANCELLED webhook...')
+
       // Update payment status
       await prisma.payment.update({
         where: { id: payment.id },
@@ -226,11 +244,12 @@ const confirmWebhook = async (req, res, next) => {
           processedAt: new Date(),
         },
       })
+      console.log('✓ Payment status updated to failed')
 
       // Payment cancelled - cancel booking and release seats
+      console.log('Cancelling booking...')
       await bookingService.cancelBooking(bookingId, booking.userId)
-
-      console.log('Booking cancelled via webhook:', bookingId)
+      console.log('✓ Booking cancelled successfully:', bookingId)
     }
 
     res.status(StatusCodes.OK).json({
@@ -253,7 +272,9 @@ const confirmWebhook = async (req, res, next) => {
 // Dev: Manual webhook trigger (bypass PayOS webhook call)
 const devConfirmBooking = async (req, res, next) => {
   try {
+    console.log('====== DEV CONFIRM BOOKING ======')
     const { bookingId, orderCode } = req.body
+    console.log('Request:', { bookingId, orderCode })
 
     if (!bookingId || !orderCode) {
       return res.status(StatusCodes.BAD_REQUEST).json({
@@ -268,26 +289,33 @@ const devConfirmBooking = async (req, res, next) => {
     })
 
     if (!booking) {
+      console.error('✗ Booking not found:', bookingId)
       return res.status(StatusCodes.NOT_FOUND).json({
         success: false,
         message: 'Booking not found',
       })
     }
 
+    console.log('✓ Booking found:', bookingId)
+    console.log('Booking status:', booking.status)
+    console.log('Booking userId:', booking.userId)
+
     // Confirm booking
+    console.log('Confirming booking...')
     await bookingService.confirmBooking(bookingId, booking.userId, {
       provider: 'payos',
       transactionRef: String(orderCode),
     })
-
-    console.log('[DEV] Booking confirmed manually:', bookingId)
+    console.log('✓ [DEV] Booking confirmed successfully:', bookingId)
 
     // Send e-ticket email
     try {
+      console.log('Sending e-ticket email...')
       await eTicketService.sendETicketEmail(bookingId, booking.userId || null)
-      console.log('[DEV] E-ticket sent:', bookingId)
+      console.log('✓ [DEV] E-ticket email sent successfully:', bookingId)
     } catch (emailError) {
-      console.error('[DEV] Failed to send e-ticket:', emailError)
+      console.error('✗ [DEV] Failed to send e-ticket email:', emailError.message)
+      console.error('Email error stack:', emailError.stack)
     }
 
     res.status(StatusCodes.OK).json({
@@ -296,6 +324,8 @@ const devConfirmBooking = async (req, res, next) => {
       bookingId,
     })
   } catch (error) {
+    console.error('✗ [DEV] Error in devConfirmBooking:', error.message)
+    console.error('Error stack:', error.stack)
     next(error)
   }
 }
