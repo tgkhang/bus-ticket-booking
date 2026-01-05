@@ -309,36 +309,48 @@ const getSeatStatusesByTripId = async (tripId) => {
 }
 
 const confirmBooking = async (bookingId, userId, paymentData) => {
+  console.log('====== CONFIRM BOOKING ======')
+  console.log('BookingId:', bookingId)
+  console.log('UserId:', userId)
+  console.log('PaymentData:', paymentData)
+
   const prisma = GET_DB()
 
   const booking = await bookingModel.getBookingById(bookingId)
   sanitizeBooking(booking)
 
   if (!booking) {
+    console.error('✗ Booking not found:', bookingId)
     throw new ApiError(StatusCodes.NOT_FOUND, 'Booking not found')
   }
+  console.log('✓ Booking found, status:', booking.status)
 
   // For authenticated users, verify ownership
   // For guest bookings (both booking.userId and userId are null), skip check
   if (booking.userId && booking.userId !== userId) {
+    console.error('✗ User does not own booking')
     throw new ApiError(StatusCodes.FORBIDDEN, 'You do not have permission to confirm this booking')
   }
 
   // Idempotency: If already confirmed, return the existing booking
   if (booking.status === 'confirmed') {
-    console.log('Booking already confirmed (idempotent):', bookingId)
+    console.log('ℹ Booking already confirmed (idempotent):', bookingId)
     return booking
   }
 
   if (booking.status !== 'pending') {
+    console.error('✗ Booking is not pending, status:', booking.status)
     throw new ApiError(StatusCodes.BAD_REQUEST, `Booking is not in pending status (current status: ${booking.status})`)
   }
 
   // Create payment and update booking status in transaction
+  console.log('Starting transaction...')
   const result = await prisma.$transaction(async (tx) => {
-    // Create payment record
-    await tx.payment.create({
-      data: {
+    console.log('Upserting payment record...')
+    // Create or update payment record (upsert to handle duplicate transactionRef)
+    await tx.payment.upsert({
+      where: { transactionRef: paymentData.transactionRef },
+      create: {
         bookingId,
         provider: paymentData.provider || 'card',
         transactionRef: paymentData.transactionRef,
@@ -346,9 +358,15 @@ const confirmBooking = async (bookingId, userId, paymentData) => {
         status: 'completed',
         processedAt: new Date(),
       },
+      update: {
+        status: 'completed',
+        processedAt: new Date(),
+      },
     })
+    console.log('✓ Payment record upserted')
 
     // Update booking status
+    console.log('Updating booking status to confirmed...')
     const updatedBooking = await tx.booking.update({
       where: { id: bookingId },
       data: { status: 'confirmed' },
@@ -369,8 +387,11 @@ const confirmBooking = async (bookingId, userId, paymentData) => {
       },
     })
 
+    console.log('✓ Booking status updated to confirmed')
+
     // Get seat IDs from passenger details to mark as booked
     const seatCodes = booking.passengerDetails.map((p) => p.seatCode)
+    console.log('Finding seat IDs for codes:', seatCodes)
 
     // Find seat IDs from seat codes
     const seats = await tx.seat.findMany({
@@ -381,9 +402,11 @@ const confirmBooking = async (bookingId, userId, paymentData) => {
     })
 
     const seatIds = seats.map((s) => s.id)
+    console.log('Found seat IDs:', seatIds)
 
     // Mark seats as booked and remove lock
     if (seatIds.length > 0) {
+      console.log('Marking seats as booked...')
       await tx.seatStatus.updateMany({
         where: {
           tripId: booking.tripId,
@@ -394,6 +417,7 @@ const confirmBooking = async (bookingId, userId, paymentData) => {
           lockedUntil: null,
         },
       })
+      console.log('✓ Seats marked as booked')
     }
 
     // Attach meta info for controller broadcast
@@ -404,6 +428,7 @@ const confirmBooking = async (bookingId, userId, paymentData) => {
     return resultWithMeta
   })
 
+  console.log('✓ Transaction completed successfully')
   sanitizeBooking(result)
 
   return result
