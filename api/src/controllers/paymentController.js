@@ -62,6 +62,17 @@ const createPaymentLink = async (req, res, next) => {
   // Use paymentRequests.create() method from PayOS SDK
   const paymentLinkResponse = await payOS.paymentRequests.create(body)
 
+  // Create payment record to store orderCode → bookingId mapping
+  await prisma.payment.create({
+    data: {
+      bookingId,
+      provider: 'payos',
+      transactionRef: String(orderCode),
+      amount: booking.totalAmount,
+      status: 'pending',
+    },
+  })
+
   res.status(StatusCodes.CREATED).json({
     success: true,
     checkoutUrl: paymentLinkResponse.checkoutUrl,
@@ -112,6 +123,18 @@ const createPaymentLinkPublic = async (req, res, next) => {
 
   const paymentLinkResponse = await payOS.paymentRequests.create(body)
 
+  // Create payment record to store orderCode → bookingId mapping
+  const prisma = GET_DB()
+  await prisma.payment.create({
+    data: {
+      bookingId,
+      provider: 'payos',
+      transactionRef: String(orderCode),
+      amount: booking.totalAmount,
+      status: 'pending',
+    },
+  })
+
   res.status(StatusCodes.CREATED).json({
     success: true,
     checkoutUrl: paymentLinkResponse.checkoutUrl,
@@ -141,28 +164,23 @@ const confirmWebhook = async (req, res, next) => {
 
     console.log('Webhook verified:', verifiedData)
 
-    // Find booking by orderCode stored in description or custom field
-    // Since PayOS doesn't have a built-in bookingId field, we need to find it from the return URL
+    // Find payment record by orderCode (stored in transactionRef)
     const prisma = GET_DB()
-    const paymentInfo = await payOS.paymentRequests.get(verifiedData.orderCode)
+    const payment = await prisma.payment.findUnique({
+      where: { transactionRef: String(verifiedData.orderCode) },
+      include: { booking: true },
+    })
 
-    // Extract bookingId from returnUrl or cancelUrl
-    const returnUrl = paymentInfo.returnUrl || ''
-    const bookingIdMatch = returnUrl.match(/bookingId=([^&]+)/)
-    const bookingId = bookingIdMatch ? bookingIdMatch[1] : null
-
-    if (!bookingId) {
-      console.error('Could not extract bookingId from webhook data')
+    if (!payment) {
+      console.error('Payment not found for orderCode:', verifiedData.orderCode)
       return res.status(StatusCodes.OK).json({
         success: false,
-        message: 'BookingId not found in webhook data',
+        message: 'Payment record not found',
       })
     }
 
-    // Get booking to find userId
-    const booking = await prisma.booking.findUnique({
-      where: { id: bookingId },
-    })
+    const bookingId = payment.bookingId
+    const booking = payment.booking
 
     if (!booking) {
       console.error('Booking not found:', bookingId)
@@ -174,6 +192,15 @@ const confirmWebhook = async (req, res, next) => {
 
     // Process based on payment status
     if (verifiedData.code === '00' && verifiedData.status === 'PAID') {
+      // Update payment status
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'completed',
+          processedAt: new Date(),
+        },
+      })
+
       // Payment successful - confirm booking
       await bookingService.confirmBooking(bookingId, booking.userId, {
         provider: 'payos',
@@ -191,6 +218,15 @@ const confirmWebhook = async (req, res, next) => {
         // Don't fail the webhook if email fails - booking is already confirmed
       }
     } else if (verifiedData.code === '01' && verifiedData.status === 'CANCELLED') {
+      // Update payment status
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'failed',
+          processedAt: new Date(),
+        },
+      })
+
       // Payment cancelled - cancel booking and release seats
       await bookingService.cancelBooking(bookingId, booking.userId)
 
