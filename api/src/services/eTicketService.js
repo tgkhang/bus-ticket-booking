@@ -46,12 +46,12 @@ const generateETicketPDF = async (booking) => {
       doc.fillColor('#343a40').fontSize(11).text('Scan for', qrX, qrY - 25, { width: qrSize, align: 'center' });
       doc.text('Verification', qrX, qrY - 13, { width: qrSize, align: 'center' });
       const domain = env.BUILD_MODE === 'dev' ? env.WEBSITE_DOMAIN_DEVELOPMENT : env.WEBSITE_DOMAIN_PRODUCTION;
-      const qrUrl = `${domain}/admin/verify-ticket?bookingId=${booking.id}`;
+      const qrUrl = `${domain}/booking/confirmation?bookingId=${booking.id}&bookingRef=${booking.referenceCode || booking.id}`;
       const qrDataUrl = await QRCode.toDataURL(qrUrl);
       const qrBase64 = qrDataUrl.replace(/^data:image\/png;base64,/, '');
       const qrBuffer = Buffer.from(qrBase64, 'base64');
       doc.image(qrBuffer, qrX, qrY, { fit: [qrSize, qrSize] });
-      doc.fillColor('#6c757d').fontSize(10).text('Scan at boarding (admin only)', qrX, qrY + qrSize + 4, { width: qrSize, align: 'center' });
+      doc.fillColor('#6c757d').fontSize(10).text('Scan at boarding', qrX, qrY + qrSize + 4, { width: qrSize, align: 'center' });
 
       // Left column content
       const leftX = doc.options.margin;

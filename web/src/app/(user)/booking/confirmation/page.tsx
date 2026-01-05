@@ -266,7 +266,7 @@ function ConfirmationContent() {
                 <div className="text-center">
                   {booking && (
                     <QRCode
-                      value={`https://domain.com/admin/verify-ticket?bookingId=${booking.id}`}
+                      value={`${typeof window !== 'undefined' ? window.location.origin : 'https://busbook-one.vercel.app'}/booking/confirmation?bookingId=${booking.id}&bookingRef=${booking.referenceCode || booking.id}`}
                       size={160}
                     />
                   )}
